@@ -1,24 +1,29 @@
-import { SignInPage, Testimonial } from "@/components/ui/sign-in";
+import { SignInPage, RoleInfo } from "@/components/ui/sign-in";
 import { useToast } from "@/hooks/use-toast";
 
-const testimonials: Testimonial[] = [
+const roles: RoleInfo[] = [
   {
-    avatarSrc: "https://randomuser.me/api/portraits/women/44.jpg",
-    name: "María González",
-    handle: "@mgonzalez_tercol",
-    text: "El sistema de inventario ha optimizado nuestros conteos. Ahora tardamos la mitad del tiempo."
+    role: "Superadmin",
+    features: [
+      "Carga la data maestra",
+      "Tiene visión global",
+      "Valida los ajustes finales y define tolerancias"
+    ]
   },
   {
-    avatarSrc: "https://randomuser.me/api/portraits/men/32.jpg",
-    name: "Carlos Rodríguez",
-    handle: "@crodriguez_lider",
-    text: "Como líder de bodega, la plataforma me permite coordinar mi equipo de manera eficiente."
+    role: "Administradores",
+    features: [
+      "Asigna ubicaciones específicas a los Supervisores",
+      "Asigna tareas a los operarios",
+      "Puede exportar o imprimir listado de responsables"
+    ]
   },
   {
-    avatarSrc: "https://randomuser.me/api/portraits/men/67.jpg",
-    name: "Andrés Martínez",
-    handle: "@amartinez_admin",
-    text: "La trazabilidad de los conteos y la validación en tiempo real son increíbles."
+    role: "Supervisores / Líderes de bodega",
+    features: [
+      "Encargado de transcribir cantidades contadas físicas",
+      "Puede exportar o imprimir listado de responsables"
+    ]
   },
 ];
 
@@ -61,7 +66,7 @@ const Index = () => {
         }
         description="Accede a tu cuenta para gestionar el inventario semestral 2026"
         heroImageSrc="https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=2160&q=80"
-        testimonials={testimonials}
+        roles={roles}
         onSignIn={handleSignIn}
         onResetPassword={handleResetPassword}
         onCreateAccount={handleCreateAccount}
