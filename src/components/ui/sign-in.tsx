@@ -3,18 +3,16 @@ import { Eye, EyeOff, Package } from 'lucide-react';
 
 // --- TYPE DEFINITIONS ---
 
-export interface Testimonial {
-  avatarSrc: string;
-  name: string;
-  handle: string;
-  text: string;
+export interface RoleInfo {
+  role: string;
+  features: string[];
 }
 
 interface SignInPageProps {
   title?: React.ReactNode;
   description?: React.ReactNode;
   heroImageSrc?: string;
-  testimonials?: Testimonial[];
+  roles?: RoleInfo[];
   onSignIn?: (event: React.FormEvent<HTMLFormElement>) => void;
   onResetPassword?: () => void;
   onCreateAccount?: () => void;
@@ -28,14 +26,17 @@ const GlassInputWrapper = ({ children }: { children: React.ReactNode }) => (
   </div>
 );
 
-const TestimonialCard = ({ testimonial, delay }: { testimonial: Testimonial, delay: string }) => (
-  <div className={`animate-testimonial ${delay} flex items-start gap-3 rounded-3xl bg-card/40 backdrop-blur-xl border border-white/10 p-5 w-64`}>
-    <img src={testimonial.avatarSrc} className="h-10 w-10 object-cover rounded-2xl" alt="avatar" />
-    <div className="text-sm leading-snug">
-      <p className="flex items-center gap-1 font-medium text-white">{testimonial.name}</p>
-      <p className="text-white/70">{testimonial.handle}</p>
-      <p className="mt-1 text-white/90">{testimonial.text}</p>
-    </div>
+const RoleCard = ({ role, delay }: { role: RoleInfo, delay: string }) => (
+  <div className={`animate-testimonial ${delay} rounded-2xl bg-card/40 backdrop-blur-xl border border-white/10 p-4 w-72`}>
+    <p className="font-semibold text-white text-sm mb-2">{role.role}</p>
+    <ul className="space-y-1">
+      {role.features.map((feature, idx) => (
+        <li key={idx} className="flex items-start gap-2 text-xs text-white/85">
+          <span className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
+          {feature}
+        </li>
+      ))}
+    </ul>
   </div>
 );
 
@@ -45,7 +46,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({
   title = <span className="font-light text-foreground tracking-tighter">Bienvenido</span>,
   description = "Accede a tu cuenta para gestionar el inventario",
   heroImageSrc,
-  testimonials = [],
+  roles = [],
   onSignIn,
   onResetPassword,
   onCreateAccount,
@@ -162,19 +163,15 @@ export const SignInPage: React.FC<SignInPageProps> = ({
             <div className="absolute inset-0 rounded-3xl bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
           </div>
           
-          {testimonials.length > 0 && (
-            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-4 px-8 w-full justify-center z-10">
-              <TestimonialCard testimonial={testimonials[0]} delay="animate-delay-1000" />
-              {testimonials[1] && (
-                <div className="hidden xl:flex">
-                  <TestimonialCard testimonial={testimonials[1]} delay="animate-delay-1200" />
-                </div>
-              )}
-              {testimonials[2] && (
-                <div className="hidden 2xl:flex">
-                  <TestimonialCard testimonial={testimonials[2]} delay="animate-delay-1400" />
-                </div>
-              )}
+          {roles.length > 0 && (
+            <div className="absolute bottom-8 left-8 right-8 flex gap-3 justify-center flex-wrap z-10">
+              {roles.map((role, idx) => (
+                <RoleCard 
+                  key={role.role} 
+                  role={role} 
+                  delay={`animate-delay-${1000 + idx * 200}`} 
+                />
+              ))}
             </div>
           )}
         </section>
