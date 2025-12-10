@@ -80,7 +80,6 @@ export type Database = {
           master_reference: string
           operario_id: string | null
           quantity_counted: number | null
-          responsible_name: string | null
           updated_at: string | null
         }
         Insert: {
@@ -94,7 +93,6 @@ export type Database = {
           master_reference: string
           operario_id?: string | null
           quantity_counted?: number | null
-          responsible_name?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -108,7 +106,6 @@ export type Database = {
           master_reference?: string
           operario_id?: string | null
           quantity_counted?: number | null
-          responsible_name?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -287,6 +284,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_superadmin: { Args: { _user_id: string }; Returns: boolean }
       validate_and_close_round: {
         Args: { _admin_id: string; _reference: string }
         Returns: Json

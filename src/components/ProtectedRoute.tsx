@@ -1,8 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, AppRole } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
-
-type AppRole = 'admin' | 'supervisor' | 'operario';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -31,6 +29,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
+  // If allowedRoles specified and user has a role, check if it's allowed
   if (allowedRoles && role && !allowedRoles.includes(role)) {
     return <Navigate to="/dashboard" replace />;
   }

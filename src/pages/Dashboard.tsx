@@ -2,12 +2,13 @@ import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import SuperadminDashboard from './SuperadminDashboard';
 import AdminDashboard from './AdminDashboard';
 import SupervisorDashboard from './SupervisorDashboard';
-import OperarioDashboard from './OperarioDashboard';
+import PendingApproval from './PendingApproval';
 
 const Dashboard: React.FC = () => {
-  const { role, loading } = useAuth();
+  const { role, loading, user } = useAuth();
 
   if (loading) {
     return (
@@ -17,16 +18,22 @@ const Dashboard: React.FC = () => {
     );
   }
 
+  // If no user, redirect to auth
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+
   // Redirect to role-specific dashboard
   switch (role) {
+    case 'superadmin':
+      return <SuperadminDashboard />;
     case 'admin':
       return <AdminDashboard />;
     case 'supervisor':
       return <SupervisorDashboard />;
-    case 'operario':
-      return <OperarioDashboard />;
     default:
-      return <Navigate to="/auth" replace />;
+      // User has no role or role is null - show pending approval
+      return <PendingApproval />;
   }
 };
 
