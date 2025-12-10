@@ -14,6 +14,203 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_logs: {
+        Row: {
+          action_type: string
+          created_at: string | null
+          id: string
+          master_reference: string | null
+          new_data: Json | null
+          notes: string | null
+          previous_data: Json | null
+          round_number: number | null
+          task_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action_type: string
+          created_at?: string | null
+          id?: string
+          master_reference?: string | null
+          new_data?: Json | null
+          notes?: string | null
+          previous_data?: Json | null
+          round_number?: number | null
+          task_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action_type?: string
+          created_at?: string | null
+          id?: string
+          master_reference?: string | null
+          new_data?: Json | null
+          notes?: string | null
+          previous_data?: Json | null
+          round_number?: number | null
+          task_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_master_reference_fkey"
+            columns: ["master_reference"]
+            isOneToOne: false
+            referencedRelation: "inventory_master"
+            referencedColumns: ["reference"]
+          },
+          {
+            foreignKeyName: "audit_logs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "count_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      count_tasks: {
+        Row: {
+          assigned_supervisor_id: string | null
+          audit_round: number
+          created_at: string | null
+          id: string
+          is_completed: boolean | null
+          location_detail: string | null
+          location_name: string
+          master_reference: string
+          operario_id: string | null
+          quantity_counted: number | null
+          responsible_name: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_supervisor_id?: string | null
+          audit_round?: number
+          created_at?: string | null
+          id?: string
+          is_completed?: boolean | null
+          location_detail?: string | null
+          location_name: string
+          master_reference: string
+          operario_id?: string | null
+          quantity_counted?: number | null
+          responsible_name?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_supervisor_id?: string | null
+          audit_round?: number
+          created_at?: string | null
+          id?: string
+          is_completed?: boolean | null
+          location_detail?: string | null
+          location_name?: string
+          master_reference?: string
+          operario_id?: string | null
+          quantity_counted?: number | null
+          responsible_name?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "count_tasks_master_reference_fkey"
+            columns: ["master_reference"]
+            isOneToOne: false
+            referencedRelation: "inventory_master"
+            referencedColumns: ["reference"]
+          },
+          {
+            foreignKeyName: "count_tasks_operario_id_fkey"
+            columns: ["operario_id"]
+            isOneToOne: false
+            referencedRelation: "operarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_master: {
+        Row: {
+          assigned_admin_id: string | null
+          audit_round: number | null
+          count_history: Json | null
+          created_at: string | null
+          description: string | null
+          erp_alm: number | null
+          erp_pld: number | null
+          erp_plr: number | null
+          erp_target_qty: number | null
+          erp_za: number | null
+          material_type: Database["public"]["Enums"]["material_type"]
+          reference: string
+          status_slug: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_admin_id?: string | null
+          audit_round?: number | null
+          count_history?: Json | null
+          created_at?: string | null
+          description?: string | null
+          erp_alm?: number | null
+          erp_pld?: number | null
+          erp_plr?: number | null
+          erp_target_qty?: number | null
+          erp_za?: number | null
+          material_type: Database["public"]["Enums"]["material_type"]
+          reference: string
+          status_slug?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_admin_id?: string | null
+          audit_round?: number | null
+          count_history?: Json | null
+          created_at?: string | null
+          description?: string | null
+          erp_alm?: number | null
+          erp_pld?: number | null
+          erp_plr?: number | null
+          erp_target_qty?: number | null
+          erp_za?: number | null
+          material_type?: Database["public"]["Enums"]["material_type"]
+          reference?: string
+          status_slug?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_master_status_slug_fkey"
+            columns: ["status_slug"]
+            isOneToOne: false
+            referencedRelation: "task_statuses"
+            referencedColumns: ["slug"]
+          },
+        ]
+      }
+      operarios: {
+        Row: {
+          created_at: string | null
+          document_id: string | null
+          full_name: string
+          id: string
+          is_active: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          document_id?: string | null
+          full_name: string
+          id?: string
+          is_active?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          document_id?: string | null
+          full_name?: string
+          id?: string
+          is_active?: boolean | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string | null
@@ -32,6 +229,24 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+        }
+        Relationships: []
+      }
+      task_statuses: {
+        Row: {
+          is_final: boolean | null
+          label: string
+          slug: string
+        }
+        Insert: {
+          is_final?: boolean | null
+          label: string
+          slug: string
+        }
+        Update: {
+          is_final?: boolean | null
+          label?: string
+          slug?: string
         }
         Relationships: []
       }
@@ -75,6 +290,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "supervisor" | "operario"
+      material_type: "MP" | "PP"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -203,6 +419,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "supervisor", "operario"],
+      material_type: ["MP", "PP"],
     },
   },
 } as const
