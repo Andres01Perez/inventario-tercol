@@ -287,6 +287,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      validate_and_close_round: {
+        Args: { _admin_id: string; _reference: string }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin" | "supervisor" | "operario"
