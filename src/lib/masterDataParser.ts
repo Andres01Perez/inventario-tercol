@@ -53,7 +53,41 @@ function parseNumber(value: unknown): number {
   if (value === null || value === undefined || value === '') {
     return 0;
   }
-  const num = typeof value === 'number' ? value : parseFloat(String(value).replace(',', '.'));
+  
+  // If already a number, return directly
+  if (typeof value === 'number') {
+    return value;
+  }
+  
+  let str = String(value).trim();
+  
+  // Detect regional format: Spanish (1.234,56) vs American (1,234.56)
+  const lastComma = str.lastIndexOf(',');
+  const lastDot = str.lastIndexOf('.');
+  
+  if (lastComma > -1 && lastDot > -1) {
+    // Both present - determine which is decimal
+    if (lastComma > lastDot) {
+      // Spanish format: 1.234,56 → comma is decimal
+      str = str.replace(/\./g, '').replace(',', '.');
+    } else {
+      // American format: 1,234.56 → dot is decimal
+      str = str.replace(/,/g, '');
+    }
+  } else if (lastComma > -1 && lastDot === -1) {
+    // Only commas: could be decimal (1,5) or thousands (1,234)
+    const afterComma = str.substring(lastComma + 1);
+    if (afterComma.length <= 2) {
+      // It's decimal: 1,5 → 1.5
+      str = str.replace(',', '.');
+    } else {
+      // It's thousands separator: 1,234 → 1234
+      str = str.replace(/,/g, '');
+    }
+  }
+  // If only dot(s), parseFloat handles it correctly
+  
+  const num = parseFloat(str);
   return isNaN(num) ? 0 : num;
 }
 
