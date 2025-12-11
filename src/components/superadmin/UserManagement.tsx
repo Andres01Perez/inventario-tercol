@@ -5,11 +5,11 @@ import {
   Users, 
   Search, 
   Shield, 
-  UserCog, 
   User,
   Loader2,
-  Check,
-  X
+  X,
+  Package,
+  Boxes
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,11 +38,12 @@ interface UserWithRole {
   role: string | null;
 }
 
-type AppRoleOption = 'superadmin' | 'admin' | 'supervisor' | 'none';
+type AppRoleOption = 'superadmin' | 'admin_mp' | 'admin_pp' | 'supervisor' | 'none';
 
 const roleLabels: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   superadmin: { label: 'Superadmin', color: 'bg-purple-500/10 text-purple-500 border-purple-500/30', icon: Shield },
-  admin: { label: 'Admin', color: 'bg-primary/10 text-primary border-primary/30', icon: UserCog },
+  admin_mp: { label: 'Admin MP', color: 'bg-orange-500/10 text-orange-500 border-orange-500/30', icon: Package },
+  admin_pp: { label: 'Admin PP', color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30', icon: Boxes },
   supervisor: { label: 'Supervisor', color: 'bg-blue-500/10 text-blue-500 border-blue-500/30', icon: User },
   none: { label: 'Sin Rol', color: 'bg-muted text-muted-foreground border-muted', icon: X },
 };
@@ -258,7 +259,8 @@ const UserManagement: React.FC = () => {
                         <SelectContent>
                           <SelectItem value="none">Sin Rol</SelectItem>
                           <SelectItem value="supervisor">Supervisor</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="admin_mp">Admin MP (Materia Prima)</SelectItem>
+                          <SelectItem value="admin_pp">Admin PP (Producto en Proceso)</SelectItem>
                           <SelectItem value="superadmin">Superadmin</SelectItem>
                         </SelectContent>
                       </Select>

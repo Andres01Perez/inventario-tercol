@@ -27,7 +27,8 @@ const Dashboard: React.FC = () => {
   switch (role) {
     case 'superadmin':
       return <SuperadminDashboard />;
-    case 'admin':
+    case 'admin_mp':
+    case 'admin_pp':
       return <AdminDashboard />;
     case 'supervisor':
       return <SupervisorDashboard />;
