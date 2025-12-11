@@ -433,17 +433,17 @@ const MasterDataImport: React.FC = () => {
 
           {/* Preview Table */}
           <div className="rounded-lg border border-border overflow-hidden">
-            <div className="max-h-80 overflow-auto">
-              <Table>
-                <TableHeader className="sticky top-0 bg-card">
+            <div className="max-h-80 overflow-x-auto overflow-y-auto">
+              <Table className="min-w-[800px]">
+                <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
-                    <TableHead>Referencia</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead className="text-right">Alm</TableHead>
-                    <TableHead className="text-right">PLd</TableHead>
-                    <TableHead className="text-right">PLr</TableHead>
-                    <TableHead className="text-right">ZA</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="min-w-[180px] font-mono text-xs bg-muted/50">reference</TableHead>
+                    <TableHead className="min-w-[100px] font-mono text-xs bg-muted/50">material_type</TableHead>
+                    <TableHead className="min-w-[90px] text-right font-mono text-xs bg-muted/50">erp_alm</TableHead>
+                    <TableHead className="min-w-[90px] text-right font-mono text-xs bg-muted/50">erp_pld</TableHead>
+                    <TableHead className="min-w-[90px] text-right font-mono text-xs bg-muted/50">erp_plr</TableHead>
+                    <TableHead className="min-w-[90px] text-right font-mono text-xs bg-muted/50">erp_za</TableHead>
+                    <TableHead className="min-w-[110px] text-right font-mono text-xs bg-muted/50">erp_target_qty</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -461,11 +461,11 @@ const MasterDataImport: React.FC = () => {
                           {row.material_type}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">{row.erp_alm}</TableCell>
-                      <TableCell className="text-right tabular-nums">{row.erp_pld}</TableCell>
-                      <TableCell className="text-right tabular-nums">{row.erp_plr}</TableCell>
-                      <TableCell className="text-right tabular-nums">{row.erp_za}</TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">{row.erp_target_qty}</TableCell>
+                      <TableCell className="text-right tabular-nums">{row.erp_alm.toLocaleString('es-CO')}</TableCell>
+                      <TableCell className="text-right tabular-nums">{row.erp_pld.toLocaleString('es-CO')}</TableCell>
+                      <TableCell className="text-right tabular-nums">{row.erp_plr.toLocaleString('es-CO')}</TableCell>
+                      <TableCell className="text-right tabular-nums">{row.erp_za.toLocaleString('es-CO')}</TableCell>
+                      <TableCell className="text-right tabular-nums font-medium">{row.erp_target_qty.toLocaleString('es-CO')}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
