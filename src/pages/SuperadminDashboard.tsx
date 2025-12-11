@@ -15,8 +15,9 @@ import {
 import { Button } from '@/components/ui/button';
 import UserManagement from '@/components/superadmin/UserManagement';
 import OperariosManagement from '@/components/shared/OperariosManagement';
+import MasterDataImport from '@/components/superadmin/MasterDataImport';
 
-type TabType = 'overview' | 'users' | 'operarios';
+type TabType = 'overview' | 'users' | 'operarios' | 'import';
 
 const SuperadminDashboard: React.FC = () => {
   const { profile, signOut } = useAuth();
@@ -30,7 +31,7 @@ const SuperadminDashboard: React.FC = () => {
   ];
 
   const quickActions = [
-    { label: 'Importar Maestra', icon: Upload, description: 'Cargar inventario desde archivo' },
+    { label: 'Importar Maestra', icon: Upload, description: 'Cargar inventario desde archivo', onClick: () => setActiveTab('import') },
     { label: 'Gestionar Usuarios', icon: Users, description: 'Asignar roles y permisos', onClick: () => setActiveTab('users') },
     { label: 'Ver Reportes', icon: FileSpreadsheet, description: 'Exportar informes completos' },
     { label: 'Configuración', icon: Settings, description: 'Ajustes del sistema' },
@@ -38,6 +39,7 @@ const SuperadminDashboard: React.FC = () => {
 
   const tabs = [
     { id: 'overview' as TabType, label: 'Resumen', icon: BarChart3 },
+    { id: 'import' as TabType, label: 'Importar', icon: Upload },
     { id: 'users' as TabType, label: 'Usuarios', icon: Users },
     { id: 'operarios' as TabType, label: 'Operarios', icon: UserCog },
   ];
@@ -158,6 +160,7 @@ const SuperadminDashboard: React.FC = () => {
           </>
         )}
 
+        {activeTab === 'import' && <MasterDataImport />}
         {activeTab === 'users' && <UserManagement />}
         {activeTab === 'operarios' && <OperariosManagement />}
       </main>
