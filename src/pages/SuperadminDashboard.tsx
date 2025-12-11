@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { 
   Package, 
   Users, 
@@ -10,7 +11,9 @@ import {
   Shield,
   BarChart3,
   UserCog,
-  Database
+  Database,
+  Boxes,
+  Table
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import UserManagement from '@/components/superadmin/UserManagement';
@@ -21,6 +24,7 @@ type TabType = 'overview' | 'users' | 'operarios' | 'import';
 
 const SuperadminDashboard: React.FC = () => {
   const { profile, signOut } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
 
   const stats = [
@@ -33,8 +37,8 @@ const SuperadminDashboard: React.FC = () => {
   const quickActions = [
     { label: 'Importar Maestra', icon: Upload, description: 'Cargar inventario desde archivo', onClick: () => setActiveTab('import') },
     { label: 'Gestionar Usuarios', icon: Users, description: 'Asignar roles y permisos', onClick: () => setActiveTab('users') },
-    { label: 'Ver Reportes', icon: FileSpreadsheet, description: 'Exportar informes completos' },
-    { label: 'Configuración', icon: Settings, description: 'Ajustes del sistema' },
+    { label: 'Inventario MP', icon: Package, description: 'CRUD Materia Prima', onClick: () => navigate('/superadmin/inventario-mp') },
+    { label: 'Inventario PP', icon: Boxes, description: 'CRUD Producto en Proceso', onClick: () => navigate('/superadmin/inventario-pp') },
   ];
 
   const tabs = [

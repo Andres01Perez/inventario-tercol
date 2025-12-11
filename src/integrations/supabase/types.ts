@@ -70,45 +70,64 @@ export type Database = {
       }
       count_tasks: {
         Row: {
+          assigned_admin_id: string | null
           assigned_supervisor_id: string | null
           audit_round: number
           created_at: string | null
           id: string
           is_completed: boolean | null
           location_detail: string | null
-          location_name: string
+          location_name: string | null
           master_reference: string
+          metodo_conteo: string | null
           operario_id: string | null
+          punto_referencia: string | null
           quantity_counted: number | null
+          subcategoria: string | null
           updated_at: string | null
         }
         Insert: {
+          assigned_admin_id?: string | null
           assigned_supervisor_id?: string | null
           audit_round?: number
           created_at?: string | null
           id?: string
           is_completed?: boolean | null
           location_detail?: string | null
-          location_name: string
+          location_name?: string | null
           master_reference: string
+          metodo_conteo?: string | null
           operario_id?: string | null
+          punto_referencia?: string | null
           quantity_counted?: number | null
+          subcategoria?: string | null
           updated_at?: string | null
         }
         Update: {
+          assigned_admin_id?: string | null
           assigned_supervisor_id?: string | null
           audit_round?: number
           created_at?: string | null
           id?: string
           is_completed?: boolean | null
           location_detail?: string | null
-          location_name?: string
+          location_name?: string | null
           master_reference?: string
+          metodo_conteo?: string | null
           operario_id?: string | null
+          punto_referencia?: string | null
           quantity_counted?: number | null
+          subcategoria?: string | null
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "count_tasks_assigned_admin_id_fkey"
+            columns: ["assigned_admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "count_tasks_master_reference_fkey"
             columns: ["master_reference"]
@@ -309,6 +328,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_can_access_reference: {
+        Args: { _reference: string; _user_id: string }
+        Returns: boolean
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
