@@ -131,7 +131,6 @@ export type Database = {
           audit_round: number | null
           count_history: Json | null
           created_at: string | null
-          description: string | null
           erp_alm: number | null
           erp_pld: number | null
           erp_plr: number | null
@@ -147,7 +146,6 @@ export type Database = {
           audit_round?: number | null
           count_history?: Json | null
           created_at?: string | null
-          description?: string | null
           erp_alm?: number | null
           erp_pld?: number | null
           erp_plr?: number | null
@@ -163,7 +161,6 @@ export type Database = {
           audit_round?: number | null
           count_history?: Json | null
           created_at?: string | null
-          description?: string | null
           erp_alm?: number | null
           erp_pld?: number | null
           erp_plr?: number | null
