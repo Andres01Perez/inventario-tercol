@@ -57,7 +57,7 @@ export type Database = {
             columns: ["master_reference"]
             isOneToOne: false
             referencedRelation: "inventory_master"
-            referencedColumns: ["reference"]
+            referencedColumns: ["referencia"]
           },
           {
             foreignKeyName: "audit_logs_task_id_fkey"
@@ -114,7 +114,7 @@ export type Database = {
             columns: ["master_reference"]
             isOneToOne: false
             referencedRelation: "inventory_master"
-            referencedColumns: ["reference"]
+            referencedColumns: ["referencia"]
           },
           {
             foreignKeyName: "count_tasks_operario_id_fkey"
@@ -129,45 +129,84 @@ export type Database = {
         Row: {
           assigned_admin_id: string | null
           audit_round: number | null
+          cant_alm_mp: number | null
+          cant_alm_pp: number | null
+          cant_pld: number | null
+          cant_plr: number | null
+          cant_prov_d: number | null
+          cant_prov_pp: number | null
+          cant_prov_r: number | null
+          cant_t_mp: number | null
+          cant_total_erp: number | null
+          cant_total_pp: number | null
+          cant_za: number | null
+          control: string | null
+          costo_t: number | null
+          costo_u_mp: number | null
+          costo_u_pp: number | null
           count_history: Json | null
           created_at: string | null
-          erp_alm: number | null
-          erp_pld: number | null
-          erp_plr: number | null
-          erp_target_qty: number | null
-          erp_za: number | null
           material_type: Database["public"]["Enums"]["material_type"]
-          reference: string
+          mo_costo: number | null
+          mp_costo: number | null
+          referencia: string
+          servicio: number | null
           status_slug: string | null
           updated_at: string | null
         }
         Insert: {
           assigned_admin_id?: string | null
           audit_round?: number | null
+          cant_alm_mp?: number | null
+          cant_alm_pp?: number | null
+          cant_pld?: number | null
+          cant_plr?: number | null
+          cant_prov_d?: number | null
+          cant_prov_pp?: number | null
+          cant_prov_r?: number | null
+          cant_t_mp?: number | null
+          cant_total_erp?: number | null
+          cant_total_pp?: number | null
+          cant_za?: number | null
+          control?: string | null
+          costo_t?: number | null
+          costo_u_mp?: number | null
+          costo_u_pp?: number | null
           count_history?: Json | null
           created_at?: string | null
-          erp_alm?: number | null
-          erp_pld?: number | null
-          erp_plr?: number | null
-          erp_target_qty?: number | null
-          erp_za?: number | null
           material_type: Database["public"]["Enums"]["material_type"]
-          reference: string
+          mo_costo?: number | null
+          mp_costo?: number | null
+          referencia: string
+          servicio?: number | null
           status_slug?: string | null
           updated_at?: string | null
         }
         Update: {
           assigned_admin_id?: string | null
           audit_round?: number | null
+          cant_alm_mp?: number | null
+          cant_alm_pp?: number | null
+          cant_pld?: number | null
+          cant_plr?: number | null
+          cant_prov_d?: number | null
+          cant_prov_pp?: number | null
+          cant_prov_r?: number | null
+          cant_t_mp?: number | null
+          cant_total_erp?: number | null
+          cant_total_pp?: number | null
+          cant_za?: number | null
+          control?: string | null
+          costo_t?: number | null
+          costo_u_mp?: number | null
+          costo_u_pp?: number | null
           count_history?: Json | null
           created_at?: string | null
-          erp_alm?: number | null
-          erp_pld?: number | null
-          erp_plr?: number | null
-          erp_target_qty?: number | null
-          erp_za?: number | null
           material_type?: Database["public"]["Enums"]["material_type"]
-          reference?: string
+          mo_costo?: number | null
+          mp_costo?: number | null
+          referencia?: string
+          servicio?: number | null
           status_slug?: string | null
           updated_at?: string | null
         }

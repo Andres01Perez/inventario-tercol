@@ -3,13 +3,30 @@ import * as XLSX from 'xlsx';
 export type MaterialType = 'MP' | 'PP';
 
 export interface ParsedRow {
-  reference: string;
+  referencia: string;
   material_type: MaterialType;
-  erp_alm: number;
-  erp_pld: number;
-  erp_plr: number;
-  erp_za: number;
-  erp_target_qty: number;
+  // Columnas compartidas
+  control: string | null;
+  cant_pld: number | null;
+  cant_plr: number | null;
+  cant_za: number | null;
+  costo_t: number | null;
+  // Columnas solo MP
+  costo_u_mp: number | null;
+  cant_alm_mp: number | null;
+  cant_prov_d: number | null;
+  cant_prov_r: number | null;
+  cant_t_mp: number | null;
+  // Columnas solo PP
+  mp_costo: number | null;
+  mo_costo: number | null;
+  servicio: number | null;
+  costo_u_pp: number | null;
+  cant_alm_pp: number | null;
+  cant_prov_pp: number | null;
+  cant_total_pp: number | null;
+  // Columna calculada (para preview, no se inserta)
+  cant_total_erp?: number;
 }
 
 export interface ParseResult {
@@ -18,24 +35,39 @@ export interface ParseResult {
   warnings: string[];
 }
 
-// Column mappings for each file type
-const MP_COLUMN_MAP: Record<string, keyof Omit<ParsedRow, 'material_type'>> = {
-  'referencia': 'reference',
-  'cant.alm': 'erp_alm',
-  'cant.pld': 'erp_pld',
-  'cant.plr': 'erp_plr',
-  'cant.za': 'erp_za',
-  'cant.t': 'erp_target_qty',
+// Column mappings for MP file
+const MP_COLUMN_MAP: Record<string, keyof ParsedRow> = {
+  'referencia': 'referencia',
+  'control': 'control',
+  'costo.u': 'costo_u_mp',
+  'costou': 'costo_u_mp',
+  'cant.alm': 'cant_alm_mp',
+  'cant.pld': 'cant_pld',
+  'cant.plr': 'cant_plr',
+  'cant.za': 'cant_za',
+  'cant.provd': 'cant_prov_d',
+  'cant.provr': 'cant_prov_r',
+  'cant.t': 'cant_t_mp',
+  'costo.t': 'costo_t',
 };
 
-const PP_COLUMN_MAP: Record<string, keyof Omit<ParsedRow, 'material_type'>> = {
-  'referencia': 'reference',
-  'can.alm': 'erp_alm',      // Note: "Can" without "t"
-  'cant.alm': 'erp_alm',     // Also accept with "t"
-  'cant.pld': 'erp_pld',
-  'cant.plr': 'erp_plr',
-  'cant.za': 'erp_za',
-  'cant.total': 'erp_target_qty',
+// Column mappings for PP file
+const PP_COLUMN_MAP: Record<string, keyof ParsedRow> = {
+  'referencia': 'referencia',
+  'control': 'control',
+  'mp': 'mp_costo',
+  'mo': 'mo_costo',
+  'servicio': 'servicio',
+  'costo.u': 'costo_u_pp',
+  'costou': 'costo_u_pp',
+  'can.alm': 'cant_alm_pp',
+  'cant.alm': 'cant_alm_pp',
+  'cant.pld': 'cant_pld',
+  'cant.plr': 'cant_plr',
+  'cant.za': 'cant_za',
+  'cant.prov': 'cant_prov_pp',
+  'cant.total': 'cant_total_pp',
+  'costo.t': 'costo_t',
 };
 
 const REQUIRED_COLUMNS_MP = ['referencia'];
@@ -49,9 +81,9 @@ function normalizeColumnName(name: string): string {
     .replace(/[\u0300-\u036f]/g, ''); // Remove accents
 }
 
-function parseNumber(value: unknown): number {
+function parseNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === '') {
-    return 0;
+    return null;
   }
   
   // If already a number, return directly
@@ -88,7 +120,51 @@ function parseNumber(value: unknown): number {
   // If only dot(s), parseFloat handles it correctly
   
   const num = parseFloat(str);
-  return isNaN(num) ? 0 : num;
+  return isNaN(num) ? null : num;
+}
+
+function parseString(value: unknown): string | null {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  return String(value).trim();
+}
+
+// Create empty row with all nulls for the given type
+function createEmptyRow(type: MaterialType): ParsedRow {
+  return {
+    referencia: '',
+    material_type: type,
+    // Compartidas
+    control: null,
+    cant_pld: null,
+    cant_plr: null,
+    cant_za: null,
+    costo_t: null,
+    // Solo MP (null para PP)
+    costo_u_mp: null,
+    cant_alm_mp: null,
+    cant_prov_d: null,
+    cant_prov_r: null,
+    cant_t_mp: null,
+    // Solo PP (null para MP)
+    mp_costo: null,
+    mo_costo: null,
+    servicio: null,
+    costo_u_pp: null,
+    cant_alm_pp: null,
+    cant_prov_pp: null,
+    cant_total_pp: null,
+  };
+}
+
+// Calculate total ERP for preview
+function calculateTotalErp(row: ParsedRow): number {
+  if (row.material_type === 'MP') {
+    return (row.cant_alm_mp ?? 0) + (row.cant_pld ?? 0) + (row.cant_plr ?? 0) + (row.cant_za ?? 0);
+  } else {
+    return (row.cant_alm_pp ?? 0) + (row.cant_pld ?? 0) + (row.cant_plr ?? 0) + (row.cant_za ?? 0);
+  }
 }
 
 export function parseExcelFile(file: File, type: MaterialType): Promise<ParseResult> {
@@ -117,7 +193,7 @@ export function parseExcelFile(file: File, type: MaterialType): Promise<ParseRes
         const originalColumns = Object.keys(firstRow);
         const normalizedColumns = originalColumns.map(normalizeColumnName);
         
-        // Create mapping from original to normalized
+        // Create mapping from normalized to original
         const columnMapping: Record<string, string> = {};
         originalColumns.forEach((col, idx) => {
           columnMapping[normalizedColumns[idx]] = col;
@@ -148,48 +224,65 @@ export function parseExcelFile(file: File, type: MaterialType): Promise<ParseRes
         };
 
         let emptyReferenceCount = 0;
-        let convertedToZeroCount = 0;
+        let convertedToNullCount = 0;
 
-        jsonData.forEach((row: Record<string, unknown>, index: number) => {
+        jsonData.forEach((row: Record<string, unknown>) => {
           // Find the reference column (case-insensitive)
-          let reference = '';
+          let referencia = '';
           for (const [normalized, original] of Object.entries(columnMapping)) {
             if (normalized === 'referencia') {
-              reference = String(row[original] || '').trim();
+              referencia = String(row[original] || '').trim();
               break;
             }
           }
 
-          if (!reference) {
+          if (!referencia) {
             emptyReferenceCount++;
             return; // Skip rows without reference
           }
 
-          const parsedRow: ParsedRow = {
-            reference,
-            material_type: type,
-            erp_alm: 0,
-            erp_pld: 0,
-            erp_plr: 0,
-            erp_za: 0,
-            erp_target_qty: 0,
-          };
+          const parsedRow = createEmptyRow(type);
+          parsedRow.referencia = referencia;
 
           // Map each column
           for (const [normalized, original] of Object.entries(columnMapping)) {
             const dbField = columnMap[normalized];
-            if (dbField && dbField !== 'reference') {
-              const value = parseNumber(row[original]);
-              if (row[original] !== '' && row[original] !== null && value === 0) {
-                convertedToZeroCount++;
+            if (dbField && dbField !== 'referencia') {
+              const rawValue = row[original];
+              
+              // Control is a string, others are numbers
+              if (dbField === 'control') {
+                parsedRow.control = parseString(rawValue);
+              } else {
+                const numValue = parseNumber(rawValue);
+                if (rawValue !== '' && rawValue !== null && numValue === null) {
+                  convertedToNullCount++;
+                }
+                // Assign dynamically based on field name
+                switch (dbField) {
+                  case 'cant_pld': parsedRow.cant_pld = numValue; break;
+                  case 'cant_plr': parsedRow.cant_plr = numValue; break;
+                  case 'cant_za': parsedRow.cant_za = numValue; break;
+                  case 'costo_t': parsedRow.costo_t = numValue; break;
+                  case 'costo_u_mp': parsedRow.costo_u_mp = numValue; break;
+                  case 'cant_alm_mp': parsedRow.cant_alm_mp = numValue; break;
+                  case 'cant_prov_d': parsedRow.cant_prov_d = numValue; break;
+                  case 'cant_prov_r': parsedRow.cant_prov_r = numValue; break;
+                  case 'cant_t_mp': parsedRow.cant_t_mp = numValue; break;
+                  case 'mp_costo': parsedRow.mp_costo = numValue; break;
+                  case 'mo_costo': parsedRow.mo_costo = numValue; break;
+                  case 'servicio': parsedRow.servicio = numValue; break;
+                  case 'costo_u_pp': parsedRow.costo_u_pp = numValue; break;
+                  case 'cant_alm_pp': parsedRow.cant_alm_pp = numValue; break;
+                  case 'cant_prov_pp': parsedRow.cant_prov_pp = numValue; break;
+                  case 'cant_total_pp': parsedRow.cant_total_pp = numValue; break;
+                }
               }
-              if (dbField === 'erp_alm') parsedRow.erp_alm = value;
-              else if (dbField === 'erp_pld') parsedRow.erp_pld = value;
-              else if (dbField === 'erp_plr') parsedRow.erp_plr = value;
-              else if (dbField === 'erp_za') parsedRow.erp_za = value;
-              else if (dbField === 'erp_target_qty') parsedRow.erp_target_qty = value;
             }
           }
+
+          // Calculate total for preview
+          parsedRow.cant_total_erp = calculateTotalErp(parsedRow);
 
           result.data.push(parsedRow);
         });
@@ -198,8 +291,8 @@ export function parseExcelFile(file: File, type: MaterialType): Promise<ParseRes
           result.warnings.push(`${emptyReferenceCount} filas omitidas por referencia vacía`);
         }
 
-        if (convertedToZeroCount > 0) {
-          result.warnings.push(`${convertedToZeroCount} valores no numéricos convertidos a 0`);
+        if (convertedToNullCount > 0) {
+          result.warnings.push(`${convertedToNullCount} valores no numéricos ignorados`);
         }
 
         resolve(result);
@@ -247,7 +340,7 @@ export function validateCombinedData(
   };
 
   // Check duplicates within MP
-  const mpRefs = mpData.map((r) => r.reference);
+  const mpRefs = mpData.map((r) => r.referencia);
   const mpDuplicates = mpRefs.filter((ref, idx) => mpRefs.indexOf(ref) !== idx);
   if (mpDuplicates.length > 0) {
     result.duplicatesWithinMp = [...new Set(mpDuplicates)];
@@ -260,7 +353,7 @@ export function validateCombinedData(
   }
 
   // Check duplicates within PP
-  const ppRefs = ppData.map((r) => r.reference);
+  const ppRefs = ppData.map((r) => r.referencia);
   const ppDuplicates = ppRefs.filter((ref, idx) => ppRefs.indexOf(ref) !== idx);
   if (ppDuplicates.length > 0) {
     result.duplicatesWithinPp = [...new Set(ppDuplicates)];

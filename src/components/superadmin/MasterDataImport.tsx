@@ -175,6 +175,12 @@ const FileUploadZone: React.FC<FileUploadZoneProps> = ({
   );
 };
 
+// Helper to format number or show dash for null
+const formatNumber = (value: number | null | undefined): string => {
+  if (value === null || value === undefined) return '—';
+  return value.toLocaleString('es-CO');
+};
+
 const MasterDataImport: React.FC = () => {
   const { toast } = useToast();
   
@@ -253,15 +259,15 @@ const MasterDataImport: React.FC = () => {
     setProgress(0);
 
     try {
-      // Remove erp_target_qty since it's a generated column in the database
-      const dataToInsert = combinedData.map(({ erp_target_qty, ...rest }) => rest);
+      // Remove cant_total_erp since it's a generated column in the database
+      const dataToInsert = combinedData.map(({ cant_total_erp, ...rest }) => rest);
 
       // Step 1: Delete all existing records
       setProgress(10);
       const { error: deleteError } = await supabase
         .from('inventory_master')
         .delete()
-        .neq('reference', '');
+        .neq('referencia', '');
 
       if (deleteError) {
         throw new Error(`Error al eliminar datos existentes: ${deleteError.message}`);
@@ -280,7 +286,7 @@ const MasterDataImport: React.FC = () => {
         const batch = batches[i];
         const { error: insertError } = await supabase
           .from('inventory_master')
-          .insert(batch);
+          .insert(batch as any);
 
         if (insertError) {
           throw new Error(`Error al insertar lote ${i + 1}: ${insertError.message}`);
@@ -436,23 +442,46 @@ const MasterDataImport: React.FC = () => {
 
           {/* Preview Table */}
           <div className="rounded-lg border border-border overflow-hidden">
-            <div className="max-h-80 overflow-x-auto overflow-y-auto">
-              <Table className="min-w-[800px]">
+            <div className="max-h-96 overflow-x-auto overflow-y-auto">
+              <Table className="min-w-[1400px]">
                 <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
-                    <TableHead className="min-w-[180px] font-mono text-xs bg-muted/50">reference</TableHead>
-                    <TableHead className="min-w-[100px] font-mono text-xs bg-muted/50">material_type</TableHead>
-                    <TableHead className="min-w-[90px] text-right font-mono text-xs bg-muted/50">erp_alm</TableHead>
-                    <TableHead className="min-w-[90px] text-right font-mono text-xs bg-muted/50">erp_pld</TableHead>
-                    <TableHead className="min-w-[90px] text-right font-mono text-xs bg-muted/50">erp_plr</TableHead>
-                    <TableHead className="min-w-[90px] text-right font-mono text-xs bg-muted/50">erp_za</TableHead>
-                    <TableHead className="min-w-[110px] text-right font-mono text-xs bg-muted/50">erp_target_qty</TableHead>
+                    {/* Columnas principales */}
+                    <TableHead className="min-w-[140px] font-mono text-xs bg-muted/50 sticky left-0 z-20">Referencia</TableHead>
+                    <TableHead className="min-w-[60px] font-mono text-xs bg-muted/50">Tipo</TableHead>
+                    <TableHead className="min-w-[100px] font-mono text-xs bg-muted/50">Control</TableHead>
+                    
+                    {/* Columnas compartidas */}
+                    <TableHead className="min-w-[80px] text-right font-mono text-xs bg-purple-500/10">Cant.PLd</TableHead>
+                    <TableHead className="min-w-[80px] text-right font-mono text-xs bg-purple-500/10">Cant.PLr</TableHead>
+                    <TableHead className="min-w-[80px] text-right font-mono text-xs bg-purple-500/10">Cant.ZA</TableHead>
+                    <TableHead className="min-w-[90px] text-right font-mono text-xs bg-purple-500/10">Costo.T</TableHead>
+                    
+                    {/* Columnas solo MP */}
+                    <TableHead className="min-w-[80px] text-right font-mono text-xs bg-blue-500/10">Costo.U MP</TableHead>
+                    <TableHead className="min-w-[80px] text-right font-mono text-xs bg-blue-500/10">Cant.Alm MP</TableHead>
+                    <TableHead className="min-w-[80px] text-right font-mono text-xs bg-blue-500/10">Cant.ProvD</TableHead>
+                    <TableHead className="min-w-[80px] text-right font-mono text-xs bg-blue-500/10">Cant.ProvR</TableHead>
+                    <TableHead className="min-w-[80px] text-right font-mono text-xs bg-blue-500/10">Cant.T MP</TableHead>
+                    
+                    {/* Columnas solo PP */}
+                    <TableHead className="min-w-[80px] text-right font-mono text-xs bg-emerald-500/10">MP</TableHead>
+                    <TableHead className="min-w-[80px] text-right font-mono text-xs bg-emerald-500/10">MO</TableHead>
+                    <TableHead className="min-w-[80px] text-right font-mono text-xs bg-emerald-500/10">Servicio</TableHead>
+                    <TableHead className="min-w-[80px] text-right font-mono text-xs bg-emerald-500/10">Costo.U PP</TableHead>
+                    <TableHead className="min-w-[80px] text-right font-mono text-xs bg-emerald-500/10">Cant.Alm PP</TableHead>
+                    <TableHead className="min-w-[80px] text-right font-mono text-xs bg-emerald-500/10">Cant.Prov PP</TableHead>
+                    <TableHead className="min-w-[90px] text-right font-mono text-xs bg-emerald-500/10">Cant.Total PP</TableHead>
+                    
+                    {/* Total calculado */}
+                    <TableHead className="min-w-[100px] text-right font-mono text-xs bg-amber-500/10">Total ERP</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {combinedData.slice(0, 100).map((row, idx) => (
                     <TableRow key={idx}>
-                      <TableCell className="font-mono text-sm">{row.reference}</TableCell>
+                      {/* Principales */}
+                      <TableCell className="font-mono text-sm sticky left-0 bg-card">{row.referencia}</TableCell>
                       <TableCell>
                         <Badge 
                           variant="outline" 
@@ -464,11 +493,34 @@ const MasterDataImport: React.FC = () => {
                           {row.material_type}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">{row.erp_alm.toLocaleString('es-CO')}</TableCell>
-                      <TableCell className="text-right tabular-nums">{row.erp_pld.toLocaleString('es-CO')}</TableCell>
-                      <TableCell className="text-right tabular-nums">{row.erp_plr.toLocaleString('es-CO')}</TableCell>
-                      <TableCell className="text-right tabular-nums">{row.erp_za.toLocaleString('es-CO')}</TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">{row.erp_target_qty.toLocaleString('es-CO')}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{row.control || '—'}</TableCell>
+                      
+                      {/* Compartidas */}
+                      <TableCell className="text-right tabular-nums">{formatNumber(row.cant_pld)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatNumber(row.cant_plr)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatNumber(row.cant_za)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatNumber(row.costo_t)}</TableCell>
+                      
+                      {/* Solo MP */}
+                      <TableCell className="text-right tabular-nums text-blue-600">{formatNumber(row.costo_u_mp)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-blue-600">{formatNumber(row.cant_alm_mp)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-blue-600">{formatNumber(row.cant_prov_d)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-blue-600">{formatNumber(row.cant_prov_r)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-blue-600">{formatNumber(row.cant_t_mp)}</TableCell>
+                      
+                      {/* Solo PP */}
+                      <TableCell className="text-right tabular-nums text-emerald-600">{formatNumber(row.mp_costo)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-emerald-600">{formatNumber(row.mo_costo)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-emerald-600">{formatNumber(row.servicio)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-emerald-600">{formatNumber(row.costo_u_pp)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-emerald-600">{formatNumber(row.cant_alm_pp)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-emerald-600">{formatNumber(row.cant_prov_pp)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-emerald-600">{formatNumber(row.cant_total_pp)}</TableCell>
+                      
+                      {/* Total */}
+                      <TableCell className="text-right tabular-nums font-medium text-amber-600">
+                        {formatNumber(row.cant_total_erp)}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -503,42 +555,25 @@ const MasterDataImport: React.FC = () => {
           )}
 
           {/* Import Button */}
-          <div className="flex justify-end">
-            <Button 
-              size="lg"
-              onClick={handleImport}
-              disabled={!canImport}
-              className="min-w-40"
-            >
-              {state === 'importing' ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Importando...
-                </>
-              ) : (
-                <>
-                  <Upload className="w-4 h-4 mr-2" />
-                  Importar {totalCount} referencias
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Empty State */}
-      {combinedData.length === 0 && state === 'idle' && (
-        <div className="text-center py-8 text-muted-foreground">
-          <FileSpreadsheet className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p>Selecciona al menos un archivo para comenzar</p>
-        </div>
-      )}
-
-      {/* Parsing State */}
-      {state === 'parsing' && (
-        <div className="text-center py-8">
-          <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin text-primary" />
-          <p className="text-muted-foreground">Procesando archivo...</p>
+          {state !== 'importing' && state !== 'success' && (
+            <div className="flex justify-end">
+              <Button
+                onClick={handleImport}
+                disabled={!canImport}
+                size="lg"
+                className="min-w-[200px]"
+              >
+                {state === 'error' ? (
+                  <>Reintentar Importación</>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Importar {totalCount} Referencias
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>
