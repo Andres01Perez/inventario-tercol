@@ -1,12 +1,12 @@
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { 
   Package, 
   Users, 
   FileSpreadsheet, 
   Settings, 
   LogOut,
-  Upload,
   MapPin,
   ClipboardCheck,
   BarChart3,
@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 
 const AdminDashboard: React.FC = () => {
   const { profile, role, signOut } = useAuth();
+  const navigate = useNavigate();
 
   // Determine admin type and display info
   const isAdminMP = role === 'admin_mp';
@@ -32,8 +33,8 @@ const AdminDashboard: React.FC = () => {
   ];
 
   const quickActions = [
-    { label: 'Cargar Maestra', icon: Upload, description: `Importar referencias de ${adminTypeLabel}` },
-    { label: 'Asignar Ubicaciones', icon: MapPin, description: 'Asignar zonas a supervisores' },
+    { label: 'Gestionar Ubicaciones', icon: MapPin, description: 'Asignar ubicaciones y supervisores', onClick: () => navigate('/admin/gestion-ubicacion') },
+    { label: 'Ver Conteos', icon: ClipboardCheck, description: 'Monitorear progreso de conteos' },
     { label: 'Ver Reportes', icon: FileSpreadsheet, description: 'Exportar informes de inventario' },
     { label: 'Configuración', icon: Settings, description: 'Ajustar tolerancias y parámetros' },
   ];
