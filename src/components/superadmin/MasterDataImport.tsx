@@ -253,6 +253,9 @@ const MasterDataImport: React.FC = () => {
     setProgress(0);
 
     try {
+      // Remove erp_target_qty since it's a generated column in the database
+      const dataToInsert = combinedData.map(({ erp_target_qty, ...rest }) => rest);
+
       // Step 1: Delete all existing records
       setProgress(10);
       const { error: deleteError } = await supabase
@@ -267,8 +270,8 @@ const MasterDataImport: React.FC = () => {
       // Step 2: Insert in batches of 500
       const BATCH_SIZE = 500;
       const batches = [];
-      for (let i = 0; i < combinedData.length; i += BATCH_SIZE) {
-        batches.push(combinedData.slice(i, i + BATCH_SIZE));
+      for (let i = 0; i < dataToInsert.length; i += BATCH_SIZE) {
+        batches.push(dataToInsert.slice(i, i + BATCH_SIZE));
       }
 
       const progressPerBatch = 80 / batches.length;
