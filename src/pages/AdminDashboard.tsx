@@ -73,6 +73,7 @@ const AdminDashboard: React.FC = () => {
 
   const quickActions = [
     { label: 'Gestionar Ubicaciones', icon: MapPin, description: 'Asignar ubicaciones y supervisores', onClick: () => navigate('/admin/gestion-ubicacion') },
+    { label: 'Asignar Responsables', icon: Users, description: 'Asignación masiva de líderes de conteo', onClick: () => navigate('/admin/gestion-responsables') },
     { label: 'Ver Conteos', icon: ClipboardCheck, description: 'Monitorear progreso de conteos', disabled: true },
     { label: 'Ver Reportes', icon: FileSpreadsheet, description: 'Exportar informes de inventario', disabled: true },
   ];
