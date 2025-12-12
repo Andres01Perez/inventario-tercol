@@ -173,6 +173,7 @@ export type Database = {
           location_name: string | null
           master_reference: string
           metodo_conteo: string | null
+          observaciones: string | null
           punto_referencia: string | null
           subcategoria: string | null
           updated_at: string | null
@@ -186,6 +187,7 @@ export type Database = {
           location_name?: string | null
           master_reference: string
           metodo_conteo?: string | null
+          observaciones?: string | null
           punto_referencia?: string | null
           subcategoria?: string | null
           updated_at?: string | null
@@ -199,6 +201,7 @@ export type Database = {
           location_name?: string | null
           master_reference?: string
           metodo_conteo?: string | null
+          observaciones?: string | null
           punto_referencia?: string | null
           subcategoria?: string | null
           updated_at?: string | null
