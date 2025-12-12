@@ -133,7 +133,7 @@ const SupervisorDashboard: React.FC = () => {
           </TabsList>
 
           <TabsContent value="assignment">
-            <div className="glass-card">
+            <div className="glass-card-static">
               <h3 className="text-lg font-semibold mb-4">Asignar Operarios a Ubicaciones</h3>
               <AssignmentTab />
             </div>
