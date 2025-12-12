@@ -12,7 +12,8 @@ import {
   BarChart3,
   UserCog,
   Database,
-  Boxes
+  Boxes,
+  MapPin
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import UserManagement from '@/components/superadmin/UserManagement';
@@ -40,11 +41,10 @@ const SuperadminDashboard: React.FC = () => {
         .from('inventory_master')
         .select('referencia', { count: 'exact', head: true });
 
-      // Get active counts (tasks not completed)
-      const { count: activeCountsCount } = await supabase
-        .from('count_tasks')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_completed', false);
+      // Get locations count
+      const { count: locationsCount } = await supabase
+        .from('locations')
+        .select('id', { count: 'exact', head: true });
 
       // Get active operarios count
       const { count: operariosCount } = await supabase
@@ -55,7 +55,7 @@ const SuperadminDashboard: React.FC = () => {
       return {
         usuarios: usersCount || 0,
         referencias: referencesCount || 0,
-        conteosActivos: activeCountsCount || 0,
+        ubicaciones: locationsCount || 0,
         operarios: operariosCount || 0
       };
     }
@@ -64,7 +64,7 @@ const SuperadminDashboard: React.FC = () => {
   const statsDisplay = [
     { label: 'Usuarios Registrados', value: stats?.usuarios?.toString() || '0', icon: Users, color: 'bg-primary/10 text-primary' },
     { label: 'Referencias Totales', value: stats?.referencias?.toString() || '0', icon: Package, color: 'bg-blue-500/10 text-blue-500' },
-    { label: 'Conteos Activos', value: stats?.conteosActivos?.toString() || '0', icon: BarChart3, color: 'bg-amber-500/10 text-amber-500' },
+    { label: 'Ubicaciones Configuradas', value: stats?.ubicaciones?.toString() || '0', icon: MapPin, color: 'bg-amber-500/10 text-amber-500' },
     { label: 'Operarios Activos', value: stats?.operarios?.toString() || '0', icon: UserCog, color: 'bg-green-500/10 text-green-500' },
   ];
 
