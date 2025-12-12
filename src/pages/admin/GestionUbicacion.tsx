@@ -13,7 +13,8 @@ import {
   Boxes,
   X,
   Plus,
-  Trash2
+  Trash2,
+  Users
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -83,6 +84,7 @@ const GestionUbicacion: React.FC = () => {
   const [filterTipo, setFilterTipo] = useState<string>('all');
   const [filterSubcategoria, setFilterSubcategoria] = useState('');
   const [filterUbicacion, setFilterUbicacion] = useState('');
+  const [filterObservacion, setFilterObservacion] = useState('');
   const [filterSupervisor, setFilterSupervisor] = useState<string>('all');
 
   const isAdminMP = role === 'admin_mp';
@@ -115,19 +117,20 @@ const GestionUbicacion: React.FC = () => {
     }
   });
 
-  const hasActiveFilters = filterTipo !== 'all' || filterSubcategoria || filterUbicacion || filterSupervisor !== 'all';
+  const hasActiveFilters = filterTipo !== 'all' || filterSubcategoria || filterUbicacion || filterObservacion || filterSupervisor !== 'all';
 
   const clearFilters = () => {
     setFilterTipo('all');
     setFilterSubcategoria('');
     setFilterUbicacion('');
-    setFilterSupervisor('');
+    setFilterObservacion('');
+    setFilterSupervisor('all');
     setCurrentPage(1);
   };
 
   // Fetch inventory items with their associated locations - supporting 1:N relationship
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ['admin-inventory', profile?.id, role, searchTerm, currentPage, filterTipo, filterSubcategoria, filterUbicacion, filterSupervisor],
+  const { data, isLoading, refetch, isFetching } = useQuery({
+    queryKey: ['admin-inventory', profile?.id, role, searchTerm, currentPage, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor],
     queryFn: async () => {
       let query = supabase
         .from('inventory_master')
@@ -191,6 +194,11 @@ const GestionUbicacion: React.FC = () => {
         if (filterUbicacion) {
           locations = locations.filter(loc => 
             loc.location_name?.toLowerCase().includes(filterUbicacion.toLowerCase())
+          );
+        }
+        if (filterObservacion) {
+          locations = locations.filter(loc => 
+            loc.observaciones?.toLowerCase().includes(filterObservacion.toLowerCase())
           );
         }
         if (filterSupervisor !== 'all') {
@@ -334,7 +342,16 @@ const GestionUbicacion: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => navigate('/admin/gestion-responsables')}
+                className="gap-2"
+              >
+                <Users className="w-4 h-4" />
+                Asignar Responsables
+              </Button>
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-foreground">{profile?.full_name}</p>
                 <p className="text-xs text-muted-foreground">Admin {isAdminMP ? 'MP' : 'PP'}</p>
@@ -360,8 +377,15 @@ const GestionUbicacion: React.FC = () => {
               className="pl-10"
             />
           </div>
-          <Button variant="outline" size="icon" onClick={() => refetch()}>
-            <RefreshCw className="w-4 h-4" />
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+            Recargar
           </Button>
           <span className="text-sm text-muted-foreground">
             {data?.total || 0} referencias
@@ -403,6 +427,17 @@ const GestionUbicacion: React.FC = () => {
               placeholder="Filtrar..."
               value={filterUbicacion}
               onChange={(e) => { setFilterUbicacion(e.target.value); setCurrentPage(1); }}
+              className="w-[140px] h-9"
+            />
+          </div>
+
+          {/* Observación filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Observación:</span>
+            <Input
+              placeholder="Filtrar..."
+              value={filterObservacion}
+              onChange={(e) => { setFilterObservacion(e.target.value); setCurrentPage(1); }}
               className="w-[140px] h-9"
             />
           </div>

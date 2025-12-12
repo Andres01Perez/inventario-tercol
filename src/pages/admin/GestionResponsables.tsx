@@ -49,8 +49,11 @@ interface LocationWithReference {
   id: string;
   master_reference: string;
   subcategoria: string | null;
+  observaciones: string | null;
   location_name: string | null;
   location_detail: string | null;
+  punto_referencia: string | null;
+  metodo_conteo: string | null;
   assigned_supervisor_id: string | null;
   material_type: 'MP' | 'PP';
   control: string | null;
@@ -72,6 +75,7 @@ const GestionResponsables: React.FC = () => {
   const [filterTipo, setFilterTipo] = useState<string>('all');
   const [filterSubcategoria, setFilterSubcategoria] = useState('');
   const [filterUbicacion, setFilterUbicacion] = useState('');
+  const [filterObservacion, setFilterObservacion] = useState('');
   const [filterSupervisor, setFilterSupervisor] = useState<string>('all');
 
   const isAdminMP = role === 'admin_mp';
@@ -83,7 +87,7 @@ const GestionResponsables: React.FC = () => {
   // Clear selection when filters change
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [searchTerm, filterTipo, filterSubcategoria, filterUbicacion, filterSupervisor, currentPage]);
+  }, [searchTerm, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, currentPage]);
 
   // Fetch supervisors for the filter dropdown
   const { data: supervisors } = useQuery({
@@ -109,87 +113,97 @@ const GestionResponsables: React.FC = () => {
     }
   });
 
-  const hasActiveFilters = filterTipo !== 'all' || filterSubcategoria || filterUbicacion || filterSupervisor !== 'all';
+  const hasActiveFilters = filterTipo !== 'all' || filterSubcategoria || filterUbicacion || filterObservacion || filterSupervisor !== 'all';
 
   const clearFilters = () => {
     setFilterTipo('all');
     setFilterSubcategoria('');
     setFilterUbicacion('');
-    setFilterSupervisor('');
+    setFilterObservacion('');
+    setFilterSupervisor('all');
     setCurrentPage(1);
   };
 
-  // Fetch locations with their inventory_master data
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ['locations-responsables', profile?.id, role, searchTerm, currentPage, filterTipo, filterSubcategoria, filterUbicacion, filterSupervisor],
+  // OPTIMIZED QUERY: Start from locations with JOIN to inventory_master
+  const { data, isLoading, refetch, isFetching } = useQuery({
+    queryKey: ['locations-responsables', role, searchTerm, currentPage, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor],
     queryFn: async () => {
-      // First get the references that match admin type
-      let inventoryQuery = supabase
-        .from('inventory_master')
-        .select('referencia, material_type, control');
-
-      if (isAdminMP) {
-        inventoryQuery = inventoryQuery.not('control', 'is', null);
-      } else {
-        inventoryQuery = inventoryQuery.is('control', null);
-      }
-
-      if (filterTipo !== 'all') {
-        inventoryQuery = inventoryQuery.eq('material_type', filterTipo as 'MP' | 'PP');
-      }
-
-      if (searchTerm) {
-        inventoryQuery = inventoryQuery.ilike('referencia', `%${searchTerm}%`);
-      }
-
-      const { data: inventoryData, error: inventoryError } = await inventoryQuery;
-      if (inventoryError) throw inventoryError;
-
-      if (!inventoryData || inventoryData.length === 0) {
-        return { locations: [], total: 0 };
-      }
-
-      const referencias = inventoryData.map(i => i.referencia);
-      const inventoryMap = new Map(inventoryData.map(i => [i.referencia, i]));
-
-      // Fetch locations for these references
-      let locationsQuery = supabase
+      // Single query starting from locations with inner join to inventory_master
+      let query = supabase
         .from('locations')
-        .select('*', { count: 'exact' })
-        .in('master_reference', referencias)
-        .order('master_reference');
+        .select(`
+          id,
+          master_reference,
+          subcategoria,
+          observaciones,
+          location_name,
+          location_detail,
+          punto_referencia,
+          metodo_conteo,
+          assigned_supervisor_id,
+          inventory_master!inner(material_type, control)
+        `, { count: 'exact' });
 
-      // Apply location filters
+      // Filter by admin role (MP has control, PP has no control)
+      if (isAdminMP) {
+        query = query.not('inventory_master.control', 'is', null);
+      } else {
+        query = query.is('inventory_master.control', null);
+      }
+
+      // Filter by material type
+      if (filterTipo === 'MP' || filterTipo === 'PP') {
+        query = query.eq('inventory_master.material_type', filterTipo);
+      }
+
+      // Search by reference
+      if (searchTerm) {
+        query = query.ilike('master_reference', `%${searchTerm}%`);
+      }
+
+      // Filter by subcategoria
       if (filterSubcategoria) {
-        locationsQuery = locationsQuery.ilike('subcategoria', `%${filterSubcategoria}%`);
+        query = query.ilike('subcategoria', `%${filterSubcategoria}%`);
       }
+
+      // Filter by location name
       if (filterUbicacion) {
-        locationsQuery = locationsQuery.ilike('location_name', `%${filterUbicacion}%`);
+        query = query.ilike('location_name', `%${filterUbicacion}%`);
       }
+
+      // Filter by observaciones
+      if (filterObservacion) {
+        query = query.ilike('observaciones', `%${filterObservacion}%`);
+      }
+
+      // Filter by supervisor
       if (filterSupervisor !== 'all') {
-        locationsQuery = locationsQuery.eq('assigned_supervisor_id', filterSupervisor);
+        query = query.eq('assigned_supervisor_id', filterSupervisor);
       }
 
+      // Pagination
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
-      locationsQuery = locationsQuery.range(from, from + ITEMS_PER_PAGE - 1);
+      query = query
+        .order('master_reference')
+        .range(from, from + ITEMS_PER_PAGE - 1);
 
-      const { data: locationsData, error: locationsError, count } = await locationsQuery;
-      if (locationsError) throw locationsError;
+      const { data: locationsData, error, count } = await query;
+      if (error) throw error;
 
-      // Map locations with inventory data
-      const locations: LocationWithReference[] = (locationsData || []).map(loc => {
-        const inv = inventoryMap.get(loc.master_reference);
-        return {
-          id: loc.id,
-          master_reference: loc.master_reference,
-          subcategoria: loc.subcategoria,
-          location_name: loc.location_name,
-          location_detail: loc.location_detail,
-          assigned_supervisor_id: loc.assigned_supervisor_id,
-          material_type: inv?.material_type as 'MP' | 'PP' || 'MP',
-          control: inv?.control || null
-        };
-      });
+      // Map the data to our interface
+      const locations: LocationWithReference[] = (locationsData || []).map((loc: any) => ({
+        id: loc.id,
+        master_reference: loc.master_reference,
+        subcategoria: loc.subcategoria,
+        observaciones: loc.observaciones,
+        location_name: loc.location_name,
+        location_detail: loc.location_detail,
+        punto_referencia: loc.punto_referencia,
+        metodo_conteo: loc.metodo_conteo,
+        assigned_supervisor_id: loc.assigned_supervisor_id,
+        material_type: loc.inventory_master.material_type as 'MP' | 'PP',
+        control: loc.inventory_master.control
+      }));
 
       return { locations, total: count || 0 };
     },
@@ -319,8 +333,15 @@ const GestionResponsables: React.FC = () => {
               className="pl-10"
             />
           </div>
-          <Button variant="outline" size="icon" onClick={() => refetch()}>
-            <RefreshCw className="w-4 h-4" />
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+            Recargar
           </Button>
           <span className="text-sm text-muted-foreground">
             {data?.total || 0} ubicaciones
@@ -362,6 +383,17 @@ const GestionResponsables: React.FC = () => {
               placeholder="Filtrar..."
               value={filterUbicacion}
               onChange={(e) => { setFilterUbicacion(e.target.value); setCurrentPage(1); }}
+              className="w-[140px] h-9"
+            />
+          </div>
+
+          {/* Observación filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Observación:</span>
+            <Input
+              placeholder="Filtrar..."
+              value={filterObservacion}
+              onChange={(e) => { setFilterObservacion(e.target.value); setCurrentPage(1); }}
               className="w-[140px] h-9"
             />
           </div>
@@ -473,41 +505,51 @@ const GestionResponsables: React.FC = () => {
                     <TableHead className="w-[80px]">Tipo</TableHead>
                     <TableHead className="w-[150px]">Referencia</TableHead>
                     <TableHead>Subcategoría</TableHead>
+                    <TableHead>Observaciones</TableHead>
                     <TableHead>Ubicación</TableHead>
-                    <TableHead>Detalle</TableHead>
-                    <TableHead className="w-[200px]">Líder Actual</TableHead>
+                    <TableHead>Ubicación Detallada</TableHead>
+                    <TableHead>Punto Referencia</TableHead>
+                    <TableHead>Método Conteo</TableHead>
+                    <TableHead className="w-[200px]">Líder Conteo</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data?.locations.map((loc) => (
-                    <TableRow 
-                      key={loc.id}
-                      className={selectedIds.has(loc.id) ? 'bg-primary/5' : ''}
-                    >
+                  {data?.locations.map((location) => (
+                    <TableRow key={location.id}>
                       <TableCell>
                         <Checkbox
-                          checked={selectedIds.has(loc.id)}
-                          onCheckedChange={() => toggleSelection(loc.id)}
-                          aria-label={`Seleccionar ${loc.master_reference}`}
+                          checked={selectedIds.has(location.id)}
+                          onCheckedChange={() => toggleSelection(location.id)}
+                          aria-label={`Seleccionar ${location.master_reference}`}
                         />
                       </TableCell>
                       <TableCell>
-                        <Badge variant={loc.material_type === 'MP' ? 'default' : 'secondary'}>
-                          {loc.material_type}
+                        <Badge 
+                          variant="outline" 
+                          className={location.material_type === 'MP' 
+                            ? 'border-orange-500 text-orange-500' 
+                            : 'border-emerald-500 text-emerald-500'
+                          }
+                        >
+                          {location.material_type}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-mono text-sm">{loc.master_reference}</TableCell>
-                      <TableCell className="text-sm">{loc.subcategoria || '-'}</TableCell>
-                      <TableCell className="text-sm">{loc.location_name || '-'}</TableCell>
-                      <TableCell className="text-sm">{loc.location_detail || '-'}</TableCell>
+                      <TableCell className="font-mono text-sm">{location.master_reference}</TableCell>
+                      <TableCell className="text-sm">{location.subcategoria || '-'}</TableCell>
+                      <TableCell className="text-sm max-w-[200px] truncate" title={location.observaciones || ''}>
+                        {location.observaciones || '-'}
+                      </TableCell>
+                      <TableCell className="text-sm">{location.location_name || '-'}</TableCell>
+                      <TableCell className="text-sm">{location.location_detail || '-'}</TableCell>
+                      <TableCell className="text-sm">{location.punto_referencia || '-'}</TableCell>
+                      <TableCell className="text-sm">{location.metodo_conteo || '-'}</TableCell>
                       <TableCell>
                         <SupervisorSelect
-                          value={loc.assigned_supervisor_id}
-                          onValueChange={(val) => updateAssignmentMutation.mutate({ 
-                            locationId: loc.id, 
-                            supervisorId: val 
+                          value={location.assigned_supervisor_id}
+                          onValueChange={(value) => updateAssignmentMutation.mutate({
+                            locationId: location.id,
+                            supervisorId: value
                           })}
-                          placeholder="Sin asignar"
                           disabled={updateAssignmentMutation.isPending}
                         />
                       </TableCell>
@@ -521,7 +563,7 @@ const GestionResponsables: React.FC = () => {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="mt-4 flex justify-center">
+          <div className="mt-4">
             <Pagination>
               <PaginationContent>
                 <PaginationItem>
@@ -530,7 +572,6 @@ const GestionResponsables: React.FC = () => {
                     className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                   />
                 </PaginationItem>
-                
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum: number;
                   if (totalPages <= 5) {
@@ -542,7 +583,6 @@ const GestionResponsables: React.FC = () => {
                   } else {
                     pageNum = currentPage - 2 + i;
                   }
-                  
                   return (
                     <PaginationItem key={pageNum}>
                       <PaginationLink
@@ -555,7 +595,6 @@ const GestionResponsables: React.FC = () => {
                     </PaginationItem>
                   );
                 })}
-                
                 <PaginationItem>
                   <PaginationNext 
                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
