@@ -1,19 +1,18 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Package, 
   Users, 
-  FileSpreadsheet, 
-  Settings, 
   LogOut,
   Upload,
   Shield,
   BarChart3,
   UserCog,
   Database,
-  Boxes,
-  Table
+  Boxes
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import UserManagement from '@/components/superadmin/UserManagement';
@@ -27,11 +26,46 @@ const SuperadminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
 
-  const stats = [
-    { label: 'Usuarios Registrados', value: '0', icon: Users, color: 'bg-primary/10 text-primary' },
-    { label: 'Referencias Totales', value: '0', icon: Package, color: 'bg-blue-500/10 text-blue-500' },
-    { label: 'Conteos Activos', value: '0', icon: BarChart3, color: 'bg-amber-500/10 text-amber-500' },
-    { label: 'Operarios Activos', value: '0', icon: UserCog, color: 'bg-green-500/10 text-green-500' },
+  // Fetch real statistics
+  const { data: stats } = useQuery({
+    queryKey: ['superadmin-stats'],
+    queryFn: async () => {
+      // Get users count
+      const { count: usersCount } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true });
+
+      // Get total references count
+      const { count: referencesCount } = await supabase
+        .from('inventory_master')
+        .select('referencia', { count: 'exact', head: true });
+
+      // Get active counts (tasks not completed)
+      const { count: activeCountsCount } = await supabase
+        .from('count_tasks')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_completed', false);
+
+      // Get active operarios count
+      const { count: operariosCount } = await supabase
+        .from('operarios')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_active', true);
+
+      return {
+        usuarios: usersCount || 0,
+        referencias: referencesCount || 0,
+        conteosActivos: activeCountsCount || 0,
+        operarios: operariosCount || 0
+      };
+    }
+  });
+
+  const statsDisplay = [
+    { label: 'Usuarios Registrados', value: stats?.usuarios?.toString() || '0', icon: Users, color: 'bg-primary/10 text-primary' },
+    { label: 'Referencias Totales', value: stats?.referencias?.toString() || '0', icon: Package, color: 'bg-blue-500/10 text-blue-500' },
+    { label: 'Conteos Activos', value: stats?.conteosActivos?.toString() || '0', icon: BarChart3, color: 'bg-amber-500/10 text-amber-500' },
+    { label: 'Operarios Activos', value: stats?.operarios?.toString() || '0', icon: UserCog, color: 'bg-green-500/10 text-green-500' },
   ];
 
   const quickActions = [
@@ -115,7 +149,7 @@ const SuperadminDashboard: React.FC = () => {
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              {stats.map((stat) => (
+              {statsDisplay.map((stat) => (
                 <div key={stat.label} className="glass-card">
                   <div className="flex items-center gap-4">
                     <div className={`p-3 rounded-xl ${stat.color}`}>
