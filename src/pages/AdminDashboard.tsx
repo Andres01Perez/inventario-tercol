@@ -38,47 +38,28 @@ const AdminDashboard: React.FC = () => {
       }
       const { count: refCount } = await refQuery;
 
-      // Get assigned supervisors count (unique supervisors with tasks for this admin type)
-      const { data: tasksWithSupervisors } = await supabase
-        .from('count_tasks')
+      // Get assigned supervisors count (unique supervisors with locations for this admin type)
+      const { data: locationsWithSupervisors } = await supabase
+        .from('locations')
         .select('assigned_supervisor_id, inventory_master!inner(control)')
         .not('assigned_supervisor_id', 'is', null);
       
-      const relevantTasks = tasksWithSupervisors?.filter(t => {
-        const inv = t.inventory_master as any;
+      const relevantLocations = locationsWithSupervisors?.filter(l => {
+        const inv = l.inventory_master as any;
         return isAdminMP ? inv.control !== null : inv.control === null;
       }) || [];
-      const uniqueSupervisors = new Set(relevantTasks.map(t => t.assigned_supervisor_id));
+      const uniqueSupervisors = new Set(relevantLocations.map(l => l.assigned_supervisor_id));
 
-      // Get pending counts (tasks not completed)
-      const { data: pendingTasks } = await supabase
-        .from('count_tasks')
-        .select('id, is_completed, inventory_master!inner(control)')
-        .eq('is_completed', false);
-      
-      const pendingCount = pendingTasks?.filter(t => {
-        const inv = t.inventory_master as any;
-        return isAdminMP ? inv.control !== null : inv.control === null;
-      }).length || 0;
-
-      // Get differences (tasks with quantity_counted != 0 that might need review)
-      const { data: differenceTasks } = await supabase
-        .from('count_tasks')
-        .select('id, quantity_counted, inventory_master!inner(control, cant_total_erp)')
-        .eq('is_completed', true)
-        .not('quantity_counted', 'is', null);
-      
-      const diffCount = differenceTasks?.filter(t => {
-        const inv = t.inventory_master as any;
-        const isRelevant = isAdminMP ? inv.control !== null : inv.control === null;
-        return isRelevant && t.quantity_counted !== inv.cant_total_erp;
-      }).length || 0;
+      // Count locations (these are the configured locations, not tasks yet)
+      const { count: locationsCount } = await supabase
+        .from('locations')
+        .select('id', { count: 'exact', head: true });
 
       return {
         referencias: refCount || 0,
         supervisores: uniqueSupervisors.size,
-        pendientes: pendingCount,
-        diferencias: diffCount
+        ubicaciones: locationsCount || 0,
+        diferencias: 0 // Will be calculated from future count_tasks table
       };
     }
   });
@@ -86,7 +67,7 @@ const AdminDashboard: React.FC = () => {
   const statsDisplay = [
     { label: 'Referencias Cargadas', value: stats?.referencias?.toString() || '0', icon: isAdminMP ? Package : Boxes, color: `${adminBgClass} ${adminColorClass}` },
     { label: 'Supervisores Asignados', value: stats?.supervisores?.toString() || '0', icon: Users, color: 'bg-blue-500/10 text-blue-500' },
-    { label: 'Conteos Pendientes', value: stats?.pendientes?.toString() || '0', icon: ClipboardCheck, color: 'bg-amber-500/10 text-amber-500' },
+    { label: 'Ubicaciones Configuradas', value: stats?.ubicaciones?.toString() || '0', icon: MapPin, color: 'bg-amber-500/10 text-amber-500' },
     { label: 'Diferencias', value: stats?.diferencias?.toString() || '0', icon: BarChart3, color: 'bg-destructive/10 text-destructive' },
   ];
 

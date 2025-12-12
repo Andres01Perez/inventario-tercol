@@ -63,83 +63,7 @@ export type Database = {
             foreignKeyName: "audit_logs_task_id_fkey"
             columns: ["task_id"]
             isOneToOne: false
-            referencedRelation: "count_tasks"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      count_tasks: {
-        Row: {
-          assigned_admin_id: string | null
-          assigned_supervisor_id: string | null
-          audit_round: number
-          created_at: string | null
-          id: string
-          is_completed: boolean | null
-          location_detail: string | null
-          location_name: string | null
-          master_reference: string
-          metodo_conteo: string | null
-          operario_id: string | null
-          punto_referencia: string | null
-          quantity_counted: number | null
-          subcategoria: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          assigned_admin_id?: string | null
-          assigned_supervisor_id?: string | null
-          audit_round?: number
-          created_at?: string | null
-          id?: string
-          is_completed?: boolean | null
-          location_detail?: string | null
-          location_name?: string | null
-          master_reference: string
-          metodo_conteo?: string | null
-          operario_id?: string | null
-          punto_referencia?: string | null
-          quantity_counted?: number | null
-          subcategoria?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          assigned_admin_id?: string | null
-          assigned_supervisor_id?: string | null
-          audit_round?: number
-          created_at?: string | null
-          id?: string
-          is_completed?: boolean | null
-          location_detail?: string | null
-          location_name?: string | null
-          master_reference?: string
-          metodo_conteo?: string | null
-          operario_id?: string | null
-          punto_referencia?: string | null
-          quantity_counted?: number | null
-          subcategoria?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "count_tasks_assigned_admin_id_fkey"
-            columns: ["assigned_admin_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "count_tasks_master_reference_fkey"
-            columns: ["master_reference"]
-            isOneToOne: false
-            referencedRelation: "inventory_master"
-            referencedColumns: ["referencia"]
-          },
-          {
-            foreignKeyName: "count_tasks_operario_id_fkey"
-            columns: ["operario_id"]
-            isOneToOne: false
-            referencedRelation: "operarios"
+            referencedRelation: "locations"
             referencedColumns: ["id"]
           },
         ]
@@ -236,6 +160,63 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "task_statuses"
             referencedColumns: ["slug"]
+          },
+        ]
+      }
+      locations: {
+        Row: {
+          assigned_admin_id: string | null
+          assigned_supervisor_id: string | null
+          created_at: string | null
+          id: string
+          location_detail: string | null
+          location_name: string | null
+          master_reference: string
+          metodo_conteo: string | null
+          punto_referencia: string | null
+          subcategoria: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_admin_id?: string | null
+          assigned_supervisor_id?: string | null
+          created_at?: string | null
+          id?: string
+          location_detail?: string | null
+          location_name?: string | null
+          master_reference: string
+          metodo_conteo?: string | null
+          punto_referencia?: string | null
+          subcategoria?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_admin_id?: string | null
+          assigned_supervisor_id?: string | null
+          created_at?: string | null
+          id?: string
+          location_detail?: string | null
+          location_name?: string | null
+          master_reference?: string
+          metodo_conteo?: string | null
+          punto_referencia?: string | null
+          subcategoria?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "count_tasks_assigned_admin_id_fkey"
+            columns: ["assigned_admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "count_tasks_master_reference_fkey"
+            columns: ["master_reference"]
+            isOneToOne: false
+            referencedRelation: "inventory_master"
+            referencedColumns: ["referencia"]
           },
         ]
       }

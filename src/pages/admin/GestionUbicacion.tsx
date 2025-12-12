@@ -155,27 +155,27 @@ const GestionUbicacion: React.FC = () => {
         return { items: [], total: 0 };
       }
 
-      // Fetch associated tasks
+      // Fetch associated locations
       const referencias = inventoryData.map(i => i.referencia);
-      let tasksQuery = supabase
-        .from('count_tasks')
+      let locationsQuery = supabase
+        .from('locations')
         .select('*')
         .in('master_reference', referencias);
 
-      const { data: tasksData, error: tasksError } = await tasksQuery;
-      if (tasksError) throw tasksError;
+      const { data: locationsData, error: locationsError } = await locationsQuery;
+      if (locationsError) throw locationsError;
 
-      // Map tasks to inventory
-      const tasksMap = new Map<string, CountTask>();
-      tasksData?.forEach(task => {
-        tasksMap.set(task.master_reference, task);
+      // Map locations to inventory
+      const locationsMap = new Map<string, CountTask>();
+      locationsData?.forEach(location => {
+        locationsMap.set(location.master_reference, location);
       });
 
       let items: InventoryWithTask[] = inventoryData.map(inv => ({
         referencia: inv.referencia,
         material_type: inv.material_type as 'MP' | 'PP',
         control: inv.control,
-        task: tasksMap.get(inv.referencia) || null
+        task: locationsMap.get(inv.referencia) || null
       }));
 
       // Apply client-side filters for task-related fields
@@ -221,13 +221,13 @@ const GestionUbicacion: React.FC = () => {
     }) => {
       if (existingTaskId) {
         const { error } = await supabase
-          .from('count_tasks')
+          .from('locations')
           .update({ [field]: value } as any)
           .eq('id', existingTaskId);
         if (error) throw error;
       } else {
         const { error } = await supabase
-          .from('count_tasks')
+          .from('locations')
           .insert([{
             master_reference: referencia,
             assigned_admin_id: profile?.id,
