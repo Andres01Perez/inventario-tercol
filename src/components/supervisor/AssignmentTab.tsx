@@ -158,15 +158,16 @@ const AssignmentTab: React.FC = () => {
                 />
               </TableHead>
               <TableHead>Referencia</TableHead>
+              <TableHead>Tipo</TableHead>
               <TableHead>Ubicación</TableHead>
-              <TableHead>Subcategoría</TableHead>
+              <TableHead>Ubicación Detallada</TableHead>
               <TableHead className="w-[200px]">Operario</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredLocations.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   No hay ubicaciones asignadas
                 </TableCell>
               </TableRow>
@@ -180,21 +181,16 @@ const AssignmentTab: React.FC = () => {
                     />
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{loc.master_reference}</span>
-                      <Badge variant={loc.inventory_master?.material_type === 'MP' ? 'default' : 'secondary'} className="text-xs">
-                        {loc.inventory_master?.material_type}
-                      </Badge>
-                    </div>
+                    <span className="font-medium">{loc.master_reference}</span>
                   </TableCell>
-                  <TableCell>
-                    <span className="text-sm">
-                      {loc.location_name || '-'}
-                      {loc.location_detail && <span className="text-muted-foreground"> - {loc.location_detail}</span>}
-                    </span>
+                  <TableCell className="text-sm">
+                    {loc.inventory_master?.material_type || '-'}
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {loc.location_name || '-'}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {loc.subcategoria || '-'}
+                    {loc.location_detail || '-'}
                   </TableCell>
                   <TableCell>
                     <OperarioSelect
