@@ -8,10 +8,12 @@ import {
   Loader2,
   Trash2,
   Package,
-  Factory
+  Factory,
+  AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -20,6 +22,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,7 +44,19 @@ import {
   MaterialType
 } from '@/lib/masterDataParser';
 
-type ImportState = 'idle' | 'parsing' | 'preview' | 'importing' | 'success' | 'error';
+type ImportState = 'idle' | 'parsing' | 'preview' | 'importing' | 'success' | 'error' | 'checking';
+
+interface ActiveInventoryCheck {
+  hasLocations: boolean;
+  locationsCount: number;
+  hasAssignedSupervisors: boolean;
+  assignedCount: number;
+  hasNonPendingStatus: boolean;
+  nonPendingCount: number;
+  hasCountHistory: boolean;
+  countHistoryCount: number;
+  isActive: boolean;
+}
 
 interface FileUploadZoneProps {
   type: MaterialType;
@@ -195,6 +219,55 @@ const MasterDataImport: React.FC = () => {
   
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [combinedData, setCombinedData] = useState<ParsedRow[]>([]);
+  
+  // Active inventory protection states
+  const [activeCheck, setActiveCheck] = useState<ActiveInventoryCheck | null>(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+
+  const checkActiveInventory = async (): Promise<ActiveInventoryCheck> => {
+    // Check locations count
+    const { count: locationsCount } = await supabase
+      .from('locations')
+      .select('*', { count: 'exact', head: true });
+
+    // Check assigned supervisors
+    const { count: assignedCount } = await supabase
+      .from('locations')
+      .select('*', { count: 'exact', head: true })
+      .not('assigned_supervisor_id', 'is', null);
+
+    // Check non-pending status
+    const { count: nonPendingCount } = await supabase
+      .from('inventory_master')
+      .select('*', { count: 'exact', head: true })
+      .neq('status_slug', 'pendiente');
+
+    // Check count history (not empty array)
+    const { data: historyData } = await supabase
+      .from('inventory_master')
+      .select('count_history')
+      .neq('count_history', '[]');
+
+    const countHistoryCount = historyData?.length || 0;
+
+    const hasLocations = (locationsCount || 0) > 0;
+    const hasAssignedSupervisors = (assignedCount || 0) > 0;
+    const hasNonPendingStatus = (nonPendingCount || 0) > 0;
+    const hasCountHistory = countHistoryCount > 0;
+
+    return {
+      hasLocations,
+      locationsCount: locationsCount || 0,
+      hasAssignedSupervisors,
+      assignedCount: assignedCount || 0,
+      hasNonPendingStatus,
+      nonPendingCount: nonPendingCount || 0,
+      hasCountHistory,
+      countHistoryCount,
+      isActive: hasLocations || hasAssignedSupervisors || hasNonPendingStatus || hasCountHistory
+    };
+  };
 
   const handleMpFileSelect = async (file: File | null) => {
     setMpFile(file);
@@ -252,9 +325,31 @@ const MasterDataImport: React.FC = () => {
     }
   };
 
-  const handleImport = async () => {
+  const handleImportClick = async () => {
     if (combinedData.length === 0) return;
 
+    setState('checking');
+    const check = await checkActiveInventory();
+    setActiveCheck(check);
+
+    if (check.isActive) {
+      setShowConfirmDialog(true);
+      setConfirmText('');
+      setState('preview');
+    } else {
+      executeImport();
+    }
+  };
+
+  const handleConfirmedImport = () => {
+    if (confirmText === 'BORRAR') {
+      setShowConfirmDialog(false);
+      setConfirmText('');
+      executeImport();
+    }
+  };
+
+  const executeImport = async () => {
     setState('importing');
     setProgress(0);
 
@@ -262,7 +357,18 @@ const MasterDataImport: React.FC = () => {
       // Remove cant_total_erp since it's a generated column in the database
       const dataToInsert = combinedData.map(({ cant_total_erp, ...rest }) => rest);
 
-      // Step 1: Delete all existing records
+      // Step 1: Delete all existing locations (cascade cleanup)
+      setProgress(5);
+      const { error: locDeleteError } = await supabase
+        .from('locations')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+
+      if (locDeleteError) {
+        throw new Error(`Error al eliminar ubicaciones: ${locDeleteError.message}`);
+      }
+
+      // Step 2: Delete all existing inventory records
       setProgress(10);
       const { error: deleteError } = await supabase
         .from('inventory_master')
@@ -273,7 +379,7 @@ const MasterDataImport: React.FC = () => {
         throw new Error(`Error al eliminar datos existentes: ${deleteError.message}`);
       }
 
-      // Step 2: Insert in batches of 500
+      // Step 3: Insert in batches of 500
       const BATCH_SIZE = 500;
       const batches = [];
       for (let i = 0; i < dataToInsert.length; i += BATCH_SIZE) {
@@ -313,6 +419,7 @@ const MasterDataImport: React.FC = () => {
         setCombinedData([]);
         setState('idle');
         setProgress(0);
+        setActiveCheck(null);
       }, 2000);
     } catch (error) {
       setState('error');
@@ -558,12 +665,17 @@ const MasterDataImport: React.FC = () => {
           {state !== 'importing' && state !== 'success' && (
             <div className="flex justify-end">
               <Button
-                onClick={handleImport}
-                disabled={!canImport}
+                onClick={handleImportClick}
+                disabled={!canImport || state === ('checking' as ImportState)}
                 size="lg"
                 className="min-w-[200px]"
               >
-                {state === 'error' ? (
+                {state === ('checking' as ImportState) ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Verificando...
+                  </>
+                ) : state === 'error' ? (
                   <>Reintentar Importación</>
                 ) : (
                   <>
@@ -576,6 +688,81 @@ const MasterDataImport: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* Confirmation Dialog for Active Inventory */}
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              ¡Atención! Inventario Activo Detectado
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4 text-left">
+                <p className="text-foreground font-medium">
+                  Esta acción eliminará permanentemente los siguientes datos:
+                </p>
+                
+                <ul className="space-y-2 text-sm">
+                  {activeCheck?.hasLocations && (
+                    <li className="flex items-center gap-2">
+                      <X className="w-4 h-4 text-destructive" />
+                      <span><strong>{activeCheck.locationsCount}</strong> ubicaciones configuradas</span>
+                    </li>
+                  )}
+                  {activeCheck?.hasAssignedSupervisors && (
+                    <li className="flex items-center gap-2">
+                      <X className="w-4 h-4 text-destructive" />
+                      <span><strong>{activeCheck.assignedCount}</strong> supervisores asignados</span>
+                    </li>
+                  )}
+                  {activeCheck?.hasNonPendingStatus && (
+                    <li className="flex items-center gap-2">
+                      <X className="w-4 h-4 text-destructive" />
+                      <span><strong>{activeCheck.nonPendingCount}</strong> referencias con conteo en progreso</span>
+                    </li>
+                  )}
+                  {activeCheck?.hasCountHistory && (
+                    <li className="flex items-center gap-2">
+                      <X className="w-4 h-4 text-destructive" />
+                      <span><strong>{activeCheck.countHistoryCount}</strong> referencias con historial de conteo</span>
+                    </li>
+                  )}
+                </ul>
+
+                <div className="pt-4 border-t">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Para confirmar, escriba <strong className="text-destructive">BORRAR</strong> en el campo:
+                  </p>
+                  <Input
+                    value={confirmText}
+                    onChange={(e) => setConfirmText(e.target.value.toUpperCase())}
+                    placeholder="Escriba BORRAR"
+                    className="font-mono"
+                    autoFocus
+                  />
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setConfirmText('');
+              setShowConfirmDialog(false);
+            }}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmedImport}
+              disabled={confirmText !== 'BORRAR'}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Confirmar Borrado e Importar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
