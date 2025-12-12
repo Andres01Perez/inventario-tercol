@@ -67,7 +67,7 @@ interface LocationRow {
   location: LocationData | null;
   isFirstOfGroup: boolean;
   groupSize: number;
-  isAddRow: boolean;
+  hasNoLocations?: boolean;
 }
 
 const GestionUbicacion: React.FC = () => {
@@ -176,7 +176,7 @@ const GestionUbicacion: React.FC = () => {
         locationsMap.set(location.master_reference, existing);
       });
 
-      // Build rows: one per location + one "add" row per reference
+      // Build rows: one per location (no separate add rows)
       let rows: LocationRow[] = [];
       
       inventoryData.forEach(inv => {
@@ -199,10 +199,8 @@ const GestionUbicacion: React.FC = () => {
           );
         }
 
-        const groupSize = locations.length + 1; // +1 for add row
-
         if (locations.length === 0) {
-          // Reference with no locations - show only add row
+          // Reference with no locations - show row with add button only
           rows.push({
             referencia: inv.referencia,
             material_type: inv.material_type as 'MP' | 'PP',
@@ -210,7 +208,7 @@ const GestionUbicacion: React.FC = () => {
             location: null,
             isFirstOfGroup: true,
             groupSize: 1,
-            isAddRow: true
+            hasNoLocations: true
           });
         } else {
           // Add a row for each existing location
@@ -221,19 +219,8 @@ const GestionUbicacion: React.FC = () => {
               control: inv.control,
               location: loc,
               isFirstOfGroup: index === 0,
-              groupSize,
-              isAddRow: false
+              groupSize: locations.length
             });
-          });
-          // Add the "add new location" row
-          rows.push({
-            referencia: inv.referencia,
-            material_type: inv.material_type as 'MP' | 'PP',
-            control: inv.control,
-            location: null,
-            isFirstOfGroup: false,
-            groupSize,
-            isAddRow: true
           });
         }
       });
@@ -488,36 +475,34 @@ const GestionUbicacion: React.FC = () => {
                     const isEvenGroup = groupIndex % 2 === 0;
                     const rowKey = row.location?.id || `${row.referencia}-add-${index}`;
 
-                    if (row.isAddRow) {
-                      // Add location row
+                    // Reference without locations - show row with add button only
+                    if (row.hasNoLocations) {
                       return (
                         <TableRow 
                           key={rowKey} 
                           className={isEvenGroup ? 'bg-muted/30' : ''}
                         >
                           <TableCell>
-                            {row.isFirstOfGroup && (
-                              <Badge variant="outline" className={row.material_type === 'MP' ? 'border-orange-500 text-orange-500' : 'border-emerald-500 text-emerald-500'}>
-                                {row.material_type}
-                              </Badge>
-                            )}
+                            <Badge variant="outline" className={row.material_type === 'MP' ? 'border-orange-500 text-orange-500' : 'border-emerald-500 text-emerald-500'}>
+                              {row.material_type}
+                            </Badge>
                           </TableCell>
-                          <TableCell className="font-medium">
-                            {row.isFirstOfGroup && row.referencia}
+                          <TableCell className="font-medium">{row.referencia}</TableCell>
+                          <TableCell colSpan={7} className="text-muted-foreground text-sm italic">
+                            Sin ubicaciones asignadas
                           </TableCell>
-                          <TableCell colSpan={7} className="py-1">
+                          <TableCell>
                             <Button
                               variant="ghost"
-                              size="sm"
+                              size="icon"
                               onClick={() => handleAddLocation(row.referencia)}
                               disabled={addLocationMutation.isPending}
-                              className="text-muted-foreground hover:text-foreground gap-1"
+                              className="text-primary hover:text-primary hover:bg-primary/10"
+                              title="Agregar ubicación"
                             >
                               <Plus className="w-4 h-4" />
-                              Agregar ubicación
                             </Button>
                           </TableCell>
-                          <TableCell></TableCell>
                         </TableRow>
                       );
                     }
@@ -587,15 +572,30 @@ const GestionUbicacion: React.FC = () => {
                           />
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteLocation(row.location!.id)}
-                            disabled={deleteLocationMutation.isPending}
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            {row.isFirstOfGroup && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleAddLocation(row.referencia)}
+                                disabled={addLocationMutation.isPending}
+                                className="text-primary hover:text-primary hover:bg-primary/10"
+                                title="Agregar ubicación"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteLocation(row.location!.id)}
+                              disabled={deleteLocationMutation.isPending}
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              title="Eliminar ubicación"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
