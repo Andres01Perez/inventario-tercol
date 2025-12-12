@@ -13,7 +13,17 @@ import InventarioMP from "./pages/superadmin/InventarioMP";
 import InventarioPP from "./pages/superadmin/InventarioPP";
 import GestionUbicacion from "./pages/admin/GestionUbicacion";
 
-const queryClient = new QueryClient();
+// Configure QueryClient with proper defaults for multi-user isolation
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      gcTime: 1000 * 60 * 10, // 10 minutes (garbage collection)
+      refetchOnWindowFocus: false, // Prevent unnecessary refetches
+      retry: 1, // Only retry once on failure
+    },
+  },
+});
 
 const App: React.FC = () => (
   <QueryClientProvider client={queryClient}>

@@ -9,11 +9,22 @@ const emailSchema = z.string().email('Correo electrónico inválido');
 const passwordSchema = z.string().min(6, 'La contraseña debe tener al menos 6 caracteres');
 const fullNameSchema = z.string().min(2, 'El nombre debe tener al menos 2 caracteres');
 
-const GlassInputWrapper = ({ children, error }: { children: React.ReactNode; error?: boolean }) => (
-  <div className={`rounded-2xl border ${error ? 'border-destructive' : 'border-border'} bg-foreground/5 backdrop-blur-sm transition-colors focus-within:border-primary/70 focus-within:bg-primary/10`}>
-    {children}
-  </div>
+interface GlassInputWrapperProps {
+  children: React.ReactNode;
+  error?: boolean;
+}
+
+const GlassInputWrapper = React.forwardRef<HTMLDivElement, GlassInputWrapperProps>(
+  ({ children, error }, ref) => (
+    <div 
+      ref={ref}
+      className={`rounded-2xl border ${error ? 'border-destructive' : 'border-border'} bg-foreground/5 backdrop-blur-sm transition-colors focus-within:border-primary/70 focus-within:bg-primary/10`}
+    >
+      {children}
+    </div>
+  )
 );
+GlassInputWrapper.displayName = 'GlassInputWrapper';
 
 interface RoleInfo {
   role: string;
@@ -46,19 +57,30 @@ const roles: RoleInfo[] = [
   }
 ];
 
-const RoleCard = ({ role, delay }: { role: RoleInfo; delay: string }) => (
-  <div className={`animate-testimonial ${delay} rounded-2xl bg-card/40 backdrop-blur-xl border border-white/10 p-4 w-72`}>
-    <p className="font-semibold text-white text-sm mb-2">{role.role}</p>
-    <ul className="space-y-1">
-      {role.features.map((feature, idx) => (
-        <li key={idx} className="flex items-start gap-2 text-xs text-white/85">
-          <span className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
-          {feature}
-        </li>
-      ))}
-    </ul>
-  </div>
+interface RoleCardProps {
+  role: RoleInfo;
+  delay: string;
+}
+
+const RoleCard = React.forwardRef<HTMLDivElement, RoleCardProps>(
+  ({ role, delay }, ref) => (
+    <div 
+      ref={ref}
+      className={`animate-testimonial ${delay} rounded-2xl bg-card/40 backdrop-blur-xl border border-white/10 p-4 w-72`}
+    >
+      <p className="font-semibold text-white text-sm mb-2">{role.role}</p>
+      <ul className="space-y-1">
+        {role.features.map((feature, idx) => (
+          <li key={idx} className="flex items-start gap-2 text-xs text-white/85">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
+            {feature}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
 );
+RoleCard.displayName = 'RoleCard';
 
 const Auth: React.FC = () => {
   const [isSignUp, setIsSignUp] = useState(false);

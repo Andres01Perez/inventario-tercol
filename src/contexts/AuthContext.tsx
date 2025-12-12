@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 export type AppRole = 'superadmin' | 'admin_mp' | 'admin_pp' | 'supervisor' | null;
 
@@ -39,8 +40,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<Profile | null>(null);
   const [role, setRole] = useState<AppRole>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Track current user ID to prevent race conditions
+  const currentUserIdRef = useRef<string | null>(null);
+  const queryClientRef = useRef<ReturnType<typeof useQueryClient> | null>(null);
 
-  const fetchUserData = async (userId: string) => {
+  // Get queryClient safely (will be set when component mounts inside QueryClientProvider)
+  try {
+    queryClientRef.current = useQueryClient();
+  } catch {
+    // QueryClient not available yet, will be set later
+  }
+
+  const clearAllCaches = useCallback(() => {
+    if (queryClientRef.current) {
+      queryClientRef.current.clear();
+    }
+  }, []);
+
+  const fetchUserData = useCallback(async (userId: string) => {
+    // Prevent stale updates if user changed
+    if (currentUserIdRef.current !== userId) {
+      return;
+    }
+
     try {
       // Fetch profile
       const { data: profileData, error: profileError } = await supabase
@@ -48,6 +71,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .select('*')
         .eq('id', userId)
         .maybeSingle();
+
+      // Check again if user is still the same
+      if (currentUserIdRef.current !== userId) {
+        return;
+      }
 
       if (profileError) {
         console.error('Error fetching profile:', profileError);
@@ -59,11 +87,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data: roleData, error: roleError } = await supabase
         .rpc('get_user_role', { _user_id: userId });
 
+      // Check again if user is still the same
+      if (currentUserIdRef.current !== userId) {
+        return;
+      }
+
       if (roleError) {
         console.error('Error fetching role:', roleError);
         setRole(null);
       } else {
-        // roleData can be 'superadmin' | 'admin' | 'supervisor' | 'operario' | null
+        // roleData can be 'superadmin' | 'admin' | 'admin_mp' | 'admin_pp' | 'supervisor' | 'operario' | null
         // We exclude 'operario' from UI access
         if (roleData === 'operario') {
           setRole(null);
@@ -74,51 +107,96 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('Error fetching user data:', error);
     }
-  };
+  }, []);
 
-  const refreshUserData = async () => {
+  const refreshUserData = useCallback(async () => {
     if (user) {
       await fetchUserData(user.id);
     }
-  };
+  }, [user, fetchUserData]);
 
   useEffect(() => {
+    let isMounted = true;
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+      (event, newSession) => {
+        if (!isMounted) return;
 
-        // Use setTimeout to defer Supabase calls
-        if (session?.user) {
-          setTimeout(() => {
-            fetchUserData(session.user.id);
-          }, 0);
-        } else {
+        const newUserId = newSession?.user?.id ?? null;
+        const previousUserId = currentUserIdRef.current;
+
+        // Update session and user synchronously
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
+
+        // Handle user changes
+        if (event === 'SIGNED_OUT') {
+          currentUserIdRef.current = null;
           setProfile(null);
           setRole(null);
+          setLoading(false);
+          // Clear all cached data on logout
+          clearAllCaches();
+          return;
         }
 
-        if (event === 'SIGNED_OUT') {
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          // If user changed, clear cache to prevent data leakage
+          if (previousUserId && previousUserId !== newUserId) {
+            clearAllCaches();
+          }
+        }
+
+        // Defer Supabase calls with setTimeout to prevent deadlocks
+        if (newSession?.user) {
+          currentUserIdRef.current = newSession.user.id;
+          setTimeout(() => {
+            if (isMounted && currentUserIdRef.current === newSession.user.id) {
+              fetchUserData(newSession.user.id).finally(() => {
+                if (isMounted) setLoading(false);
+              });
+            }
+          }, 0);
+        } else {
+          currentUserIdRef.current = null;
+          setProfile(null);
+          setRole(null);
           setLoading(false);
         }
       }
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchUserData(session.user.id).finally(() => setLoading(false));
-      } else {
-        setLoading(false);
+    const initializeAuth = async () => {
+      try {
+        const { data: { session: existingSession } } = await supabase.auth.getSession();
+        
+        if (!isMounted) return;
+        
+        setSession(existingSession);
+        setUser(existingSession?.user ?? null);
+        
+        if (existingSession?.user) {
+          currentUserIdRef.current = existingSession.user.id;
+          await fetchUserData(existingSession.user.id);
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
-    });
+    };
 
-    return () => subscription.unsubscribe();
-  }, []);
+    initializeAuth();
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [fetchUserData, clearAllCaches]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
@@ -145,7 +223,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    // Clear cache BEFORE signing out to ensure clean state
+    clearAllCaches();
+    
     await supabase.auth.signOut();
+    
+    // Reset all state
+    currentUserIdRef.current = null;
     setUser(null);
     setSession(null);
     setProfile(null);
