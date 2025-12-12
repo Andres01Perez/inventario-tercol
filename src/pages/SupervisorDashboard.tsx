@@ -140,7 +140,7 @@ const SupervisorDashboard: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="transcription">
-            <div className="glass-card">
+            <div className="glass-card-static">
               <h3 className="text-lg font-semibold mb-4">Transcribir Conteos por Operario</h3>
               <TranscriptionTab />
             </div>
