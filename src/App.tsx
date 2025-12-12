@@ -12,6 +12,7 @@ import NotFound from "./pages/NotFound";
 import InventarioMP from "./pages/superadmin/InventarioMP";
 import InventarioPP from "./pages/superadmin/InventarioPP";
 import GestionUbicacion from "./pages/admin/GestionUbicacion";
+import GestionResponsables from "./pages/admin/GestionResponsables";
 
 // Configure QueryClient with proper defaults for multi-user isolation
 const queryClient = new QueryClient({
@@ -66,6 +67,14 @@ const App: React.FC = () => (
               element={
                 <ProtectedRoute allowedRoles={['admin_mp', 'admin_pp']}>
                   <GestionUbicacion />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/gestion-responsables"
+              element={
+                <ProtectedRoute allowedRoles={['admin_mp', 'admin_pp']}>
+                  <GestionResponsables />
                 </ProtectedRoute>
               }
             />
