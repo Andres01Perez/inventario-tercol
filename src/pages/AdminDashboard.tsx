@@ -25,9 +25,9 @@ const AdminDashboard: React.FC = () => {
   const adminColorClass = isAdminMP ? 'text-orange-500' : 'text-emerald-500';
   const adminBgClass = isAdminMP ? 'bg-orange-500/10' : 'bg-emerald-500/10';
 
-  // Fetch real statistics
+  // Fetch real statistics - include user.id for cache isolation
   const { data: stats } = useQuery({
-    queryKey: ['admin-stats', role],
+    queryKey: ['admin-stats', profile?.id, role],
     queryFn: async () => {
       // Get references count
       let refQuery = supabase.from('inventory_master').select('referencia', { count: 'exact', head: true });

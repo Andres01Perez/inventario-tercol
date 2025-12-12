@@ -121,9 +121,9 @@ const GestionUbicacion: React.FC = () => {
     setCurrentPage(1);
   };
 
-  // Fetch inventory items with their associated locations
+  // Fetch inventory items with their associated locations - include user.id for cache isolation
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['admin-inventory', role, searchTerm, currentPage, filterTipo, filterSubcategoria, filterUbicacion, filterSupervisor],
+    queryKey: ['admin-inventory', profile?.id, role, searchTerm, currentPage, filterTipo, filterSubcategoria, filterUbicacion, filterSupervisor],
     queryFn: async () => {
       // admin_mp: control IS NOT NULL
       // admin_pp: control IS NULL

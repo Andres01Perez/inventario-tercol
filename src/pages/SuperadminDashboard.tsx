@@ -27,9 +27,9 @@ const SuperadminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
 
-  // Fetch real statistics
+  // Fetch real statistics - include user.id for cache isolation
   const { data: stats } = useQuery({
-    queryKey: ['superadmin-stats'],
+    queryKey: ['superadmin-stats', profile?.id],
     queryFn: async () => {
       // Get users count
       const { count: usersCount } = await supabase
