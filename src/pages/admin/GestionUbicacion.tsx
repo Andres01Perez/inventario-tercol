@@ -43,7 +43,7 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination';
 
-const ITEMS_PER_PAGE = 15;
+const ITEMS_PER_PAGE = 200;
 
 interface CountTask {
   id: string;
@@ -89,12 +89,25 @@ const GestionUbicacion: React.FC = () => {
   const { data: supervisors } = useQuery({
     queryKey: ['supervisors-filter'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First get user_ids with supervisor role
+      const { data: roles, error: rolesError } = await supabase
         .from('user_roles')
-        .select('user_id, profiles!inner(id, full_name, email)')
+        .select('user_id')
         .eq('role', 'supervisor');
-      if (error) throw error;
-      return data || [];
+      
+      if (rolesError) throw rolesError;
+      if (!roles || roles.length === 0) return [];
+
+      const userIds = roles.map(r => r.user_id);
+
+      // Then get profiles for those users
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', userIds);
+
+      if (profilesError) throw profilesError;
+      return profiles || [];
     }
   });
 
@@ -340,9 +353,9 @@ const GestionUbicacion: React.FC = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
-                {supervisors?.map((s: any) => (
-                  <SelectItem key={s.user_id} value={s.user_id}>
-                    {s.profiles?.full_name || s.profiles?.email}
+                {supervisors?.map((supervisor) => (
+                  <SelectItem key={supervisor.id} value={supervisor.id}>
+                    {supervisor.full_name || supervisor.email}
                   </SelectItem>
                 ))}
               </SelectContent>
