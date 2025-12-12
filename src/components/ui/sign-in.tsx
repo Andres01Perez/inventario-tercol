@@ -54,11 +54,11 @@ export const SignInPage: React.FC<SignInPageProps> = ({
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <div className="h-[100dvh] flex flex-col md:flex-row font-sans w-[100dvw]">
+    <div className="h-[100dvh] w-[100dvw] overflow-hidden flex flex-col md:flex-row font-sans">
       {/* Left column: sign-in form */}
-      <section className="flex-1 flex items-center justify-center p-8 bg-background">
+      <section className="flex-1 flex items-center justify-center p-4 md:p-6 bg-background overflow-hidden">
         <div className="w-full max-w-md">
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-4">
             {/* Logo */}
             <div className="animate-element animate-delay-100 flex items-center gap-3 mb-2">
               <div className="w-12 h-12 rounded-xl gradient-bg flex items-center justify-center shadow-lg shadow-primary/25">
@@ -73,7 +73,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({
             <h1 className="animate-element animate-delay-200 text-4xl md:text-5xl font-semibold leading-tight">{title}</h1>
             <p className="animate-element animate-delay-300 text-muted-foreground">{description}</p>
 
-            <form className="space-y-5" onSubmit={onSignIn}>
+            <form className="space-y-4" onSubmit={onSignIn}>
               <div className="animate-element animate-delay-400">
                 <label className="text-sm font-medium text-muted-foreground">Correo Electrónico</label>
                 <GlassInputWrapper>
@@ -143,7 +143,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({
               </button>
             </p>
 
-            <div className="animate-element animate-delay-900 pt-4 border-t border-border/50 text-center">
+            <div className="animate-element animate-delay-900 pt-2 border-t border-border/50 text-center">
               <p className="text-xs text-muted-foreground">
                 © 2026 Tercol SAS. Todos los derechos reservados.
               </p>
@@ -154,9 +154,9 @@ export const SignInPage: React.FC<SignInPageProps> = ({
 
       {/* Right column: hero image + testimonials */}
       {heroImageSrc && (
-        <section className="hidden md:block flex-1 relative p-4">
+        <section className="hidden md:block flex-1 relative p-3 overflow-hidden">
           <div 
-            className="animate-slide-right animate-delay-300 absolute inset-4 rounded-3xl bg-cover bg-center"
+            className="animate-slide-right animate-delay-300 absolute inset-3 rounded-3xl bg-cover bg-center"
             style={{ backgroundImage: `url(${heroImageSrc})` }}
           >
             {/* Overlay gradient */}
@@ -164,7 +164,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({
           </div>
           
           {roles.length > 0 && (
-            <div className="absolute bottom-8 left-8 right-8 flex gap-3 justify-center flex-wrap z-10">
+            <div className="absolute bottom-4 left-4 right-4 flex gap-2 justify-center flex-wrap z-10">
               {roles.map((role, idx) => (
                 <RoleCard 
                   key={role.role} 

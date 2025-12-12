@@ -56,7 +56,7 @@ const Index = () => {
   };
 
   return (
-    <div className="bg-background text-foreground">
+    <div className="h-[100dvh] w-[100dvw] overflow-hidden bg-background text-foreground">
       <SignInPage
         title={
           <>

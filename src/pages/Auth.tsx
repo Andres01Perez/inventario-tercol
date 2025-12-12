@@ -206,11 +206,11 @@ const Auth: React.FC = () => {
   }
 
   return (
-    <div className="h-[100dvh] flex flex-col md:flex-row font-sans w-[100dvw]">
+    <div className="h-[100dvh] w-[100dvw] overflow-hidden flex flex-col md:flex-row font-sans">
       {/* Left column: sign-in form */}
-      <section className="flex-1 flex items-center justify-center p-8 bg-background">
+      <section className="flex-1 flex items-center justify-center p-4 md:p-6 bg-background overflow-hidden">
         <div className="w-full max-w-md">
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-4">
             {/* Logo */}
             <div className="animate-element animate-delay-100 flex items-center gap-3 mb-2">
               <div className="w-12 h-12 rounded-xl gradient-bg flex items-center justify-center shadow-lg shadow-primary/25">
@@ -233,7 +233,7 @@ const Auth: React.FC = () => {
                 : 'Accede a tu cuenta para gestionar el inventario'}
             </p>
 
-            <form className="space-y-5" onSubmit={handleSubmit}>
+            <form className="space-y-4" onSubmit={handleSubmit}>
               {isSignUp && (
                 <div className="animate-element animate-delay-350">
                   <label className="text-sm font-medium text-muted-foreground">Nombre Completo</label>
@@ -349,7 +349,7 @@ const Auth: React.FC = () => {
               )}
             </p>
 
-            <div className="animate-element animate-delay-900 pt-4 border-t border-border/50 text-center">
+            <div className="animate-element animate-delay-900 pt-2 border-t border-border/50 text-center">
               <p className="text-xs text-muted-foreground">
                 © 2026 Tercol SAS. Todos los derechos reservados.
               </p>
@@ -359,15 +359,15 @@ const Auth: React.FC = () => {
       </section>
 
       {/* Right column: hero image + role cards */}
-      <section className="hidden md:block flex-1 relative p-4">
+      <section className="hidden md:block flex-1 relative p-3 overflow-hidden">
         <div
-          className="animate-slide-right animate-delay-300 absolute inset-4 rounded-3xl bg-cover bg-center"
+          className="animate-slide-right animate-delay-300 absolute inset-3 rounded-3xl bg-cover bg-center"
           style={{ backgroundImage: `url(https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070)` }}
         >
           <div className="absolute inset-0 rounded-3xl bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
         </div>
 
-        <div className="absolute bottom-8 left-8 right-8 flex gap-3 justify-center flex-wrap z-10">
+        <div className="absolute bottom-4 left-4 right-4 flex gap-2 justify-center flex-wrap z-10">
           {roles.map((role, idx) => (
             <RoleCard
               key={role.role}
