@@ -11,7 +11,9 @@ import {
   CheckCircle,
   Package,
   Boxes,
-  X
+  X,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,7 +47,7 @@ import {
 
 const ITEMS_PER_PAGE = 200;
 
-interface CountTask {
+interface LocationData {
   id: string;
   master_reference: string;
   subcategoria: string | null;
@@ -58,11 +60,14 @@ interface CountTask {
   assigned_admin_id: string | null;
 }
 
-interface InventoryWithTask {
+interface LocationRow {
   referencia: string;
   material_type: 'MP' | 'PP';
   control: string | null;
-  task: CountTask | null;
+  location: LocationData | null;
+  isFirstOfGroup: boolean;
+  groupSize: number;
+  isAddRow: boolean;
 }
 
 const GestionUbicacion: React.FC = () => {
@@ -90,7 +95,6 @@ const GestionUbicacion: React.FC = () => {
   const { data: supervisors } = useQuery({
     queryKey: ['supervisors-filter'],
     queryFn: async () => {
-      // First get user_ids with supervisor role
       const { data: roles, error: rolesError } = await supabase
         .from('user_roles')
         .select('user_id')
@@ -101,7 +105,6 @@ const GestionUbicacion: React.FC = () => {
 
       const userIds = roles.map(r => r.user_id);
 
-      // Then get profiles for those users
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, full_name, email')
@@ -118,16 +121,14 @@ const GestionUbicacion: React.FC = () => {
     setFilterTipo('all');
     setFilterSubcategoria('');
     setFilterUbicacion('');
-    setFilterSupervisor('all');
+    setFilterSupervisor('');
     setCurrentPage(1);
   };
 
-  // Fetch inventory items with their associated locations - include user.id for cache isolation
+  // Fetch inventory items with their associated locations - supporting 1:N relationship
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['admin-inventory', profile?.id, role, searchTerm, currentPage, filterTipo, filterSubcategoria, filterUbicacion, filterSupervisor],
     queryFn: async () => {
-      // admin_mp: control IS NOT NULL
-      // admin_pp: control IS NULL
       let query = supabase
         .from('inventory_master')
         .select('referencia, material_type, control', { count: 'exact' });
@@ -138,7 +139,6 @@ const GestionUbicacion: React.FC = () => {
         query = query.is('control', null);
       }
 
-      // Apply tipo filter
       if (filterTipo !== 'all') {
         query = query.eq('material_type', filterTipo as 'MP' | 'PP');
       }
@@ -149,7 +149,6 @@ const GestionUbicacion: React.FC = () => {
 
       query = query.order('referencia');
 
-      // Apply server-side pagination FIRST
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       query = query.range(from, from + ITEMS_PER_PAGE - 1);
 
@@ -157,10 +156,10 @@ const GestionUbicacion: React.FC = () => {
       if (inventoryError) throw inventoryError;
 
       if (!inventoryData || inventoryData.length === 0) {
-        return { items: [], total: count || 0 };
+        return { rows: [], total: count || 0 };
       }
 
-      // Fetch locations ONLY for the paginated items (max ITEMS_PER_PAGE)
+      // Fetch ALL locations for the paginated inventory items
       const referencias = inventoryData.map(i => i.referencia);
       const { data: locationsData, error: locationsError } = await supabase
         .from('locations')
@@ -169,72 +168,97 @@ const GestionUbicacion: React.FC = () => {
 
       if (locationsError) throw locationsError;
 
-      // Map locations to inventory
-      const locationsMap = new Map<string, CountTask>();
+      // Group locations by master_reference (1:N relationship)
+      const locationsMap = new Map<string, LocationData[]>();
       locationsData?.forEach(location => {
-        locationsMap.set(location.master_reference, location);
+        const existing = locationsMap.get(location.master_reference) || [];
+        existing.push(location);
+        locationsMap.set(location.master_reference, existing);
       });
 
-      let items: InventoryWithTask[] = inventoryData.map(inv => ({
-        referencia: inv.referencia,
-        material_type: inv.material_type as 'MP' | 'PP',
-        control: inv.control,
-        task: locationsMap.get(inv.referencia) || null
-      }));
+      // Build rows: one per location + one "add" row per reference
+      let rows: LocationRow[] = [];
+      
+      inventoryData.forEach(inv => {
+        let locations = locationsMap.get(inv.referencia) || [];
+        
+        // Apply client-side filters
+        if (filterSubcategoria) {
+          locations = locations.filter(loc => 
+            loc.subcategoria?.toLowerCase().includes(filterSubcategoria.toLowerCase())
+          );
+        }
+        if (filterUbicacion) {
+          locations = locations.filter(loc => 
+            loc.location_name?.toLowerCase().includes(filterUbicacion.toLowerCase())
+          );
+        }
+        if (filterSupervisor !== 'all') {
+          locations = locations.filter(loc => 
+            loc.assigned_supervisor_id === filterSupervisor
+          );
+        }
 
-      // Apply client-side filters for task-related fields
-      if (filterSubcategoria) {
-        items = items.filter(item => 
-          item.task?.subcategoria?.toLowerCase().includes(filterSubcategoria.toLowerCase())
-        );
-      }
+        const groupSize = locations.length + 1; // +1 for add row
 
-      if (filterUbicacion) {
-        items = items.filter(item => 
-          item.task?.location_name?.toLowerCase().includes(filterUbicacion.toLowerCase())
-        );
-      }
+        if (locations.length === 0) {
+          // Reference with no locations - show only add row
+          rows.push({
+            referencia: inv.referencia,
+            material_type: inv.material_type as 'MP' | 'PP',
+            control: inv.control,
+            location: null,
+            isFirstOfGroup: true,
+            groupSize: 1,
+            isAddRow: true
+          });
+        } else {
+          // Add a row for each existing location
+          locations.forEach((loc, index) => {
+            rows.push({
+              referencia: inv.referencia,
+              material_type: inv.material_type as 'MP' | 'PP',
+              control: inv.control,
+              location: loc,
+              isFirstOfGroup: index === 0,
+              groupSize,
+              isAddRow: false
+            });
+          });
+          // Add the "add new location" row
+          rows.push({
+            referencia: inv.referencia,
+            material_type: inv.material_type as 'MP' | 'PP',
+            control: inv.control,
+            location: null,
+            isFirstOfGroup: false,
+            groupSize,
+            isAddRow: true
+          });
+        }
+      });
 
-      if (filterSupervisor !== 'all') {
-        items = items.filter(item => 
-          item.task?.assigned_supervisor_id === filterSupervisor
-        );
-      }
-
-      return { items, total: count || 0 };
+      return { rows, total: count || 0 };
     },
-    enabled: !!role, // Only run when role is available
+    enabled: !!role,
   });
 
-  // Create or update task
-  const upsertTaskMutation = useMutation({
+  // Update existing location
+  const updateLocationMutation = useMutation({
     mutationFn: async ({ 
-      referencia, 
+      locationId, 
       field, 
-      value, 
-      existingTaskId 
+      value 
     }: { 
-      referencia: string; 
+      locationId: string; 
       field: string; 
       value: string | null; 
-      existingTaskId: string | null;
     }) => {
-      if (existingTaskId) {
-        const { error } = await supabase
-          .from('locations')
-          .update({ [field]: value } as any)
-          .eq('id', existingTaskId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('locations')
-          .insert([{
-            master_reference: referencia,
-            assigned_admin_id: profile?.id,
-            [field]: value
-          }] as any);
-        if (error) throw error;
-      }
+      const { error } = await supabase
+        .from('locations')
+        .update({ [field]: value } as any)
+        .eq('id', locationId);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-inventory'] });
@@ -246,11 +270,63 @@ const GestionUbicacion: React.FC = () => {
     }
   });
 
-  const handleSave = async (referencia: string, field: string, value: string | null, existingTaskId: string | null) => {
-    await upsertTaskMutation.mutateAsync({ referencia, field, value, existingTaskId });
+  // Add new location
+  const addLocationMutation = useMutation({
+    mutationFn: async (referencia: string) => {
+      const { error } = await supabase
+        .from('locations')
+        .insert({
+          master_reference: referencia,
+          assigned_admin_id: profile?.id
+        });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-inventory'] });
+      toast({ title: 'Ubicación agregada', description: 'Nueva ubicación creada para la referencia' });
+    },
+    onError: (error) => {
+      toast({ title: 'Error', description: 'No se pudo agregar la ubicación', variant: 'destructive' });
+      console.error('Add location error:', error);
+    }
+  });
+
+  // Delete location
+  const deleteLocationMutation = useMutation({
+    mutationFn: async (locationId: string) => {
+      const { error } = await supabase
+        .from('locations')
+        .delete()
+        .eq('id', locationId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-inventory'] });
+      toast({ title: 'Ubicación eliminada', description: 'La ubicación fue eliminada correctamente' });
+    },
+    onError: (error) => {
+      toast({ title: 'Error', description: 'No se pudo eliminar la ubicación', variant: 'destructive' });
+      console.error('Delete location error:', error);
+    }
+  });
+
+  const handleSave = async (locationId: string, field: string, value: string | null) => {
+    await updateLocationMutation.mutateAsync({ locationId, field, value });
+  };
+
+  const handleAddLocation = async (referencia: string) => {
+    await addLocationMutation.mutateAsync(referencia);
+  };
+
+  const handleDeleteLocation = async (locationId: string) => {
+    await deleteLocationMutation.mutateAsync(locationId);
   };
 
   const totalPages = Math.ceil((data?.total || 0) / ITEMS_PER_PAGE);
+
+  // Track alternating group colors
+  let groupIndex = 0;
+  let lastReferencia = '';
 
   return (
     <div className="min-h-screen bg-background">
@@ -379,7 +455,7 @@ const GestionUbicacion: React.FC = () => {
             <div className="flex items-center justify-center py-12">
               <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
-          ) : data?.items.length === 0 ? (
+          ) : data?.rows.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
               <CheckCircle className="w-12 h-12 text-green-500 mb-4" />
               <p className="text-foreground font-medium">¡Todo configurado!</p>
@@ -399,109 +475,181 @@ const GestionUbicacion: React.FC = () => {
                     <TableHead>Punto Referencia</TableHead>
                     <TableHead>Método Conteo</TableHead>
                     <TableHead className="w-[180px]">Líder Conteo</TableHead>
+                    <TableHead className="w-[100px]">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data?.items.map((item) => (
-                    <TableRow key={item.referencia}>
-                      <TableCell>
-                        <Badge variant="outline" className={item.material_type === 'MP' ? 'border-orange-500 text-orange-500' : 'border-emerald-500 text-emerald-500'}>
-                          {item.material_type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">{item.referencia}</TableCell>
-                      <TableCell className="py-1">
-                        <EditableCell
-                          value={item.task?.subcategoria}
-                          onSave={(value) => handleSave(item.referencia, 'subcategoria', value, item.task?.id || null)}
-                          placeholder="Ingresar..."
-                        />
-                      </TableCell>
-                      <TableCell className="py-1">
-                        <EditableCell
-                          value={item.task?.observaciones}
-                          onSave={(value) => handleSave(item.referencia, 'observaciones', value, item.task?.id || null)}
-                          placeholder="Ingresar..."
-                        />
-                      </TableCell>
-                      <TableCell className="py-1">
-                        <EditableCell
-                          value={item.task?.location_name}
-                          onSave={(value) => handleSave(item.referencia, 'location_name', value, item.task?.id || null)}
-                          placeholder="Ingresar..."
-                        />
-                      </TableCell>
-                      <TableCell className="py-1">
-                        <EditableCell
-                          value={item.task?.location_detail}
-                          onSave={(value) => handleSave(item.referencia, 'location_detail', value, item.task?.id || null)}
-                          placeholder="Ingresar..."
-                        />
-                      </TableCell>
-                      <TableCell className="py-1">
-                        <EditableCell
-                          value={item.task?.punto_referencia}
-                          onSave={(value) => handleSave(item.referencia, 'punto_referencia', value, item.task?.id || null)}
-                          placeholder="Ingresar..."
-                        />
-                      </TableCell>
-                      <TableCell className="py-1">
-                        <EditableCell
-                          value={item.task?.metodo_conteo}
-                          onSave={(value) => handleSave(item.referencia, 'metodo_conteo', value, item.task?.id || null)}
-                          placeholder="Ingresar..."
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <SupervisorSelect
-                          value={item.task?.assigned_supervisor_id}
-                          onValueChange={(value) => handleSave(item.referencia, 'assigned_supervisor_id', value, item.task?.id || null)}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {data?.rows.map((row, index) => {
+                    // Track group index for alternating colors
+                    if (row.referencia !== lastReferencia) {
+                      groupIndex++;
+                      lastReferencia = row.referencia;
+                    }
+                    const isEvenGroup = groupIndex % 2 === 0;
+                    const rowKey = row.location?.id || `${row.referencia}-add-${index}`;
+
+                    if (row.isAddRow) {
+                      // Add location row
+                      return (
+                        <TableRow 
+                          key={rowKey} 
+                          className={isEvenGroup ? 'bg-muted/30' : ''}
+                        >
+                          <TableCell>
+                            {row.isFirstOfGroup && (
+                              <Badge variant="outline" className={row.material_type === 'MP' ? 'border-orange-500 text-orange-500' : 'border-emerald-500 text-emerald-500'}>
+                                {row.material_type}
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {row.isFirstOfGroup && row.referencia}
+                          </TableCell>
+                          <TableCell colSpan={7} className="py-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleAddLocation(row.referencia)}
+                              disabled={addLocationMutation.isPending}
+                              className="text-muted-foreground hover:text-foreground gap-1"
+                            >
+                              <Plus className="w-4 h-4" />
+                              Agregar ubicación
+                            </Button>
+                          </TableCell>
+                          <TableCell></TableCell>
+                        </TableRow>
+                      );
+                    }
+
+                    // Regular location row
+                    return (
+                      <TableRow 
+                        key={rowKey}
+                        className={isEvenGroup ? 'bg-muted/30' : ''}
+                      >
+                        <TableCell>
+                          {row.isFirstOfGroup && (
+                            <Badge variant="outline" className={row.material_type === 'MP' ? 'border-orange-500 text-orange-500' : 'border-emerald-500 text-emerald-500'}>
+                              {row.material_type}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {row.isFirstOfGroup && row.referencia}
+                        </TableCell>
+                        <TableCell className="py-1">
+                          <EditableCell
+                            value={row.location?.subcategoria}
+                            onSave={(value) => handleSave(row.location!.id, 'subcategoria', value)}
+                            placeholder="Ingresar..."
+                          />
+                        </TableCell>
+                        <TableCell className="py-1">
+                          <EditableCell
+                            value={row.location?.observaciones}
+                            onSave={(value) => handleSave(row.location!.id, 'observaciones', value)}
+                            placeholder="Ingresar..."
+                          />
+                        </TableCell>
+                        <TableCell className="py-1">
+                          <EditableCell
+                            value={row.location?.location_name}
+                            onSave={(value) => handleSave(row.location!.id, 'location_name', value)}
+                            placeholder="Ingresar..."
+                          />
+                        </TableCell>
+                        <TableCell className="py-1">
+                          <EditableCell
+                            value={row.location?.location_detail}
+                            onSave={(value) => handleSave(row.location!.id, 'location_detail', value)}
+                            placeholder="Ingresar..."
+                          />
+                        </TableCell>
+                        <TableCell className="py-1">
+                          <EditableCell
+                            value={row.location?.punto_referencia}
+                            onSave={(value) => handleSave(row.location!.id, 'punto_referencia', value)}
+                            placeholder="Ingresar..."
+                          />
+                        </TableCell>
+                        <TableCell className="py-1">
+                          <EditableCell
+                            value={row.location?.metodo_conteo}
+                            onSave={(value) => handleSave(row.location!.id, 'metodo_conteo', value)}
+                            placeholder="Ingresar..."
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <SupervisorSelect
+                            value={row.location?.assigned_supervisor_id}
+                            onValueChange={(value) => handleSave(row.location!.id, 'assigned_supervisor_id', value)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteLocation(row.location!.id)}
+                            disabled={deleteLocationMutation.isPending}
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
           )}
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="border-t border-border p-4">
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                    />
-                  </PaginationItem>
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    const page = currentPage <= 3 ? i + 1 : currentPage - 2 + i;
-                    if (page > totalPages) return null;
-                    return (
-                      <PaginationItem key={page}>
-                        <PaginationLink
-                          onClick={() => setCurrentPage(page)}
-                          isActive={page === currentPage}
-                          className="cursor-pointer"
-                        >
-                          {page}
-                        </PaginationLink>
-                      </PaginationItem>
-                    );
-                  })}
-                  <PaginationItem>
-                    <PaginationNext
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                      className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
-          )}
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="mt-4 flex justify-center">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+                {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                  let pageNum: number;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  return (
+                    <PaginationItem key={pageNum}>
+                      <PaginationLink
+                        onClick={() => setCurrentPage(pageNum)}
+                        isActive={currentPage === pageNum}
+                        className="cursor-pointer"
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+                <PaginationItem>
+                  <PaginationNext 
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </main>
     </div>
   );
