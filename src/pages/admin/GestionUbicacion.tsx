@@ -121,7 +121,7 @@ const GestionUbicacion: React.FC = () => {
     setCurrentPage(1);
   };
 
-  // Fetch inventory items with their associated tasks
+  // Fetch inventory items with their associated locations
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['admin-inventory', role, searchTerm, currentPage, filterTipo, filterSubcategoria, filterUbicacion, filterSupervisor],
     queryFn: async () => {
@@ -148,21 +148,24 @@ const GestionUbicacion: React.FC = () => {
 
       query = query.order('referencia');
 
+      // Apply server-side pagination FIRST
+      const from = (currentPage - 1) * ITEMS_PER_PAGE;
+      query = query.range(from, from + ITEMS_PER_PAGE - 1);
+
       const { data: inventoryData, error: inventoryError, count } = await query;
       if (inventoryError) throw inventoryError;
 
       if (!inventoryData || inventoryData.length === 0) {
-        return { items: [], total: 0 };
+        return { items: [], total: count || 0 };
       }
 
-      // Fetch associated locations
+      // Fetch locations ONLY for the paginated items (max ITEMS_PER_PAGE)
       const referencias = inventoryData.map(i => i.referencia);
-      let locationsQuery = supabase
+      const { data: locationsData, error: locationsError } = await supabase
         .from('locations')
         .select('*')
         .in('master_reference', referencias);
 
-      const { data: locationsData, error: locationsError } = await locationsQuery;
       if (locationsError) throw locationsError;
 
       // Map locations to inventory
@@ -197,13 +200,9 @@ const GestionUbicacion: React.FC = () => {
         );
       }
 
-      // Paginate after client-side filtering
-      const totalFiltered = items.length;
-      const from = (currentPage - 1) * ITEMS_PER_PAGE;
-      const paginatedItems = items.slice(from, from + ITEMS_PER_PAGE);
-
-      return { items: paginatedItems, total: totalFiltered };
-    }
+      return { items, total: count || 0 };
+    },
+    enabled: !!role, // Only run when role is available
   });
 
   // Create or update task
@@ -375,7 +374,7 @@ const GestionUbicacion: React.FC = () => {
       {/* Table */}
       <main className="px-4 sm:px-6 lg:px-8 py-6">
         <div className="bg-card rounded-lg border border-border overflow-hidden">
-          {isLoading ? (
+          {(isLoading || !role) ? (
             <div className="flex items-center justify-center py-12">
               <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
