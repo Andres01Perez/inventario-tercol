@@ -14,56 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
-      audit_logs: {
+      inventory_counts: {
         Row: {
-          action_type: string
+          audit_round: number
           created_at: string | null
           id: string
-          master_reference: string | null
-          new_data: Json | null
-          notes: string | null
-          previous_data: Json | null
-          round_number: number | null
-          task_id: string | null
-          user_id: string | null
+          location_id: string | null
+          quantity_counted: number
+          supervisor_id: string | null
+          updated_at: string | null
         }
         Insert: {
-          action_type: string
+          audit_round?: number
           created_at?: string | null
           id?: string
-          master_reference?: string | null
-          new_data?: Json | null
-          notes?: string | null
-          previous_data?: Json | null
-          round_number?: number | null
-          task_id?: string | null
-          user_id?: string | null
+          location_id?: string | null
+          quantity_counted: number
+          supervisor_id?: string | null
+          updated_at?: string | null
         }
         Update: {
-          action_type?: string
+          audit_round?: number
           created_at?: string | null
           id?: string
-          master_reference?: string | null
-          new_data?: Json | null
-          notes?: string | null
-          previous_data?: Json | null
-          round_number?: number | null
-          task_id?: string | null
-          user_id?: string | null
+          location_id?: string | null
+          quantity_counted?: number
+          supervisor_id?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "audit_logs_master_reference_fkey"
-            columns: ["master_reference"]
-            isOneToOne: false
-            referencedRelation: "inventory_master"
-            referencedColumns: ["referencia"]
-          },
-          {
-            foreignKeyName: "audit_logs_task_id_fkey"
-            columns: ["task_id"]
+            foreignKeyName: "inventory_counts_location_id_fkey"
+            columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_counts_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -174,6 +165,7 @@ export type Database = {
           master_reference: string
           metodo_conteo: string | null
           observaciones: string | null
+          operario_id: string | null
           punto_referencia: string | null
           subcategoria: string | null
           updated_at: string | null
@@ -188,6 +180,7 @@ export type Database = {
           master_reference: string
           metodo_conteo?: string | null
           observaciones?: string | null
+          operario_id?: string | null
           punto_referencia?: string | null
           subcategoria?: string | null
           updated_at?: string | null
@@ -202,6 +195,7 @@ export type Database = {
           master_reference?: string
           metodo_conteo?: string | null
           observaciones?: string | null
+          operario_id?: string | null
           punto_referencia?: string | null
           subcategoria?: string | null
           updated_at?: string | null
@@ -220,6 +214,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "inventory_master"
             referencedColumns: ["referencia"]
+          },
+          {
+            foreignKeyName: "locations_operario_id_fkey"
+            columns: ["operario_id"]
+            isOneToOne: false
+            referencedRelation: "operarios"
+            referencedColumns: ["id"]
           },
         ]
       }
