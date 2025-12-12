@@ -49,6 +49,7 @@ interface CountTask {
   id: string;
   master_reference: string;
   subcategoria: string | null;
+  observaciones: string | null;
   location_name: string | null;
   location_detail: string | null;
   punto_referencia: string | null;
@@ -392,6 +393,7 @@ const GestionUbicacion: React.FC = () => {
                     <TableHead className="w-[80px]">Tipo</TableHead>
                     <TableHead className="w-[120px]">Referencia</TableHead>
                     <TableHead>Subcategoría</TableHead>
+                    <TableHead>Observaciones</TableHead>
                     <TableHead>Ubicación</TableHead>
                     <TableHead>Ubicación Detallada</TableHead>
                     <TableHead>Punto Referencia</TableHead>
@@ -412,6 +414,13 @@ const GestionUbicacion: React.FC = () => {
                         <EditableCell
                           value={item.task?.subcategoria}
                           onSave={(value) => handleSave(item.referencia, 'subcategoria', value, item.task?.id || null)}
+                          placeholder="Ingresar..."
+                        />
+                      </TableCell>
+                      <TableCell className="py-1">
+                        <EditableCell
+                          value={item.task?.observaciones}
+                          onSave={(value) => handleSave(item.referencia, 'observaciones', value, item.task?.id || null)}
                           placeholder="Ingresar..."
                         />
                       </TableCell>
