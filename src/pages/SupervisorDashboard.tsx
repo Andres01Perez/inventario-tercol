@@ -1,24 +1,65 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Package, 
   LogOut,
   ClipboardList,
   CheckCircle2,
   AlertCircle,
-  MapPin
+  Users
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import AssignmentTab from '@/components/supervisor/AssignmentTab';
+import TranscriptionTab from '@/components/supervisor/TranscriptionTab';
 
 const SupervisorDashboard: React.FC = () => {
-  const { profile, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
 
-  const stats = [
-    { label: 'Asignadas', value: '0', icon: ClipboardList, color: 'bg-primary/10 text-primary' },
-    { label: 'Completadas', value: '0', icon: CheckCircle2, color: 'bg-green-500/10 text-green-500' },
-    { label: 'Con Diferencias', value: '0', icon: AlertCircle, color: 'bg-amber-500/10 text-amber-500' },
-    { label: 'Ubicaciones', value: '0', icon: MapPin, color: 'bg-blue-500/10 text-blue-500' },
-  ];
+  // Fetch locations and counts for stats
+  const { data: locations = [] } = useQuery({
+    queryKey: ['supervisor-stats-locations', user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('locations')
+        .select('id, operario_id')
+        .eq('assigned_supervisor_id', user!.id);
+      return data || [];
+    },
+    enabled: !!user?.id,
+  });
+
+  const locationIds = useMemo(() => locations.map(l => l.id), [locations]);
+
+  const { data: counts = [] } = useQuery({
+    queryKey: ['supervisor-stats-counts', locationIds],
+    queryFn: async () => {
+      if (locationIds.length === 0) return [];
+      const { data } = await supabase
+        .from('inventory_counts')
+        .select('location_id')
+        .in('location_id', locationIds)
+        .eq('audit_round', 1);
+      return data || [];
+    },
+    enabled: locationIds.length > 0,
+  });
+
+  const stats = useMemo(() => {
+    const countedIds = new Set(counts.map(c => c.location_id));
+    const completed = locations.filter(l => countedIds.has(l.id)).length;
+    const pending = locations.length - completed;
+    const operariosSet = new Set(locations.filter(l => l.operario_id).map(l => l.operario_id));
+
+    return [
+      { label: 'Asignadas', value: String(locations.length), icon: ClipboardList, color: 'bg-primary/10 text-primary' },
+      { label: 'Completadas', value: String(completed), icon: CheckCircle2, color: 'bg-green-500/10 text-green-500' },
+      { label: 'Pendientes', value: String(pending), icon: AlertCircle, color: 'bg-amber-500/10 text-amber-500' },
+      { label: 'Operarios', value: String(operariosSet.size), icon: Users, color: 'bg-blue-500/10 text-blue-500' },
+    ];
+  }, [locations, counts]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -57,7 +98,7 @@ const SupervisorDashboard: React.FC = () => {
             Hola, {profile?.full_name?.split(' ')[0] || 'Supervisor'}
           </h2>
           <p className="text-muted-foreground">
-            Registra los conteos físicos de las referencias asignadas
+            Gestiona operarios y transcribe los conteos físicos
           </p>
         </div>
 
@@ -78,13 +119,52 @@ const SupervisorDashboard: React.FC = () => {
           ))}
         </div>
 
-        {/* Empty State */}
-        <div className="glass-card text-center py-12">
-          <ClipboardList className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <p className="text-muted-foreground">No tienes referencias asignadas</p>
-          <p className="text-sm text-muted-foreground">El administrador te asignará ubicaciones para contar</p>
-        </div>
+        {/* Main Tabs */}
+        <Tabs defaultValue="assignment" className="space-y-6">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="assignment" className="gap-2">
+              <ClipboardList className="w-4 h-4" />
+              Asignación
+            </TabsTrigger>
+            <TabsTrigger value="transcription" className="gap-2">
+              <CheckCircle2 className="w-4 h-4" />
+              Transcripción
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="assignment">
+            <div className="glass-card">
+              <h3 className="text-lg font-semibold mb-4">Asignar Operarios a Ubicaciones</h3>
+              <AssignmentTab />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="transcription">
+            <div className="glass-card">
+              <h3 className="text-lg font-semibold mb-4">Transcribir Conteos por Operario</h3>
+              <TranscriptionTab />
+            </div>
+          </TabsContent>
+        </Tabs>
       </main>
+
+      {/* Print Styles */}
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          #printable-sheet, #printable-sheet * {
+            visibility: visible;
+          }
+          #printable-sheet {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+          }
+        }
+      `}</style>
     </div>
   );
 };
