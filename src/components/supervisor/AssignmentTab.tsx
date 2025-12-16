@@ -10,13 +10,20 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import OperarioSelect from '@/components/shared/OperarioSelect';
 import { toast } from 'sonner';
-import { Loader2, Search, Users, RefreshCw } from 'lucide-react';
+import { Loader2, Search, Users, RefreshCw, Filter } from 'lucide-react';
 
 interface Location {
   id: string;
@@ -35,6 +42,11 @@ const AssignmentTab: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
   const [bulkOperarioId, setBulkOperarioId] = useState<string | null>(null);
+  
+  // Filter states
+  const [filterTipo, setFilterTipo] = useState<string>('all');
+  const [filterUbicacion, setFilterUbicacion] = useState('');
+  const [filterUbicacionDetallada, setFilterUbicacionDetallada] = useState('');
 
   const { data: locations = [], isLoading, refetch } = useQuery({
     queryKey: ['supervisor-locations', user?.id],
@@ -76,13 +88,42 @@ const AssignmentTab: React.FC = () => {
   });
 
   const filteredLocations = useMemo(() => {
-    if (!searchTerm) return locations;
-    const term = searchTerm.toLowerCase();
-    return locations.filter(loc =>
-      loc.master_reference.toLowerCase().includes(term) ||
-      loc.location_name?.toLowerCase().includes(term)
-    );
-  }, [locations, searchTerm]);
+    let filtered = locations;
+    
+    // Search term filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(loc =>
+        loc.master_reference.toLowerCase().includes(term) ||
+        loc.location_name?.toLowerCase().includes(term)
+      );
+    }
+    
+    // Tipo filter
+    if (filterTipo !== 'all') {
+      filtered = filtered.filter(loc => 
+        loc.inventory_master?.material_type === filterTipo
+      );
+    }
+    
+    // Ubicación filter
+    if (filterUbicacion) {
+      const term = filterUbicacion.toLowerCase();
+      filtered = filtered.filter(loc =>
+        loc.location_name?.toLowerCase().includes(term)
+      );
+    }
+    
+    // Ubicación Detallada filter
+    if (filterUbicacionDetallada) {
+      const term = filterUbicacionDetallada.toLowerCase();
+      filtered = filtered.filter(loc =>
+        loc.location_detail?.toLowerCase().includes(term)
+      );
+    }
+    
+    return filtered;
+  }, [locations, searchTerm, filterTipo, filterUbicacion, filterUbicacionDetallada]);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -144,6 +185,51 @@ const AssignmentTab: React.FC = () => {
           <RefreshCw className="w-4 h-4 mr-2" />
           Recargar
         </Button>
+        <span className="text-sm text-muted-foreground">
+          {filteredLocations.length} de {locations.length} ubicaciones
+        </span>
+      </div>
+
+      {/* Filters row */}
+      <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/30 rounded-lg">
+        <Filter className="w-4 h-4 text-muted-foreground" />
+        
+        {/* Tipo filter */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Tipo:</span>
+          <Select value={filterTipo} onValueChange={setFilterTipo}>
+            <SelectTrigger className="w-[100px] h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="MP">MP</SelectItem>
+              <SelectItem value="PP">PP</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Ubicación filter */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Ubicación:</span>
+          <Input
+            placeholder="Filtrar..."
+            value={filterUbicacion}
+            onChange={(e) => setFilterUbicacion(e.target.value)}
+            className="w-[140px] h-9"
+          />
+        </div>
+
+        {/* Ubicación Detallada filter */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Ubic. Detallada:</span>
+          <Input
+            placeholder="Filtrar..."
+            value={filterUbicacionDetallada}
+            onChange={(e) => setFilterUbicacionDetallada(e.target.value)}
+            className="w-[140px] h-9"
+          />
+        </div>
       </div>
 
       {/* Table */}
