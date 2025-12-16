@@ -20,8 +20,13 @@ interface Location {
   master_reference: string;
   location_name: string | null;
   location_detail: string | null;
+  subcategoria: string | null;
+  observaciones: string | null;
+  punto_referencia: string | null;
+  metodo_conteo: string | null;
   operario_id: string | null;
   operarios: { id: string; full_name: string } | null;
+  inventory_master: { referencia: string; material_type: string } | null;
 }
 
 interface Count {
@@ -46,8 +51,11 @@ const TranscriptionTab: React.FC = () => {
       const { data, error } = await supabase
         .from('locations')
         .select(`
-          id, master_reference, location_name, location_detail, operario_id,
-          operarios(id, full_name)
+          id, master_reference, location_name, location_detail,
+          subcategoria, observaciones, punto_referencia, metodo_conteo,
+          operario_id,
+          operarios(id, full_name),
+          inventory_master!inner(referencia, material_type)
         `)
         .eq('assigned_supervisor_id', user!.id);
 
@@ -243,58 +251,84 @@ const TranscriptionTab: React.FC = () => {
               </AccordionTrigger>
 
               <AccordionContent className="pt-2 pb-4">
-                <div className="space-y-2">
-                  {group.locations.map(loc => {
-                    const isCounted = countsMap.has(loc.id);
-                    const countedValue = countsMap.get(loc.id);
-                    const isSaving = savingIds.has(loc.id);
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="border-b text-left text-muted-foreground">
+                        <th className="p-2 font-medium">Tipo</th>
+                        <th className="p-2 font-medium">Referencia</th>
+                        <th className="p-2 font-medium">Subcategoría</th>
+                        <th className="p-2 font-medium">Observaciones</th>
+                        <th className="p-2 font-medium">Ubicación</th>
+                        <th className="p-2 font-medium">Ubic. Det.</th>
+                        <th className="p-2 font-medium">Punto Ref.</th>
+                        <th className="p-2 font-medium">Método</th>
+                        <th className="p-2 font-medium text-center">Cantidad</th>
+                        <th className="p-2"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {group.locations.map(loc => {
+                        const isCounted = countsMap.has(loc.id);
+                        const countedValue = countsMap.get(loc.id);
+                        const isSaving = savingIds.has(loc.id);
 
-                    return (
-                      <div
-                        key={loc.id}
-                        className={`flex items-center gap-4 p-3 rounded-lg border ${isCounted ? 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-900' : 'bg-muted/30'}`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{loc.master_reference}</p>
-                          <p className="text-sm text-muted-foreground truncate">
-                            {loc.location_name || '-'}
-                            {loc.location_detail && ` - ${loc.location_detail}`}
-                          </p>
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          {isCounted ? (
-                            <div className="flex items-center gap-2 px-3">
-                              <CheckCircle2 className="w-5 h-5 text-green-500" />
-                              <span className="font-bold text-green-700 dark:text-green-400">
-                                {countedValue}
-                              </span>
-                            </div>
-                          ) : null}
-
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            placeholder={isCounted ? String(countedValue) : '0'}
-                            className="w-24 text-center font-bold"
-                            value={quantities[loc.id] || ''}
-                            onChange={(e) => setQuantities(prev => ({
-                              ...prev,
-                              [loc.id]: e.target.value
-                            }))}
-                            onBlur={() => handleSaveCount(loc.id)}
-                            onKeyDown={(e) => handleKeyDown(e, loc.id)}
-                            disabled={isSaving}
-                          />
-
-                          {isSaving && (
-                            <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                        return (
+                          <tr
+                            key={loc.id}
+                            className={`border-b ${isCounted ? 'bg-green-50 dark:bg-green-950/20' : ''}`}
+                          >
+                            <td className="p-2">
+                              <Badge variant="outline" className="text-xs">
+                                {loc.inventory_master?.material_type || '-'}
+                              </Badge>
+                            </td>
+                            <td className="p-2 font-medium">{loc.master_reference}</td>
+                            <td className="p-2 text-muted-foreground">{loc.subcategoria || '-'}</td>
+                            <td className="p-2 text-muted-foreground max-w-[120px] truncate" title={loc.observaciones || ''}>
+                              {loc.observaciones || '-'}
+                            </td>
+                            <td className="p-2">{loc.location_name || '-'}</td>
+                            <td className="p-2 text-muted-foreground">{loc.location_detail || '-'}</td>
+                            <td className="p-2">{loc.punto_referencia || '-'}</td>
+                            <td className="p-2">{loc.metodo_conteo || '-'}</td>
+                            <td className="p-2">
+                              <div className="flex items-center justify-center gap-2">
+                                {isCounted && (
+                                  <div className="flex items-center gap-1">
+                                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                    <span className="font-bold text-green-700 dark:text-green-400">
+                                      {countedValue}
+                                    </span>
+                                  </div>
+                                )}
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  placeholder={isCounted ? String(countedValue) : '0'}
+                                  className="w-20 text-center font-bold h-8"
+                                  value={quantities[loc.id] || ''}
+                                  onChange={(e) => setQuantities(prev => ({
+                                    ...prev,
+                                    [loc.id]: e.target.value
+                                  }))}
+                                  onBlur={() => handleSaveCount(loc.id)}
+                                  onKeyDown={(e) => handleKeyDown(e, loc.id)}
+                                  disabled={isSaving}
+                                />
+                              </div>
+                            </td>
+                            <td className="p-2">
+                              {isSaving && (
+                                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </AccordionContent>
             </AccordionItem>

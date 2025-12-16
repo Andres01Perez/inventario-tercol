@@ -31,6 +31,9 @@ interface Location {
   location_name: string | null;
   location_detail: string | null;
   subcategoria: string | null;
+  observaciones: string | null;
+  punto_referencia: string | null;
+  metodo_conteo: string | null;
   operario_id: string | null;
   operarios: { id: string; full_name: string } | null;
   inventory_master: { referencia: string; material_type: string } | null;
@@ -55,7 +58,8 @@ const AssignmentTab: React.FC = () => {
         .from('locations')
         .select(`
           id, master_reference, location_name, location_detail,
-          subcategoria, operario_id,
+          subcategoria, observaciones, punto_referencia, metodo_conteo,
+          operario_id,
           operarios(id, full_name),
           inventory_master!inner(referencia, material_type)
         `)
@@ -233,7 +237,7 @@ const AssignmentTab: React.FC = () => {
       </div>
 
       {/* Table */}
-      <div className="border rounded-lg overflow-hidden">
+      <div className="border rounded-lg overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -243,17 +247,21 @@ const AssignmentTab: React.FC = () => {
                   onCheckedChange={handleSelectAll}
                 />
               </TableHead>
-              <TableHead>Referencia</TableHead>
               <TableHead>Tipo</TableHead>
+              <TableHead>Referencia</TableHead>
+              <TableHead>Subcategoría</TableHead>
+              <TableHead>Observaciones</TableHead>
               <TableHead>Ubicación</TableHead>
-              <TableHead>Ubicación Detallada</TableHead>
+              <TableHead>Ubic. Detallada</TableHead>
+              <TableHead>Punto Ref.</TableHead>
+              <TableHead>Método Conteo</TableHead>
               <TableHead className="w-[200px]">Operario</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredLocations.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                   No hay ubicaciones asignadas
                 </TableCell>
               </TableRow>
@@ -266,17 +274,29 @@ const AssignmentTab: React.FC = () => {
                       onCheckedChange={(checked) => handleSelectRow(loc.id, !!checked)}
                     />
                   </TableCell>
+                  <TableCell className="text-sm">
+                    <Badge variant="outline">{loc.inventory_master?.material_type || '-'}</Badge>
+                  </TableCell>
                   <TableCell>
                     <span className="font-medium">{loc.master_reference}</span>
                   </TableCell>
                   <TableCell className="text-sm">
-                    {loc.inventory_master?.material_type || '-'}
+                    {loc.subcategoria || '-'}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate">
+                    {loc.observaciones || '-'}
                   </TableCell>
                   <TableCell className="text-sm">
                     {loc.location_name || '-'}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {loc.location_detail || '-'}
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {loc.punto_referencia || '-'}
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {loc.metodo_conteo || '-'}
                   </TableCell>
                   <TableCell>
                     <OperarioSelect
