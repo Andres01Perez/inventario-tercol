@@ -12,8 +12,9 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import AssignmentTab from '@/components/supervisor/AssignmentTab';
-import TranscriptionTab from '@/components/supervisor/TranscriptionTab';
+import RoundTranscriptionTab from '@/components/supervisor/RoundTranscriptionTab';
 
 const SupervisorDashboard: React.FC = () => {
   const { user, profile, signOut } = useAuth();
@@ -39,25 +40,25 @@ const SupervisorDashboard: React.FC = () => {
       if (locationIds.length === 0) return [];
       const { data } = await supabase
         .from('inventory_counts')
-        .select('location_id')
-        .in('location_id', locationIds)
-        .eq('audit_round', 1);
+        .select('location_id, audit_round')
+        .in('location_id', locationIds);
       return data || [];
     },
     enabled: locationIds.length > 0,
   });
 
   const stats = useMemo(() => {
-    const countedIds = new Set(counts.map(c => c.location_id));
-    const completed = locations.filter(l => countedIds.has(l.id)).length;
-    const pending = locations.length - completed;
+    const c1Ids = new Set(counts.filter(c => c.audit_round === 1).map(c => c.location_id));
+    const c2Ids = new Set(counts.filter(c => c.audit_round === 2).map(c => c.location_id));
+    const pendingC1 = locations.filter(l => !c1Ids.has(l.id)).length;
+    const pendingC2 = locations.filter(l => !c2Ids.has(l.id)).length;
     const operariosSet = new Set(locations.filter(l => l.operario_id).map(l => l.operario_id));
 
     return [
-      { label: 'Asignadas', value: String(locations.length), icon: ClipboardList, color: 'bg-primary/10 text-primary' },
-      { label: 'Completadas', value: String(completed), icon: CheckCircle2, color: 'bg-green-500/10 text-green-500' },
-      { label: 'Pendientes', value: String(pending), icon: AlertCircle, color: 'bg-amber-500/10 text-amber-500' },
-      { label: 'Operarios', value: String(operariosSet.size), icon: Users, color: 'bg-blue-500/10 text-blue-500' },
+      { label: 'Total Asignadas', value: String(locations.length), icon: ClipboardList, color: 'bg-primary/10 text-primary' },
+      { label: 'Pendientes C1', value: String(pendingC1), icon: AlertCircle, color: 'bg-blue-500/10 text-blue-500' },
+      { label: 'Pendientes C2', value: String(pendingC2), icon: AlertCircle, color: 'bg-purple-500/10 text-purple-500' },
+      { label: 'Operarios', value: String(operariosSet.size), icon: Users, color: 'bg-green-500/10 text-green-500' },
     ];
   }, [locations, counts]);
 
@@ -98,7 +99,7 @@ const SupervisorDashboard: React.FC = () => {
             Hola, {profile?.full_name?.split(' ')[0] || 'Supervisor'}
           </h2>
           <p className="text-muted-foreground">
-            Gestiona operarios y transcribe los conteos físicos
+            Gestiona asignaciones y transcribe los conteos físicos por rondas
           </p>
         </div>
 
@@ -120,15 +121,28 @@ const SupervisorDashboard: React.FC = () => {
         </div>
 
         {/* Main Tabs */}
-        <Tabs defaultValue="assignment" className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="assignment" className="gap-2">
-              <ClipboardList className="w-4 h-4" />
-              Asignación
+        <Tabs defaultValue="count1" className="space-y-6">
+          <TabsList className="grid w-full max-w-3xl grid-cols-5">
+            <TabsTrigger value="assignment" className="gap-1">
+              <ClipboardList className="w-4 h-4 hidden sm:inline" />
+              <span className="hidden sm:inline">Asignación</span>
+              <span className="sm:hidden">Asig.</span>
             </TabsTrigger>
-            <TabsTrigger value="transcription" className="gap-2">
-              <CheckCircle2 className="w-4 h-4" />
-              Transcripción
+            <TabsTrigger value="count1" className="gap-1">
+              <Badge variant="outline" className="bg-blue-500/10 text-blue-500 text-xs px-1">C1</Badge>
+              <span className="hidden lg:inline">Turno 1</span>
+            </TabsTrigger>
+            <TabsTrigger value="count2" className="gap-1">
+              <Badge variant="outline" className="bg-purple-500/10 text-purple-500 text-xs px-1">C2</Badge>
+              <span className="hidden lg:inline">Turno 2</span>
+            </TabsTrigger>
+            <TabsTrigger value="count3" className="gap-1">
+              <Badge variant="outline" className="bg-amber-500/10 text-amber-500 text-xs px-1">C3</Badge>
+              <span className="hidden lg:inline">Desempate</span>
+            </TabsTrigger>
+            <TabsTrigger value="count4" className="gap-1">
+              <Badge variant="outline" className="bg-orange-500/10 text-orange-500 text-xs px-1">C4</Badge>
+              <span className="hidden lg:inline">Final</span>
             </TabsTrigger>
           </TabsList>
 
@@ -139,10 +153,27 @@ const SupervisorDashboard: React.FC = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="transcription">
+          <TabsContent value="count1">
             <div className="glass-card-static">
-              <h3 className="text-lg font-semibold mb-4">Transcribir Conteos por Operario</h3>
-              <TranscriptionTab />
+              <RoundTranscriptionTab roundNumber={1} filterTurno={1} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="count2">
+            <div className="glass-card-static">
+              <RoundTranscriptionTab roundNumber={2} filterTurno={2} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="count3">
+            <div className="glass-card-static">
+              <RoundTranscriptionTab roundNumber={3} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="count4">
+            <div className="glass-card-static">
+              <RoundTranscriptionTab roundNumber={4} />
             </div>
           </TabsContent>
         </Tabs>

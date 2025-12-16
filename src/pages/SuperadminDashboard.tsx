@@ -14,14 +14,17 @@ import {
   Database,
   Boxes,
   MapPin,
-  ClipboardList
+  ClipboardList,
+  AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import UserManagement from '@/components/superadmin/UserManagement';
 import OperariosManagement from '@/components/shared/OperariosManagement';
 import MasterDataImport from '@/components/superadmin/MasterDataImport';
+import RoundTranscriptionTab from '@/components/supervisor/RoundTranscriptionTab';
 
-type TabType = 'overview' | 'users' | 'operarios' | 'import';
+type TabType = 'overview' | 'users' | 'operarios' | 'import' | 'critico';
 
 const SuperadminDashboard: React.FC = () => {
   const { profile, signOut } = useAuth();
@@ -53,11 +56,18 @@ const SuperadminDashboard: React.FC = () => {
         .select('id', { count: 'exact', head: true })
         .eq('is_active', true);
 
+      // Get critical references count (audit_round = 5)
+      const { count: criticosCount } = await supabase
+        .from('inventory_master')
+        .select('referencia', { count: 'exact', head: true })
+        .eq('audit_round', 5);
+
       return {
         usuarios: usersCount || 0,
         referencias: referencesCount || 0,
         ubicaciones: locationsCount || 0,
-        operarios: operariosCount || 0
+        operarios: operariosCount || 0,
+        criticos: criticosCount || 0
       };
     }
   });
@@ -79,6 +89,7 @@ const SuperadminDashboard: React.FC = () => {
 
   const tabs = [
     { id: 'overview' as TabType, label: 'Resumen', icon: BarChart3 },
+    { id: 'critico' as TabType, label: 'Críticos', icon: AlertTriangle, badge: stats?.criticos },
     { id: 'import' as TabType, label: 'Importar', icon: Upload },
     { id: 'users' as TabType, label: 'Usuarios', icon: Users },
     { id: 'operarios' as TabType, label: 'Operarios', icon: UserCog },
@@ -123,12 +134,19 @@ const SuperadminDashboard: React.FC = () => {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === tab.id
-                    ? 'border-primary text-primary'
+                    ? tab.id === 'critico' 
+                      ? 'border-red-500 text-red-500'
+                      : 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                 }`}
               >
                 <tab.icon className="w-4 h-4" />
                 {tab.label}
+                {tab.badge !== undefined && tab.badge > 0 && (
+                  <Badge variant="destructive" className="ml-1 text-xs px-1.5 py-0">
+                    {tab.badge}
+                  </Badge>
+                )}
               </button>
             ))}
           </nav>
@@ -166,6 +184,27 @@ const SuperadminDashboard: React.FC = () => {
               ))}
             </div>
 
+            {/* Critical Alert */}
+            {stats?.criticos && stats.criticos > 0 && (
+              <div 
+                className="mb-8 bg-red-500/10 border border-red-500/30 rounded-lg p-4 flex items-center justify-between cursor-pointer hover:bg-red-500/20 transition-colors"
+                onClick={() => setActiveTab('critico')}
+              >
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="w-6 h-6 text-red-500" />
+                  <div>
+                    <p className="font-semibold text-red-600 dark:text-red-400">
+                      {stats.criticos} Referencia(s) Crítica(s)
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Requieren tu intervención para cierre forzado (Conteo 5)
+                    </p>
+                  </div>
+                </div>
+                <Badge variant="destructive">Ver ahora</Badge>
+              </div>
+            )}
+
             {/* Quick Actions */}
             <h3 className="text-lg font-semibold text-foreground mb-4">Acciones Rápidas</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -198,6 +237,29 @@ const SuperadminDashboard: React.FC = () => {
               </div>
             </div>
           </>
+        )}
+
+        {activeTab === 'critico' && (
+          <div className="space-y-6">
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                <AlertTriangle className="w-6 h-6 text-red-500" />
+                Referencias Críticas (Conteo 5)
+              </h2>
+              <p className="text-muted-foreground">
+                Estas referencias no coincidieron en ningún conteo previo y requieren tu intervención personal para el cierre forzado.
+              </p>
+            </div>
+
+            <div className="glass-card">
+              <RoundTranscriptionTab 
+                roundNumber={5}
+                isAdminMode={true}
+                controlFilter="all"
+                isSuperadminOnly={true}
+              />
+            </div>
+          </div>
         )}
 
         {activeTab === 'import' && <MasterDataImport />}
