@@ -15,8 +15,6 @@ import {
   ClipboardList
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import AssignmentTab from '@/components/supervisor/AssignmentTab';
 
 const AdminDashboard: React.FC = () => {
   const { profile, role, signOut } = useAuth();
@@ -75,6 +73,7 @@ const AdminDashboard: React.FC = () => {
   ];
 
   const quickActions = [
+    { label: 'Gestión Operativa', icon: ClipboardList, description: 'Asignar operarios a ubicaciones', onClick: () => navigate('/gestion-operativa') },
     { label: 'Gestionar Ubicaciones', icon: MapPin, description: 'Asignar ubicaciones y supervisores', onClick: () => navigate('/admin/gestion-ubicacion') },
     { label: 'Asignar Responsables', icon: Users, description: 'Asignación masiva de líderes de conteo', onClick: () => navigate('/admin/gestion-responsables') },
     { label: 'Ver Conteos', icon: ClipboardCheck, description: 'Monitorear progreso de conteos', disabled: true },
@@ -141,7 +140,7 @@ const AdminDashboard: React.FC = () => {
 
         {/* Quick Actions */}
         <h3 className="text-lg font-semibold text-foreground mb-4">Acciones Rápidas</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           {quickActions.map((action) => (
             <button
               key={action.label}
@@ -161,28 +160,6 @@ const AdminDashboard: React.FC = () => {
               </div>
             </button>
           ))}
-        </div>
-
-        {/* Gestión Operativa */}
-        <div className="mt-8">
-          <h3 className="text-lg font-semibold text-foreground mb-4">Gestión Operativa</h3>
-          <Tabs defaultValue="assignment" className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="assignment" className="gap-2">
-                <ClipboardList className="w-4 h-4" />
-                Asignar Operarios
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="assignment">
-              <div className="glass-card">
-                <p className="text-sm text-muted-foreground mb-4">
-                  Busca cualquier ubicación y asigna operarios manualmente
-                </p>
-                <AssignmentTab isAdminMode={true} />
-              </div>
-            </TabsContent>
-          </Tabs>
         </div>
 
         {/* Empty State for Recent Activity */}
