@@ -39,7 +39,11 @@ interface Location {
   inventory_master: { referencia: string; material_type: string } | null;
 }
 
-const AssignmentTab: React.FC = () => {
+interface AssignmentTabProps {
+  isAdminMode?: boolean;
+}
+
+const AssignmentTab: React.FC<AssignmentTabProps> = ({ isAdminMode = false }) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -52,9 +56,9 @@ const AssignmentTab: React.FC = () => {
   const [filterUbicacionDetallada, setFilterUbicacionDetallada] = useState('');
 
   const { data: locations = [], isLoading, refetch } = useQuery({
-    queryKey: ['supervisor-locations', user?.id],
+    queryKey: ['assignment-locations', user?.id, isAdminMode],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('locations')
         .select(`
           id, master_reference, location_name, location_detail,
@@ -62,9 +66,14 @@ const AssignmentTab: React.FC = () => {
           operario_id,
           operarios(id, full_name),
           inventory_master!inner(referencia, material_type)
-        `)
-        .eq('assigned_supervisor_id', user!.id);
+        `);
 
+      // Only filter by supervisor if NOT admin mode
+      if (!isAdminMode) {
+        query = query.eq('assigned_supervisor_id', user!.id);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data as Location[];
     },
@@ -82,7 +91,7 @@ const AssignmentTab: React.FC = () => {
     },
     onSuccess: () => {
       toast.success('Operario asignado correctamente');
-      queryClient.invalidateQueries({ queryKey: ['supervisor-locations'] });
+      queryClient.invalidateQueries({ queryKey: ['assignment-locations'] });
       setSelectedIds(new Set());
       setBulkOperarioId(null);
     },

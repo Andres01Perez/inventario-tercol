@@ -11,9 +11,12 @@ import {
   MapPin,
   ClipboardCheck,
   BarChart3,
-  Boxes
+  Boxes,
+  ClipboardList
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import AssignmentTab from '@/components/supervisor/AssignmentTab';
 
 const AdminDashboard: React.FC = () => {
   const { profile, role, signOut } = useAuth();
@@ -158,6 +161,28 @@ const AdminDashboard: React.FC = () => {
               </div>
             </button>
           ))}
+        </div>
+
+        {/* Gestión Operativa */}
+        <div className="mt-8">
+          <h3 className="text-lg font-semibold text-foreground mb-4">Gestión Operativa</h3>
+          <Tabs defaultValue="assignment" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="assignment" className="gap-2">
+                <ClipboardList className="w-4 h-4" />
+                Asignar Operarios
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="assignment">
+              <div className="glass-card">
+                <p className="text-sm text-muted-foreground mb-4">
+                  Busca cualquier ubicación y asigna operarios manualmente
+                </p>
+                <AssignmentTab isAdminMode={true} />
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
 
         {/* Empty State for Recent Activity */}

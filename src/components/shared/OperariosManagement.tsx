@@ -33,11 +33,18 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface Operario {
   id: string;
   full_name: string;
-  document_id: string | null;
+  turno: number | null;
   is_active: boolean;
   created_at: string;
 }
@@ -48,7 +55,7 @@ const OperariosManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingOperario, setEditingOperario] = useState<Operario | null>(null);
-  const [formData, setFormData] = useState({ full_name: '', document_id: '' });
+  const [formData, setFormData] = useState({ full_name: '', turno: 1 });
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
@@ -82,11 +89,11 @@ const OperariosManagement: React.FC = () => {
       setEditingOperario(operario);
       setFormData({
         full_name: operario.full_name,
-        document_id: operario.document_id || '',
+        turno: operario.turno || 1,
       });
     } else {
       setEditingOperario(null);
-      setFormData({ full_name: '', document_id: '' });
+      setFormData({ full_name: '', turno: 1 });
     }
     setIsDialogOpen(true);
   };
@@ -110,7 +117,7 @@ const OperariosManagement: React.FC = () => {
           .from('operarios')
           .update({
             full_name: formData.full_name.trim(),
-            document_id: formData.document_id.trim() || null,
+            turno: formData.turno,
           })
           .eq('id', editingOperario.id);
 
@@ -118,7 +125,7 @@ const OperariosManagement: React.FC = () => {
 
         setOperarios(prev => prev.map(o => 
           o.id === editingOperario.id 
-            ? { ...o, full_name: formData.full_name.trim(), document_id: formData.document_id.trim() || null }
+            ? { ...o, full_name: formData.full_name.trim(), turno: formData.turno }
             : o
         ));
 
@@ -129,7 +136,7 @@ const OperariosManagement: React.FC = () => {
           .from('operarios')
           .insert({
             full_name: formData.full_name.trim(),
-            document_id: formData.document_id.trim() || null,
+            turno: formData.turno,
           })
           .select()
           .single();
@@ -204,10 +211,7 @@ const OperariosManagement: React.FC = () => {
 
   const filteredOperarios = operarios.filter(operario => {
     const searchLower = searchTerm.toLowerCase();
-    return (
-      operario.full_name.toLowerCase().includes(searchLower) ||
-      operario.document_id?.toLowerCase().includes(searchLower)
-    );
+    return operario.full_name.toLowerCase().includes(searchLower);
   });
 
   if (loading) {
@@ -261,13 +265,19 @@ const OperariosManagement: React.FC = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="document_id">Documento de Identidad</Label>
-                  <Input
-                    id="document_id"
-                    placeholder="Ej: 12345678"
-                    value={formData.document_id}
-                    onChange={(e) => setFormData(prev => ({ ...prev, document_id: e.target.value }))}
-                  />
+                  <Label htmlFor="turno">Turno *</Label>
+                  <Select
+                    value={formData.turno.toString()}
+                    onValueChange={(val) => setFormData(prev => ({ ...prev, turno: parseInt(val) }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar turno" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Turno 1</SelectItem>
+                      <SelectItem value="2">Turno 2</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <DialogFooter>
@@ -300,7 +310,7 @@ const OperariosManagement: React.FC = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Nombre</TableHead>
-                <TableHead>Documento</TableHead>
+                <TableHead>Turno</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
@@ -311,8 +321,13 @@ const OperariosManagement: React.FC = () => {
                   <TableCell className="font-medium text-foreground">
                     {operario.full_name}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {operario.document_id || '-'}
+                  <TableCell>
+                    <Badge 
+                      variant="outline" 
+                      className="bg-blue-500/10 text-blue-500 border-blue-500/30"
+                    >
+                      T{operario.turno || 1}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <Badge 
