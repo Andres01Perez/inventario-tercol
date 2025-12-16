@@ -12,8 +12,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import PrintableSheet from './PrintableSheet';
+import AddLocationDialog from './AddLocationDialog';
 import { toast } from 'sonner';
-import { Loader2, Printer, CheckCircle2, RefreshCw, User } from 'lucide-react';
+import { Loader2, Printer, CheckCircle2, RefreshCw, User, Plus } from 'lucide-react';
 
 interface Location {
   id: string;
@@ -43,6 +44,10 @@ const TranscriptionTab: React.FC = () => {
     open: false,
     operarioName: '',
     locations: [],
+  });
+  const [addDialog, setAddDialog] = useState<{ open: boolean; operarioId: string | null }>({
+    open: false,
+    operarioId: null,
   });
 
   const { data: locations = [], isLoading, refetch } = useQuery({
@@ -203,7 +208,11 @@ const TranscriptionTab: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex justify-between items-center">
+        <Button onClick={() => setAddDialog({ open: true, operarioId: null })}>
+          <Plus className="w-4 h-4 mr-2" />
+          Agregar Item
+        </Button>
         <Button variant="outline" size="sm" onClick={() => refetch()}>
           <RefreshCw className="w-4 h-4 mr-2" />
           Recargar
@@ -235,17 +244,30 @@ const TranscriptionTab: React.FC = () => {
                     </Badge>
                   </div>
                   {!isUnassigned && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePrint(group.operarioName, group.locations);
-                      }}
-                    >
-                      <Printer className="w-4 h-4 mr-2" />
-                      Imprimir Planilla
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAddDialog({ open: true, operarioId: operarioId });
+                        }}
+                      >
+                        <Plus className="w-4 h-4 mr-1" />
+                        Agregar
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePrint(group.operarioName, group.locations);
+                        }}
+                      >
+                        <Printer className="w-4 h-4 mr-2" />
+                        Imprimir
+                      </Button>
+                    </div>
                   )}
                 </div>
               </AccordionTrigger>
@@ -342,6 +364,12 @@ const TranscriptionTab: React.FC = () => {
         operarioName={printDialog.operarioName}
         supervisorName={profile?.full_name || 'Supervisor'}
         locations={printDialog.locations}
+      />
+
+      <AddLocationDialog
+        open={addDialog.open}
+        onOpenChange={(open) => setAddDialog(prev => ({ ...prev, open }))}
+        defaultOperarioId={addDialog.operarioId}
       />
     </div>
   );
