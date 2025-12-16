@@ -20,6 +20,7 @@ export type Database = {
           created_at: string | null
           id: string
           location_id: string | null
+          operario_id: string | null
           quantity_counted: number
           supervisor_id: string | null
           updated_at: string | null
@@ -29,6 +30,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           location_id?: string | null
+          operario_id?: string | null
           quantity_counted: number
           supervisor_id?: string | null
           updated_at?: string | null
@@ -38,6 +40,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           location_id?: string | null
+          operario_id?: string | null
           quantity_counted?: number
           supervisor_id?: string | null
           updated_at?: string | null
@@ -48,6 +51,13 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_counts_operario_id_fkey"
+            columns: ["operario_id"]
+            isOneToOne: false
+            referencedRelation: "operarios"
             referencedColumns: ["id"]
           },
           {
@@ -227,24 +237,24 @@ export type Database = {
       operarios: {
         Row: {
           created_at: string | null
-          document_id: string | null
           full_name: string
           id: string
           is_active: boolean | null
+          turno: number | null
         }
         Insert: {
           created_at?: string | null
-          document_id?: string | null
           full_name: string
           id?: string
           is_active?: boolean | null
+          turno?: number | null
         }
         Update: {
           created_at?: string | null
-          document_id?: string | null
           full_name?: string
           id?: string
           is_active?: boolean | null
+          turno?: number | null
         }
         Relationships: []
       }

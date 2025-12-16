@@ -20,7 +20,7 @@ import {
 interface Operario {
   id: string;
   full_name: string;
-  document_id: string | null;
+  turno: number | null;
 }
 
 interface OperarioSelectProps {
@@ -28,6 +28,7 @@ interface OperarioSelectProps {
   onChange: (value: string | null) => void;
   placeholder?: string;
   disabled?: boolean;
+  filterTurno?: number;
 }
 
 const OperarioSelect: React.FC<OperarioSelectProps> = ({
@@ -35,6 +36,7 @@ const OperarioSelect: React.FC<OperarioSelectProps> = ({
   onChange,
   placeholder = 'Seleccionar operario...',
   disabled = false,
+  filterTurno,
 }) => {
   const [open, setOpen] = useState(false);
   const [operarios, setOperarios] = useState<Operario[]>([]);
@@ -43,12 +45,17 @@ const OperarioSelect: React.FC<OperarioSelectProps> = ({
   useEffect(() => {
     const fetchOperarios = async () => {
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('operarios')
-          .select('id, full_name, document_id')
+          .select('id, full_name, turno')
           .eq('is_active', true)
           .order('full_name', { ascending: true });
 
+        if (filterTurno !== undefined) {
+          query = query.eq('turno', filterTurno);
+        }
+
+        const { data, error } = await query;
         if (error) throw error;
         setOperarios(data || []);
       } catch (error) {
@@ -59,7 +66,7 @@ const OperarioSelect: React.FC<OperarioSelectProps> = ({
     };
 
     fetchOperarios();
-  }, []);
+  }, [filterTurno]);
 
   const selectedOperario = operarios.find(o => o.id === value);
 
@@ -86,7 +93,7 @@ const OperarioSelect: React.FC<OperarioSelectProps> = ({
             {selectedOperario ? (
               <>
                 <UserCog className="h-4 w-4 shrink-0" />
-                {selectedOperario.full_name}
+                {selectedOperario.full_name} (T{selectedOperario.turno || 1})
               </>
             ) : (
               <span className="text-muted-foreground">{placeholder}</span>
@@ -128,14 +135,7 @@ const OperarioSelect: React.FC<OperarioSelectProps> = ({
                       value === operario.id ? 'opacity-100' : 'opacity-0'
                     )}
                   />
-                  <div className="flex flex-col">
-                    <span>{operario.full_name}</span>
-                    {operario.document_id && (
-                      <span className="text-xs text-muted-foreground">
-                        {operario.document_id}
-                      </span>
-                    )}
-                  </div>
+                  <span>{operario.full_name} (T{operario.turno || 1})</span>
                 </CommandItem>
               ))}
             </CommandGroup>
