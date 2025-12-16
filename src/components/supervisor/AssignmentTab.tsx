@@ -35,15 +35,16 @@ interface Location {
   punto_referencia: string | null;
   metodo_conteo: string | null;
   operario_id: string | null;
-  operarios: { id: string; full_name: string } | null;
-  inventory_master: { referencia: string; material_type: string } | null;
+  operarios: { id: string; full_name: string; turno: number | null } | null;
+  inventory_master: { referencia: string; material_type: string; control: string | null } | null;
 }
 
 interface AssignmentTabProps {
   isAdminMode?: boolean;
+  controlFilter?: 'not_null' | 'null' | 'all';
 }
 
-const AssignmentTab: React.FC<AssignmentTabProps> = ({ isAdminMode = false }) => {
+const AssignmentTab: React.FC<AssignmentTabProps> = ({ isAdminMode = false, controlFilter = 'all' }) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -56,7 +57,7 @@ const AssignmentTab: React.FC<AssignmentTabProps> = ({ isAdminMode = false }) =>
   const [filterUbicacionDetallada, setFilterUbicacionDetallada] = useState('');
 
   const { data: locations = [], isLoading, refetch } = useQuery({
-    queryKey: ['assignment-locations', user?.id, isAdminMode],
+    queryKey: ['assignment-locations', user?.id, isAdminMode, controlFilter],
     queryFn: async () => {
       let query = supabase
         .from('locations')
@@ -64,13 +65,20 @@ const AssignmentTab: React.FC<AssignmentTabProps> = ({ isAdminMode = false }) =>
           id, master_reference, location_name, location_detail,
           subcategoria, observaciones, punto_referencia, metodo_conteo,
           operario_id,
-          operarios(id, full_name),
-          inventory_master!inner(referencia, material_type)
+          operarios(id, full_name, turno),
+          inventory_master!inner(referencia, material_type, control)
         `);
 
       // Only filter by supervisor if NOT admin mode
       if (!isAdminMode) {
         query = query.eq('assigned_supervisor_id', user!.id);
+      }
+
+      // Apply control filter based on role
+      if (controlFilter === 'not_null') {
+        query = query.not('inventory_master.control', 'is', null);
+      } else if (controlFilter === 'null') {
+        query = query.is('inventory_master.control', null);
       }
 
       const { data, error } = await query;

@@ -13,7 +13,8 @@ import {
   UserCog,
   Database,
   Boxes,
-  MapPin
+  MapPin,
+  ClipboardList
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import UserManagement from '@/components/superadmin/UserManagement';
@@ -69,6 +70,7 @@ const SuperadminDashboard: React.FC = () => {
   ];
 
   const quickActions = [
+    { label: 'Gestión Operativa', icon: ClipboardList, description: 'Asignar operarios a ubicaciones', onClick: () => navigate('/gestion-operativa') },
     { label: 'Importar Maestra', icon: Upload, description: 'Cargar inventario desde archivo', onClick: () => setActiveTab('import') },
     { label: 'Gestionar Usuarios', icon: Users, description: 'Asignar roles y permisos', onClick: () => setActiveTab('users') },
     { label: 'Inventario MP', icon: Package, description: 'CRUD Materia Prima', onClick: () => navigate('/superadmin/inventario-mp') },
