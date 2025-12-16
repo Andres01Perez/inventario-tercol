@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_logs: {
+        Row: {
+          action_type: string
+          created_at: string | null
+          id: string
+          master_reference: string
+          new_data: Json | null
+          round_number: number | null
+          user_id: string | null
+        }
+        Insert: {
+          action_type: string
+          created_at?: string | null
+          id?: string
+          master_reference: string
+          new_data?: Json | null
+          round_number?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          action_type?: string
+          created_at?: string | null
+          id?: string
+          master_reference?: string
+          new_data?: Json | null
+          round_number?: number | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       inventory_counts: {
         Row: {
           audit_round: number
