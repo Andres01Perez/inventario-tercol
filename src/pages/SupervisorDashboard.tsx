@@ -6,15 +6,16 @@ import {
   Package, 
   LogOut,
   ClipboardList,
-  CheckCircle2,
   AlertCircle,
-  Users
+  Users,
+  FileCheck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import AssignmentTab from '@/components/supervisor/AssignmentTab';
+import RoundAssignmentTab from '@/components/supervisor/RoundAssignmentTab';
 import RoundTranscriptionTab from '@/components/supervisor/RoundTranscriptionTab';
+import ValidationPanel from '@/components/supervisor/ValidationPanel';
 
 const SupervisorDashboard: React.FC = () => {
   const { user, profile, signOut } = useAuth();
@@ -92,9 +93,9 @@ const SupervisorDashboard: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Welcome */}
-        <div className="mb-8">
+        <div>
           <h2 className="text-2xl font-bold text-foreground">
             Hola, {profile?.full_name?.split(' ')[0] || 'Supervisor'}
           </h2>
@@ -104,7 +105,7 @@ const SupervisorDashboard: React.FC = () => {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((stat) => (
             <div key={stat.label} className="glass-card">
               <div className="flex items-center gap-3">
@@ -120,63 +121,102 @@ const SupervisorDashboard: React.FC = () => {
           ))}
         </div>
 
-        {/* Main Tabs */}
-        <Tabs defaultValue="count1" className="space-y-6">
-          <TabsList className="grid w-full max-w-3xl grid-cols-5">
-            <TabsTrigger value="assignment" className="gap-1">
-              <ClipboardList className="w-4 h-4 hidden sm:inline" />
-              <span className="hidden sm:inline">Asignación</span>
-              <span className="sm:hidden">Asig.</span>
-            </TabsTrigger>
-            <TabsTrigger value="count1" className="gap-1">
-              <Badge variant="outline" className="bg-blue-500/10 text-blue-500 text-xs px-1">C1</Badge>
-              <span className="hidden lg:inline">Turno 1</span>
-            </TabsTrigger>
-            <TabsTrigger value="count2" className="gap-1">
-              <Badge variant="outline" className="bg-purple-500/10 text-purple-500 text-xs px-1">C2</Badge>
-              <span className="hidden lg:inline">Turno 2</span>
-            </TabsTrigger>
-            <TabsTrigger value="count3" className="gap-1">
-              <Badge variant="outline" className="bg-amber-500/10 text-amber-500 text-xs px-1">C3</Badge>
-              <span className="hidden lg:inline">Desempate</span>
-            </TabsTrigger>
-            <TabsTrigger value="count4" className="gap-1">
-              <Badge variant="outline" className="bg-orange-500/10 text-orange-500 text-xs px-1">C4</Badge>
-              <span className="hidden lg:inline">Final</span>
-            </TabsTrigger>
-          </TabsList>
+        {/* PANEL DE ASIGNACIÓN */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="w-5 h-5 text-primary" />
+            <h3 className="text-lg font-semibold text-foreground">Panel de Asignación</h3>
+          </div>
+          <div className="glass-card-static">
+            <Tabs defaultValue="assign-c1" className="space-y-4">
+              <TabsList className="grid w-full max-w-2xl grid-cols-4">
+                <TabsTrigger value="assign-c1" className="gap-1">
+                  <Badge variant="outline" className="bg-blue-500/10 text-blue-500 text-xs px-1">C1</Badge>
+                  <span className="hidden sm:inline">Turno 1</span>
+                </TabsTrigger>
+                <TabsTrigger value="assign-c2" className="gap-1">
+                  <Badge variant="outline" className="bg-purple-500/10 text-purple-500 text-xs px-1">C2</Badge>
+                  <span className="hidden sm:inline">Turno 2</span>
+                </TabsTrigger>
+                <TabsTrigger value="assign-c3" className="gap-1">
+                  <Badge variant="outline" className="bg-amber-500/10 text-amber-500 text-xs px-1">C3</Badge>
+                  <span className="hidden sm:inline">Desempate</span>
+                </TabsTrigger>
+                <TabsTrigger value="assign-c4" className="gap-1">
+                  <Badge variant="outline" className="bg-orange-500/10 text-orange-500 text-xs px-1">C4</Badge>
+                  <span className="hidden sm:inline">Final</span>
+                </TabsTrigger>
+              </TabsList>
 
-          <TabsContent value="assignment">
-            <div className="glass-card-static">
-              <h3 className="text-lg font-semibold mb-4">Asignar Operarios a Ubicaciones</h3>
-              <AssignmentTab />
-            </div>
-          </TabsContent>
+              <TabsContent value="assign-c1">
+                <RoundAssignmentTab roundNumber={1} filterTurno={1} />
+              </TabsContent>
+              <TabsContent value="assign-c2">
+                <RoundAssignmentTab roundNumber={2} filterTurno={2} />
+              </TabsContent>
+              <TabsContent value="assign-c3">
+                <RoundAssignmentTab roundNumber={3} />
+              </TabsContent>
+              <TabsContent value="assign-c4">
+                <RoundAssignmentTab roundNumber={4} />
+              </TabsContent>
+            </Tabs>
+          </div>
+        </section>
 
-          <TabsContent value="count1">
-            <div className="glass-card-static">
-              <RoundTranscriptionTab roundNumber={1} filterTurno={1} />
-            </div>
-          </TabsContent>
+        {/* PANEL DE TRANSCRIPCIÓN */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <ClipboardList className="w-5 h-5 text-primary" />
+            <h3 className="text-lg font-semibold text-foreground">Panel de Transcripción</h3>
+          </div>
+          <div className="glass-card-static">
+            <Tabs defaultValue="trans-c1" className="space-y-4">
+              <TabsList className="grid w-full max-w-2xl grid-cols-4">
+                <TabsTrigger value="trans-c1" className="gap-1">
+                  <Badge variant="outline" className="bg-blue-500/10 text-blue-500 text-xs px-1">C1</Badge>
+                  <span className="hidden sm:inline">Turno 1</span>
+                </TabsTrigger>
+                <TabsTrigger value="trans-c2" className="gap-1">
+                  <Badge variant="outline" className="bg-purple-500/10 text-purple-500 text-xs px-1">C2</Badge>
+                  <span className="hidden sm:inline">Turno 2</span>
+                </TabsTrigger>
+                <TabsTrigger value="trans-c3" className="gap-1">
+                  <Badge variant="outline" className="bg-amber-500/10 text-amber-500 text-xs px-1">C3</Badge>
+                  <span className="hidden sm:inline">Desempate</span>
+                </TabsTrigger>
+                <TabsTrigger value="trans-c4" className="gap-1">
+                  <Badge variant="outline" className="bg-orange-500/10 text-orange-500 text-xs px-1">C4</Badge>
+                  <span className="hidden sm:inline">Final</span>
+                </TabsTrigger>
+              </TabsList>
 
-          <TabsContent value="count2">
-            <div className="glass-card-static">
-              <RoundTranscriptionTab roundNumber={2} filterTurno={2} />
-            </div>
-          </TabsContent>
+              <TabsContent value="trans-c1">
+                <RoundTranscriptionTab roundNumber={1} filterTurno={1} />
+              </TabsContent>
+              <TabsContent value="trans-c2">
+                <RoundTranscriptionTab roundNumber={2} filterTurno={2} />
+              </TabsContent>
+              <TabsContent value="trans-c3">
+                <RoundTranscriptionTab roundNumber={3} />
+              </TabsContent>
+              <TabsContent value="trans-c4">
+                <RoundTranscriptionTab roundNumber={4} />
+              </TabsContent>
+            </Tabs>
+          </div>
+        </section>
 
-          <TabsContent value="count3">
-            <div className="glass-card-static">
-              <RoundTranscriptionTab roundNumber={3} />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="count4">
-            <div className="glass-card-static">
-              <RoundTranscriptionTab roundNumber={4} />
-            </div>
-          </TabsContent>
-        </Tabs>
+        {/* PANEL DE VALIDACIÓN */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <FileCheck className="w-5 h-5 text-primary" />
+            <h3 className="text-lg font-semibold text-foreground">Panel de Validación</h3>
+          </div>
+          <div className="glass-card-static">
+            <ValidationPanel />
+          </div>
+        </section>
       </main>
 
       {/* Print Styles */}

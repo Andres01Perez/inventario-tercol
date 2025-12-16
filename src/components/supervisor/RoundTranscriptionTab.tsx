@@ -57,9 +57,10 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
 
   // Fetch locations based on round logic
   const { data: locations = [], isLoading, refetch } = useQuery({
-    queryKey: ['round-locations', roundNumber, user?.id, isAdminMode, controlFilter, masterAuditRound],
+    queryKey: ['round-transcription-locations', roundNumber, user?.id, isAdminMode, controlFilter, masterAuditRound],
     queryFn: async () => {
       // Build query for locations with their master reference
+      // IMPORTANT: Only show locations that HAVE an operario assigned
       let query = supabase
         .from('locations')
         .select(`
@@ -69,7 +70,8 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
           operarios(id, full_name, turno),
           inventory_master!inner(referencia, material_type, control, audit_round)
         `)
-        .eq('inventory_master.audit_round', masterAuditRound);
+        .eq('inventory_master.audit_round', masterAuditRound)
+        .not('operario_id', 'is', null); // Only locations WITH operario assigned
 
       // If not admin mode, filter by supervisor
       if (!isAdminMode) {
@@ -99,7 +101,7 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
 
       const countedLocationIds = new Set(existingCounts?.map(c => c.location_id) || []);
 
-      // Return only locations that DON'T have a count for this round
+      // Return only locations that DON'T have a count for this round AND have operario
       return (data as Location[]).filter(loc => !countedLocationIds.has(loc.id));
     },
     enabled: !!user?.id,
