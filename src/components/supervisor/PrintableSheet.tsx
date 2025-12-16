@@ -13,6 +13,11 @@ interface LocationItem {
   master_reference: string;
   location_name: string | null;
   location_detail: string | null;
+  subcategoria: string | null;
+  observaciones: string | null;
+  punto_referencia: string | null;
+  metodo_conteo: string | null;
+  inventory_master?: { referencia: string; material_type: string } | null;
 }
 
 interface PrintableSheetProps {
@@ -38,7 +43,7 @@ const PrintableSheet: React.FC<PrintableSheetProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto print:max-w-none print:max-h-none print:overflow-visible print:shadow-none print:border-none">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto print:max-w-none print:max-h-none print:overflow-visible print:shadow-none print:border-none">
         <DialogHeader className="print:hidden">
           <DialogTitle>Planilla de Conteo Físico</DialogTitle>
         </DialogHeader>
@@ -68,26 +73,35 @@ const PrintableSheet: React.FC<PrintableSheetProps> = ({
           </div>
 
           {/* Table */}
-          <table className="w-full border-collapse text-sm">
+          <table className="w-full border-collapse text-xs">
             <thead>
               <tr className="border-b-2 border-foreground">
-                <th className="text-left py-2 px-2 w-12">#</th>
-                <th className="text-left py-2 px-2">Referencia</th>
-                <th className="text-left py-2 px-2">Ubicación</th>
-                <th className="text-center py-2 px-2 w-32">Cantidad Contada</th>
+                <th className="text-left py-2 px-1 w-8">#</th>
+                <th className="text-left py-2 px-1">Tipo</th>
+                <th className="text-left py-2 px-1">Referencia</th>
+                <th className="text-left py-2 px-1">Subcat.</th>
+                <th className="text-left py-2 px-1">Observaciones</th>
+                <th className="text-left py-2 px-1">Ubicación</th>
+                <th className="text-left py-2 px-1">Ubic. Det.</th>
+                <th className="text-left py-2 px-1">Punto Ref.</th>
+                <th className="text-left py-2 px-1">Método</th>
+                <th className="text-center py-2 px-1 w-20">Cantidad</th>
               </tr>
             </thead>
             <tbody>
               {locations.map((loc, index) => (
                 <tr key={loc.id} className="border-b border-muted">
-                  <td className="py-3 px-2">{index + 1}</td>
-                  <td className="py-3 px-2 font-medium">{loc.master_reference}</td>
-                  <td className="py-3 px-2">
-                    {loc.location_name || '-'}
-                    {loc.location_detail && ` - ${loc.location_detail}`}
-                  </td>
-                  <td className="py-3 px-2">
-                    <div className="border-b border-dashed border-foreground h-6 w-full"></div>
+                  <td className="py-2 px-1">{index + 1}</td>
+                  <td className="py-2 px-1">{loc.inventory_master?.material_type || '-'}</td>
+                  <td className="py-2 px-1 font-medium">{loc.master_reference}</td>
+                  <td className="py-2 px-1">{loc.subcategoria || '-'}</td>
+                  <td className="py-2 px-1 text-xs max-w-[100px] truncate">{loc.observaciones || '-'}</td>
+                  <td className="py-2 px-1">{loc.location_name || '-'}</td>
+                  <td className="py-2 px-1">{loc.location_detail || '-'}</td>
+                  <td className="py-2 px-1">{loc.punto_referencia || '-'}</td>
+                  <td className="py-2 px-1">{loc.metodo_conteo || '-'}</td>
+                  <td className="py-2 px-1">
+                    <div className="border-b border-dashed border-foreground h-5 w-full"></div>
                   </td>
                 </tr>
               ))}
