@@ -34,8 +34,14 @@ interface Location {
   observaciones: string | null;
   punto_referencia: string | null;
   metodo_conteo: string | null;
-  operario_id: string | null;
-  operarios: { id: string; full_name: string; turno: number | null } | null;
+  operario_c1_id: string | null;
+  operario_c2_id: string | null;
+  operario_c3_id: string | null;
+  operario_c4_id: string | null;
+  operario_c1: { id: string; full_name: string; turno: number | null } | null;
+  operario_c2: { id: string; full_name: string; turno: number | null } | null;
+  operario_c3: { id: string; full_name: string; turno: number | null } | null;
+  operario_c4: { id: string; full_name: string; turno: number | null } | null;
   inventory_master: { referencia: string; material_type: string; control: string | null; audit_round: number | null } | null;
 }
 
@@ -45,6 +51,11 @@ interface RoundAssignmentTabProps {
   isAdminMode?: boolean;
   controlFilter?: 'not_null' | 'null' | 'all';
 }
+
+// Helper to get the operario field name for each round
+const getOperarioField = (round: number): string => {
+  return `operario_c${round}_id`;
+};
 
 const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
   roundNumber,
@@ -76,8 +87,11 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
         .select(`
           id, master_reference, location_name, location_detail,
           subcategoria, observaciones, punto_referencia, metodo_conteo,
-          operario_id,
-          operarios(id, full_name, turno),
+          operario_c1_id, operario_c2_id, operario_c3_id, operario_c4_id,
+          operario_c1:operarios!locations_operario_c1_id_fkey(id, full_name, turno),
+          operario_c2:operarios!locations_operario_c2_id_fkey(id, full_name, turno),
+          operario_c3:operarios!locations_operario_c3_id_fkey(id, full_name, turno),
+          operario_c4:operarios!locations_operario_c4_id_fkey(id, full_name, turno),
           inventory_master!inner(referencia, material_type, control, audit_round)
         `)
         .eq('inventory_master.audit_round', masterAuditRound);
@@ -97,12 +111,12 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
       const { data, error } = await query;
       if (error) throw error;
 
-      // Filter locations that DON'T have an operario assigned (for C1/C2)
-      // For C3/C4, show locations where master is at that round
+      // Filter locations that DON'T have an operario assigned for this specific round
       if (!data || data.length === 0) return [];
 
-      // For this assignment tab, we want to show locations that need operario assignment
-      // The logic is: locations that don't have a count for this round yet
+      const operarioField = getOperarioField(roundNumber) as keyof typeof data[0];
+      
+      // Also filter locations that don't have a count for this round yet
       const locationIds = data.map(l => l.id);
       
       const { data: existingCounts } = await supabase
@@ -114,22 +128,26 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
       const countedLocationIds = new Set(existingCounts?.map(c => c.location_id) || []);
 
       // Return locations that DON'T have a count for this round
-      return (data as Location[]).filter(loc => !countedLocationIds.has(loc.id));
+      // We want to allow assigning operarios even if already assigned
+      return (data as unknown as Location[]).filter(loc => !countedLocationIds.has(loc.id));
     },
     enabled: !!user?.id,
   });
 
   const assignMutation = useMutation({
     mutationFn: async ({ locationIds, operarioId }: { locationIds: string[]; operarioId: string | null }) => {
+      const fieldName = getOperarioField(roundNumber);
+      const updateData = { [fieldName]: operarioId };
+      
       const { error } = await supabase
         .from('locations')
-        .update({ operario_id: operarioId })
+        .update(updateData)
         .in('id', locationIds);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success('Operario asignado correctamente');
+      toast.success(`Operario asignado para C${roundNumber}`);
       queryClient.invalidateQueries({ queryKey: ['round-assignment-locations'] });
       queryClient.invalidateQueries({ queryKey: ['round-transcription-locations'] });
       setSelectedIds(new Set());
@@ -212,6 +230,27 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
     toast.success('Datos actualizados');
   };
 
+  // Get the current operario for this round
+  const getCurrentOperario = (loc: Location) => {
+    switch (roundNumber) {
+      case 1: return loc.operario_c1;
+      case 2: return loc.operario_c2;
+      case 3: return loc.operario_c3;
+      case 4: return loc.operario_c4;
+      default: return null;
+    }
+  };
+
+  const getCurrentOperarioId = (loc: Location) => {
+    switch (roundNumber) {
+      case 1: return loc.operario_c1_id;
+      case 2: return loc.operario_c2_id;
+      case 3: return loc.operario_c3_id;
+      case 4: return loc.operario_c4_id;
+      default: return null;
+    }
+  };
+
   // Get round-specific styling
   const getRoundConfig = () => {
     switch (roundNumber) {
@@ -243,7 +282,7 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
         <p className="text-muted-foreground">
           {roundNumber >= 3 
             ? `No hay referencias en ${roundConfig.label.replace('Asignar ', '')}`
-            : `Todas las ubicaciones ya fueron asignadas para ${roundConfig.label.replace('Asignar ', '')}`
+            : `Todas las ubicaciones ya fueron contadas para ${roundConfig.label.replace('Asignar ', '')}`
           }
         </p>
       </div>
@@ -259,7 +298,7 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
             {roundConfig.label}
           </Badge>
           <span className="text-sm text-muted-foreground">
-            {filteredLocations.length} ubicación(es) pendiente(s) de asignar
+            {filteredLocations.length} ubicación(es) pendiente(s)
           </span>
         </div>
         <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
@@ -328,61 +367,62 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
               <TableHead>Ubicación</TableHead>
               <TableHead>Ubic. Detallada</TableHead>
               <TableHead>Punto Ref.</TableHead>
-              <TableHead>Operario Actual</TableHead>
-              <TableHead className="w-[200px]">Asignar Operario</TableHead>
+              <TableHead className="w-[200px]">Operario C{roundNumber}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredLocations.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   No hay ubicaciones que coincidan con los filtros
                 </TableCell>
               </TableRow>
             ) : (
-              filteredLocations.map((loc) => (
-                <TableRow key={loc.id} className={selectedIds.has(loc.id) ? 'bg-primary/5' : ''}>
-                  <TableCell>
-                    <Checkbox
-                      checked={selectedIds.has(loc.id)}
-                      onCheckedChange={(checked) => handleSelectRow(loc.id, !!checked)}
-                    />
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    <Badge variant="outline">{loc.inventory_master?.material_type || '-'}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <span className="font-medium">{loc.master_reference}</span>
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {loc.location_name || '-'}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {loc.location_detail || '-'}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {loc.punto_referencia || '-'}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {loc.operarios?.full_name ? (
-                      <span className="text-muted-foreground">
-                        {loc.operarios.full_name}
-                        {loc.operarios.turno && <span className="ml-1 text-xs">(T{loc.operarios.turno})</span>}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground/50 italic">Sin asignar</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <OperarioSelect
-                      value={loc.operario_id}
-                      onChange={(operarioId) => handleIndividualAssign(loc.id, operarioId)}
-                      filterTurno={filterTurno}
-                      placeholder="Seleccionar..."
-                    />
-                  </TableCell>
-                </TableRow>
-              ))
+              filteredLocations.map((loc) => {
+                const currentOperario = getCurrentOperario(loc);
+                const currentOperarioId = getCurrentOperarioId(loc);
+                
+                return (
+                  <TableRow key={loc.id} className={selectedIds.has(loc.id) ? 'bg-primary/5' : ''}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(loc.id)}
+                        onCheckedChange={(checked) => handleSelectRow(loc.id, !!checked)}
+                      />
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      <Badge variant="outline">{loc.inventory_master?.material_type || '-'}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-medium">{loc.master_reference}</span>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {loc.location_name || '-'}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {loc.location_detail || '-'}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {loc.punto_referencia || '-'}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <OperarioSelect
+                          value={currentOperarioId}
+                          onChange={(operarioId) => handleIndividualAssign(loc.id, operarioId)}
+                          filterTurno={filterTurno}
+                          placeholder="Seleccionar..."
+                        />
+                        {currentOperario && (
+                          <Badge variant="secondary" className="text-xs shrink-0">
+                            T{currentOperario.turno}
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -411,7 +451,7 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
               {assignMutation.isPending ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
               ) : null}
-              Asignar a Selección
+              Asignar C{roundNumber}
             </Button>
           </div>
         </div>

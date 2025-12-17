@@ -205,6 +205,10 @@ export type Database = {
           master_reference: string
           metodo_conteo: string | null
           observaciones: string | null
+          operario_c1_id: string | null
+          operario_c2_id: string | null
+          operario_c3_id: string | null
+          operario_c4_id: string | null
           operario_id: string | null
           punto_referencia: string | null
           subcategoria: string | null
@@ -220,6 +224,10 @@ export type Database = {
           master_reference: string
           metodo_conteo?: string | null
           observaciones?: string | null
+          operario_c1_id?: string | null
+          operario_c2_id?: string | null
+          operario_c3_id?: string | null
+          operario_c4_id?: string | null
           operario_id?: string | null
           punto_referencia?: string | null
           subcategoria?: string | null
@@ -235,6 +243,10 @@ export type Database = {
           master_reference?: string
           metodo_conteo?: string | null
           observaciones?: string | null
+          operario_c1_id?: string | null
+          operario_c2_id?: string | null
+          operario_c3_id?: string | null
+          operario_c4_id?: string | null
           operario_id?: string | null
           punto_referencia?: string | null
           subcategoria?: string | null
@@ -254,6 +266,34 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "inventory_master"
             referencedColumns: ["referencia"]
+          },
+          {
+            foreignKeyName: "locations_operario_c1_id_fkey"
+            columns: ["operario_c1_id"]
+            isOneToOne: false
+            referencedRelation: "operarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "locations_operario_c2_id_fkey"
+            columns: ["operario_c2_id"]
+            isOneToOne: false
+            referencedRelation: "operarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "locations_operario_c3_id_fkey"
+            columns: ["operario_c3_id"]
+            isOneToOne: false
+            referencedRelation: "operarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "locations_operario_c4_id_fkey"
+            columns: ["operario_c4_id"]
+            isOneToOne: false
+            referencedRelation: "operarios"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "locations_operario_id_fkey"

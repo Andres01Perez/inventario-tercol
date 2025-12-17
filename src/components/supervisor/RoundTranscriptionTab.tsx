@@ -12,8 +12,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import OperarioSelect from '@/components/shared/OperarioSelect';
+import PrintableSheet from '@/components/supervisor/PrintableSheet';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, RefreshCw, User, Save, AlertCircle } from 'lucide-react';
+import { Loader2, CheckCircle2, RefreshCw, User, Save, AlertCircle, Printer } from 'lucide-react';
 
 interface Location {
   id: string;
@@ -24,8 +25,14 @@ interface Location {
   observaciones: string | null;
   punto_referencia: string | null;
   metodo_conteo: string | null;
-  operario_id: string | null;
-  operarios: { id: string; full_name: string; turno: number | null } | null;
+  operario_c1_id: string | null;
+  operario_c2_id: string | null;
+  operario_c3_id: string | null;
+  operario_c4_id: string | null;
+  operario_c1: { id: string; full_name: string; turno: number | null } | null;
+  operario_c2: { id: string; full_name: string; turno: number | null } | null;
+  operario_c3: { id: string; full_name: string; turno: number | null } | null;
+  operario_c4: { id: string; full_name: string; turno: number | null } | null;
   inventory_master: { referencia: string; material_type: string; control: string | null; audit_round: number | null } | null;
 }
 
@@ -37,6 +44,12 @@ interface RoundTranscriptionTabProps {
   isSuperadminOnly?: boolean;
 }
 
+// Helper to get the operario field name for each round
+const getOperarioField = (round: number): string => {
+  if (round === 5) return 'operario_c4_id'; // C5 uses C4 operarios
+  return `operario_c${round}_id`;
+};
+
 const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
   roundNumber,
   filterTurno,
@@ -44,35 +57,38 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
   controlFilter = 'all',
   isSuperadminOnly = false,
 }) => {
-  const { user, role } = useAuth();
+  const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [operarioSelections, setOperarioSelections] = useState<Record<string, string | null>>({});
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [printOperarioData, setPrintOperarioData] = useState<{ name: string; locations: Location[] } | null>(null);
 
   // Determine which master audit_round to filter by
-  // For rounds 1 and 2, master is still at audit_round=1
-  // For rounds 3, 4, 5, master audit_round matches the round number
   const masterAuditRound = roundNumber <= 2 ? 1 : roundNumber;
 
   // Fetch locations based on round logic
   const { data: locations = [], isLoading, refetch } = useQuery({
     queryKey: ['round-transcription-locations', roundNumber, user?.id, isAdminMode, controlFilter, masterAuditRound],
     queryFn: async () => {
-      // Build query for locations with their master reference
-      // IMPORTANT: Only show locations that HAVE an operario assigned
+      const operarioField = getOperarioField(roundNumber);
+      
       let query = supabase
         .from('locations')
         .select(`
           id, master_reference, location_name, location_detail,
           subcategoria, observaciones, punto_referencia, metodo_conteo,
-          operario_id,
-          operarios(id, full_name, turno),
+          operario_c1_id, operario_c2_id, operario_c3_id, operario_c4_id,
+          operario_c1:operarios!locations_operario_c1_id_fkey(id, full_name, turno),
+          operario_c2:operarios!locations_operario_c2_id_fkey(id, full_name, turno),
+          operario_c3:operarios!locations_operario_c3_id_fkey(id, full_name, turno),
+          operario_c4:operarios!locations_operario_c4_id_fkey(id, full_name, turno),
           inventory_master!inner(referencia, material_type, control, audit_round)
         `)
         .eq('inventory_master.audit_round', masterAuditRound)
-        .not('operario_id', 'is', null); // Only locations WITH operario assigned
+        .not(operarioField, 'is', null); // Only locations WITH operario assigned for this round
 
       // If not admin mode, filter by supervisor
       if (!isAdminMode) {
@@ -102,8 +118,8 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
 
       const countedLocationIds = new Set(existingCounts?.map(c => c.location_id) || []);
 
-      // Return only locations that DON'T have a count for this round AND have operario
-      return (data as Location[]).filter(loc => !countedLocationIds.has(loc.id));
+      // Return only locations that DON'T have a count for this round
+      return (data as unknown as Location[]).filter(loc => !countedLocationIds.has(loc.id));
     },
     enabled: !!user?.id,
   });
@@ -179,7 +195,7 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
     },
   });
 
-  const handleSaveCount = (locationId: string) => {
+  const handleSaveCount = (locationId: string, operarioIdFromGroup?: string | null) => {
     const value = quantities[locationId];
     if (!value || value.trim() === '') {
       toast.error('Ingrese una cantidad');
@@ -192,28 +208,53 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
       return;
     }
 
-    const operarioId = operarioSelections[locationId];
+    const operarioId = operarioSelections[locationId] ?? operarioIdFromGroup;
     setSavingIds(prev => new Set(prev).add(locationId));
     saveCountMutation.mutate({ locationId, quantity, operarioId });
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent, locationId: string) => {
+  const handleKeyDown = (e: React.KeyboardEvent, locationId: string, operarioId?: string | null) => {
     if (e.key === 'Enter') {
-      handleSaveCount(locationId);
+      handleSaveCount(locationId, operarioId);
     }
   };
 
-  // Group locations by operario
+  // Get the operario for this round
+  const getOperarioForRound = (loc: Location) => {
+    switch (roundNumber) {
+      case 1: return loc.operario_c1;
+      case 2: return loc.operario_c2;
+      case 3: return loc.operario_c3;
+      case 4: 
+      case 5: return loc.operario_c4;
+      default: return null;
+    }
+  };
+
+  const getOperarioIdForRound = (loc: Location) => {
+    switch (roundNumber) {
+      case 1: return loc.operario_c1_id;
+      case 2: return loc.operario_c2_id;
+      case 3: return loc.operario_c3_id;
+      case 4:
+      case 5: return loc.operario_c4_id;
+      default: return null;
+    }
+  };
+
+  // Group locations by the operario assigned for THIS round
   const groupedByOperario = useMemo(() => {
-    const groups: Record<string, { operarioName: string; turno: number | null; locations: Location[] }> = {};
+    const groups: Record<string, { operarioId: string | null; operarioName: string; turno: number | null; locations: Location[] }> = {};
 
     locations.forEach(loc => {
-      const key = loc.operario_id || 'unassigned';
-      const name = loc.operarios?.full_name || 'Sin Operario Asignado';
-      const turno = loc.operarios?.turno || null;
+      const operario = getOperarioForRound(loc);
+      const operarioId = getOperarioIdForRound(loc);
+      const key = operarioId || 'unassigned';
+      const name = operario?.full_name || 'Sin Operario Asignado';
+      const turno = operario?.turno || null;
 
       if (!groups[key]) {
-        groups[key] = { operarioName: name, turno, locations: [] };
+        groups[key] = { operarioId, operarioName: name, turno, locations: [] };
       }
       groups[key].locations.push(loc);
     });
@@ -226,7 +267,12 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
     });
 
     return entries;
-  }, [locations]);
+  }, [locations, roundNumber]);
+
+  const handlePrintClick = (operarioName: string, operarioLocations: Location[]) => {
+    setPrintOperarioData({ name: operarioName, locations: operarioLocations });
+    setPrintDialogOpen(true);
+  };
 
   // Get round-specific styling and labels
   const getRoundConfig = () => {
@@ -298,13 +344,13 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
       )}
 
       <Accordion type="multiple" className="space-y-3">
-        {groupedByOperario.map(([operarioId, group]) => {
-          const isUnassigned = operarioId === 'unassigned';
+        {groupedByOperario.map(([operarioKey, group]) => {
+          const isUnassigned = operarioKey === 'unassigned';
 
           return (
             <AccordionItem
-              key={operarioId}
-              value={operarioId}
+              key={operarioKey}
+              value={operarioKey}
               className={`border rounded-lg px-4 bg-card ${roundConfig.borderColor}`}
             >
               <AccordionTrigger className="hover:no-underline py-4">
@@ -321,6 +367,18 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
                       {group.locations.length} items
                     </Badge>
                   </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="ml-auto mr-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePrintClick(group.operarioName, group.locations);
+                    }}
+                  >
+                    <Printer className="w-4 h-4 mr-1" />
+                    Imprimir
+                  </Button>
                 </div>
               </AccordionTrigger>
 
@@ -343,6 +401,7 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
                     <tbody>
                       {group.locations.map(loc => {
                         const isSaving = savingIds.has(loc.id);
+                        const operarioIdForGroup = group.operarioId;
 
                         return (
                           <tr key={loc.id} className="border-b hover:bg-muted/50">
@@ -357,7 +416,7 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
                             {(roundNumber >= 3 || isUnassigned) && (
                               <td className="p-2 min-w-[200px]">
                                 <OperarioSelect
-                                  value={operarioSelections[loc.id] ?? loc.operario_id}
+                                  value={operarioSelections[loc.id] ?? operarioIdForGroup}
                                   onChange={(val) => setOperarioSelections(prev => ({ ...prev, [loc.id]: val }))}
                                   filterTurno={filterTurno}
                                   placeholder="Seleccionar..."
@@ -376,14 +435,14 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
                                   ...prev,
                                   [loc.id]: e.target.value
                                 }))}
-                                onKeyDown={(e) => handleKeyDown(e, loc.id)}
+                                onKeyDown={(e) => handleKeyDown(e, loc.id, operarioIdForGroup)}
                                 disabled={isSaving}
                               />
                             </td>
                             <td className="p-2">
                               <Button
                                 size="sm"
-                                onClick={() => handleSaveCount(loc.id)}
+                                onClick={() => handleSaveCount(loc.id, operarioIdForGroup)}
                                 disabled={isSaving || !quantities[loc.id]}
                               >
                                 {isSaving ? (
@@ -407,6 +466,18 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
           );
         })}
       </Accordion>
+
+      {/* Print Dialog */}
+      {printOperarioData && (
+        <PrintableSheet
+          open={printDialogOpen}
+          onOpenChange={setPrintDialogOpen}
+          operarioName={printOperarioData.name}
+          supervisorName={profile?.full_name || 'Supervisor'}
+          locations={printOperarioData.locations}
+          roundNumber={roundNumber}
+        />
+      )}
     </div>
   );
 };
