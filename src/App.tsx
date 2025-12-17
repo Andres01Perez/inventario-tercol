@@ -14,6 +14,8 @@ import InventarioPP from "./pages/superadmin/InventarioPP";
 import GestionUbicacion from "./pages/admin/GestionUbicacion";
 import GestionResponsables from "./pages/admin/GestionResponsables";
 import GestionOperativa from "./pages/GestionOperativa";
+import Asignacion from "./pages/supervisor/Asignacion";
+import Transcripcion from "./pages/supervisor/Transcripcion";
 
 // Configure QueryClient with proper defaults for multi-user isolation
 const queryClient = new QueryClient({
@@ -85,6 +87,23 @@ const App: React.FC = () => (
               element={
                 <ProtectedRoute allowedRoles={['superadmin', 'admin_mp', 'admin_pp']}>
                   <GestionOperativa />
+                </ProtectedRoute>
+              }
+            />
+            {/* Supervisor Routes */}
+            <Route
+              path="/dashboard/asignacion"
+              element={
+                <ProtectedRoute allowedRoles={['supervisor']}>
+                  <Asignacion />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/transcripcion"
+              element={
+                <ProtectedRoute allowedRoles={['supervisor']}>
+                  <Transcripcion />
                 </ProtectedRoute>
               }
             />

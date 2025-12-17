@@ -57,6 +57,7 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
   const [bulkOperarioId, setBulkOperarioId] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Filter states
   const [filterTipo, setFilterTipo] = useState<string>('all');
@@ -204,6 +205,13 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
 
   const allSelected = filteredLocations.length > 0 && filteredLocations.every(l => selectedIds.has(l.id));
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refetch();
+    setIsRefreshing(false);
+    toast.success('Datos actualizados');
+  };
+
   // Get round-specific styling
   const getRoundConfig = () => {
     switch (roundNumber) {
@@ -254,9 +262,9 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
             {filteredLocations.length} ubicación(es) pendiente(s) de asignar
           </span>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Recargar
+        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+          {isRefreshing ? 'Actualizando...' : 'Recargar'}
         </Button>
       </div>
 

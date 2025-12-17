@@ -23,8 +23,9 @@ import UserManagement from '@/components/superadmin/UserManagement';
 import OperariosManagement from '@/components/shared/OperariosManagement';
 import MasterDataImport from '@/components/superadmin/MasterDataImport';
 import RoundTranscriptionTab from '@/components/supervisor/RoundTranscriptionTab';
+import ValidationPanel from '@/components/supervisor/ValidationPanel';
 
-type TabType = 'overview' | 'users' | 'operarios' | 'import' | 'critico';
+type TabType = 'overview' | 'users' | 'operarios' | 'import' | 'critico' | 'validacion';
 
 const SuperadminDashboard: React.FC = () => {
   const { profile, signOut } = useAuth();
@@ -89,6 +90,7 @@ const SuperadminDashboard: React.FC = () => {
 
   const tabs = [
     { id: 'overview' as TabType, label: 'Resumen', icon: BarChart3 },
+    { id: 'validacion' as TabType, label: 'Validación', icon: ClipboardList },
     { id: 'critico' as TabType, label: 'Críticos', icon: AlertTriangle, badge: stats?.criticos },
     { id: 'import' as TabType, label: 'Importar', icon: Upload },
     { id: 'users' as TabType, label: 'Usuarios', icon: Users },
@@ -258,6 +260,23 @@ const SuperadminDashboard: React.FC = () => {
                 controlFilter="all"
                 isSuperadminOnly={true}
               />
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'validacion' && (
+          <div className="space-y-6">
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                <ClipboardList className="w-6 h-6 text-primary" />
+                Panel de Validación
+              </h2>
+              <p className="text-muted-foreground">
+                Valida referencias con C1 y C2 completos para cerrar o escalar a C3.
+              </p>
+            </div>
+            <div className="glass-card">
+              <ValidationPanel isAdminMode={true} controlFilter="all" />
             </div>
           </div>
         )}

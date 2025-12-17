@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -8,17 +9,15 @@ import {
   ClipboardList,
   AlertCircle,
   Users,
-  FileCheck
+  ArrowRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import RoundAssignmentTab from '@/components/supervisor/RoundAssignmentTab';
-import RoundTranscriptionTab from '@/components/supervisor/RoundTranscriptionTab';
-import ValidationPanel from '@/components/supervisor/ValidationPanel';
+import { Card, CardContent } from '@/components/ui/card';
 
 const SupervisorDashboard: React.FC = () => {
   const { user, profile, signOut } = useAuth();
+  const navigate = useNavigate();
 
   // Fetch locations and counts for stats
   const { data: locations = [] } = useQuery({
@@ -53,15 +52,24 @@ const SupervisorDashboard: React.FC = () => {
     const c2Ids = new Set(counts.filter(c => c.audit_round === 2).map(c => c.location_id));
     const pendingC1 = locations.filter(l => !c1Ids.has(l.id)).length;
     const pendingC2 = locations.filter(l => !c2Ids.has(l.id)).length;
-    const operariosSet = new Set(locations.filter(l => l.operario_id).map(l => l.operario_id));
+    const withOperario = locations.filter(l => l.operario_id).length;
+    const withoutOperario = locations.length - withOperario;
 
-    return [
-      { label: 'Total Asignadas', value: String(locations.length), icon: ClipboardList, color: 'bg-primary/10 text-primary' },
-      { label: 'Pendientes C1', value: String(pendingC1), icon: AlertCircle, color: 'bg-blue-500/10 text-blue-500' },
-      { label: 'Pendientes C2', value: String(pendingC2), icon: AlertCircle, color: 'bg-purple-500/10 text-purple-500' },
-      { label: 'Operarios', value: String(operariosSet.size), icon: Users, color: 'bg-green-500/10 text-green-500' },
-    ];
+    return {
+      total: locations.length,
+      pendingC1,
+      pendingC2,
+      withOperario,
+      withoutOperario,
+    };
   }, [locations, counts]);
+
+  const statCards = [
+    { label: 'Total Asignadas', value: stats.total, icon: ClipboardList, color: 'bg-primary/10 text-primary' },
+    { label: 'Pendientes C1', value: stats.pendingC1, icon: AlertCircle, color: 'bg-blue-500/10 text-blue-500' },
+    { label: 'Pendientes C2', value: stats.pendingC2, icon: AlertCircle, color: 'bg-purple-500/10 text-purple-500' },
+    { label: 'Sin Operario', value: stats.withoutOperario, icon: Users, color: 'bg-amber-500/10 text-amber-500' },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -100,13 +108,13 @@ const SupervisorDashboard: React.FC = () => {
             Hola, {profile?.full_name?.split(' ')[0] || 'Supervisor'}
           </h2>
           <p className="text-muted-foreground">
-            Gestiona asignaciones y transcribe los conteos físicos por rondas
+            Selecciona una opción para gestionar el inventario
           </p>
         </div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {stats.map((stat) => (
+          {statCards.map((stat) => (
             <div key={stat.label} className="glass-card">
               <div className="flex items-center gap-3">
                 <div className={`p-2.5 rounded-xl ${stat.color}`}>
@@ -121,121 +129,65 @@ const SupervisorDashboard: React.FC = () => {
           ))}
         </div>
 
-        {/* PANEL DE ASIGNACIÓN */}
-        <section>
-          <div className="flex items-center gap-2 mb-4">
-            <Users className="w-5 h-5 text-primary" />
-            <h3 className="text-lg font-semibold text-foreground">Panel de Asignación</h3>
-          </div>
-          <div className="glass-card-static">
-            <Tabs defaultValue="assign-c1" className="space-y-4">
-              <TabsList className="grid w-full max-w-2xl grid-cols-4">
-                <TabsTrigger value="assign-c1" className="gap-1">
-                  <Badge variant="outline" className="bg-blue-500/10 text-blue-500 text-xs px-1">C1</Badge>
-                  <span className="hidden sm:inline">Turno 1</span>
-                </TabsTrigger>
-                <TabsTrigger value="assign-c2" className="gap-1">
-                  <Badge variant="outline" className="bg-purple-500/10 text-purple-500 text-xs px-1">C2</Badge>
-                  <span className="hidden sm:inline">Turno 2</span>
-                </TabsTrigger>
-                <TabsTrigger value="assign-c3" className="gap-1">
-                  <Badge variant="outline" className="bg-amber-500/10 text-amber-500 text-xs px-1">C3</Badge>
-                  <span className="hidden sm:inline">Desempate</span>
-                </TabsTrigger>
-                <TabsTrigger value="assign-c4" className="gap-1">
-                  <Badge variant="outline" className="bg-orange-500/10 text-orange-500 text-xs px-1">C4</Badge>
-                  <span className="hidden sm:inline">Final</span>
-                </TabsTrigger>
-              </TabsList>
+        {/* Navigation Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Asignación Card */}
+          <Card 
+            className="cursor-pointer hover:border-primary/50 transition-all group"
+            onClick={() => navigate('/dashboard/asignacion')}
+          >
+            <CardContent className="p-8">
+              <div className="flex flex-col items-center text-center space-y-4">
+                <div className="p-4 rounded-2xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                  <Users className="w-12 h-12" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-foreground">Asignación de Operarios</h3>
+                  <p className="text-muted-foreground mt-1">
+                    Asigna operarios a las ubicaciones para cada ronda de conteo
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {stats.withoutOperario > 0 && (
+                    <Badge variant="secondary" className="bg-amber-500/10 text-amber-500">
+                      {stats.withoutOperario} sin asignar
+                    </Badge>
+                  )}
+                  <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-              <TabsContent value="assign-c1">
-                <RoundAssignmentTab roundNumber={1} filterTurno={1} />
-              </TabsContent>
-              <TabsContent value="assign-c2">
-                <RoundAssignmentTab roundNumber={2} filterTurno={2} />
-              </TabsContent>
-              <TabsContent value="assign-c3">
-                <RoundAssignmentTab roundNumber={3} />
-              </TabsContent>
-              <TabsContent value="assign-c4">
-                <RoundAssignmentTab roundNumber={4} />
-              </TabsContent>
-            </Tabs>
-          </div>
-        </section>
-
-        {/* PANEL DE TRANSCRIPCIÓN */}
-        <section>
-          <div className="flex items-center gap-2 mb-4">
-            <ClipboardList className="w-5 h-5 text-primary" />
-            <h3 className="text-lg font-semibold text-foreground">Panel de Transcripción</h3>
-          </div>
-          <div className="glass-card-static">
-            <Tabs defaultValue="trans-c1" className="space-y-4">
-              <TabsList className="grid w-full max-w-2xl grid-cols-4">
-                <TabsTrigger value="trans-c1" className="gap-1">
-                  <Badge variant="outline" className="bg-blue-500/10 text-blue-500 text-xs px-1">C1</Badge>
-                  <span className="hidden sm:inline">Turno 1</span>
-                </TabsTrigger>
-                <TabsTrigger value="trans-c2" className="gap-1">
-                  <Badge variant="outline" className="bg-purple-500/10 text-purple-500 text-xs px-1">C2</Badge>
-                  <span className="hidden sm:inline">Turno 2</span>
-                </TabsTrigger>
-                <TabsTrigger value="trans-c3" className="gap-1">
-                  <Badge variant="outline" className="bg-amber-500/10 text-amber-500 text-xs px-1">C3</Badge>
-                  <span className="hidden sm:inline">Desempate</span>
-                </TabsTrigger>
-                <TabsTrigger value="trans-c4" className="gap-1">
-                  <Badge variant="outline" className="bg-orange-500/10 text-orange-500 text-xs px-1">C4</Badge>
-                  <span className="hidden sm:inline">Final</span>
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="trans-c1">
-                <RoundTranscriptionTab roundNumber={1} filterTurno={1} />
-              </TabsContent>
-              <TabsContent value="trans-c2">
-                <RoundTranscriptionTab roundNumber={2} filterTurno={2} />
-              </TabsContent>
-              <TabsContent value="trans-c3">
-                <RoundTranscriptionTab roundNumber={3} />
-              </TabsContent>
-              <TabsContent value="trans-c4">
-                <RoundTranscriptionTab roundNumber={4} />
-              </TabsContent>
-            </Tabs>
-          </div>
-        </section>
-
-        {/* PANEL DE VALIDACIÓN */}
-        <section>
-          <div className="flex items-center gap-2 mb-4">
-            <FileCheck className="w-5 h-5 text-primary" />
-            <h3 className="text-lg font-semibold text-foreground">Panel de Validación</h3>
-          </div>
-          <div className="glass-card-static">
-            <ValidationPanel />
-          </div>
-        </section>
+          {/* Transcripción Card */}
+          <Card 
+            className="cursor-pointer hover:border-primary/50 transition-all group"
+            onClick={() => navigate('/dashboard/transcripcion')}
+          >
+            <CardContent className="p-8">
+              <div className="flex flex-col items-center text-center space-y-4">
+                <div className="p-4 rounded-2xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                  <ClipboardList className="w-12 h-12" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-foreground">Transcripción de Conteos</h3>
+                  <p className="text-muted-foreground mt-1">
+                    Transcribe los conteos físicos realizados por los operarios
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {(stats.pendingC1 > 0 || stats.pendingC2 > 0) && (
+                    <Badge variant="secondary" className="bg-blue-500/10 text-blue-500">
+                      {stats.pendingC1 + stats.pendingC2} pendientes
+                    </Badge>
+                  )}
+                  <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </main>
-
-      {/* Print Styles */}
-      <style>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          #printable-sheet, #printable-sheet * {
-            visibility: visible;
-          }
-          #printable-sheet {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-          }
-        }
-      `}</style>
     </div>
   );
 };
