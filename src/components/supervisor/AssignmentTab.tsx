@@ -65,7 +65,7 @@ const AssignmentTab: React.FC<AssignmentTabProps> = ({ isAdminMode = false, cont
           id, master_reference, location_name, location_detail,
           subcategoria, observaciones, punto_referencia, metodo_conteo,
           operario_id,
-          operarios(id, full_name, turno),
+          operarios:operarios!locations_operario_id_fkey(id, full_name, turno),
           inventory_master!inner(referencia, material_type, control)
         `);
 

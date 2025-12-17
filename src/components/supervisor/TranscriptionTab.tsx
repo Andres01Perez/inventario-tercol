@@ -59,7 +59,7 @@ const TranscriptionTab: React.FC = () => {
           id, master_reference, location_name, location_detail,
           subcategoria, observaciones, punto_referencia, metodo_conteo,
           operario_id,
-          operarios(id, full_name),
+          operarios:operarios!locations_operario_id_fkey(id, full_name),
           inventory_master!inner(referencia, material_type)
         `)
         .eq('assigned_supervisor_id', user!.id);

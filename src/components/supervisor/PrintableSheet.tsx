@@ -6,6 +6,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Printer } from 'lucide-react';
 
 interface LocationItem {
@@ -26,7 +27,19 @@ interface PrintableSheetProps {
   operarioName: string;
   supervisorName: string;
   locations: LocationItem[];
+  roundNumber?: 1 | 2 | 3 | 4 | 5;
 }
+
+const getRoundLabel = (roundNumber?: number) => {
+  switch (roundNumber) {
+    case 1: return 'Conteo 1 (Turno 1)';
+    case 2: return 'Conteo 2 (Turno 2)';
+    case 3: return 'Conteo 3 (Desempate)';
+    case 4: return 'Conteo 4 (Final)';
+    case 5: return 'Conteo 5 (Crítico)';
+    default: return 'Conteo Físico';
+  }
+};
 
 const PrintableSheet: React.FC<PrintableSheetProps> = ({
   open,
@@ -34,18 +47,20 @@ const PrintableSheet: React.FC<PrintableSheetProps> = ({
   operarioName,
   supervisorName,
   locations,
+  roundNumber,
 }) => {
   const handlePrint = () => {
     window.print();
   };
 
   const today = new Date().toLocaleDateString('es-CO');
+  const roundLabel = getRoundLabel(roundNumber);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto print:max-w-none print:max-h-none print:overflow-visible print:shadow-none print:border-none">
         <DialogHeader className="print:hidden">
-          <DialogTitle>Planilla de Conteo Físico</DialogTitle>
+          <DialogTitle>Planilla de Conteo Físico - {roundLabel}</DialogTitle>
         </DialogHeader>
 
         {/* Printable Content */}
@@ -53,6 +68,7 @@ const PrintableSheet: React.FC<PrintableSheetProps> = ({
           {/* Header */}
           <div className="text-center mb-6 border-b pb-4">
             <h1 className="text-2xl font-bold mb-1">PLANILLA DE CONTEO FÍSICO</h1>
+            <p className="text-lg font-medium text-primary">{roundLabel}</p>
             <p className="text-muted-foreground">Inventario Físico</p>
           </div>
 
