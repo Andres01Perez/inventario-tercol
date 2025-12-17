@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -49,6 +49,7 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [operarioSelections, setOperarioSelections] = useState<Record<string, string | null>>({});
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Determine which master audit_round to filter by
   // For rounds 1 and 2, master is still at audit_round=1
@@ -106,6 +107,38 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
     },
     enabled: !!user?.id,
   });
+
+  // Realtime subscription for inventory_counts
+  useEffect(() => {
+    const channel = supabase
+      .channel(`inventory-counts-round-${roundNumber}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'inventory_counts',
+        },
+        (payload) => {
+          // When a new count is inserted, refresh the data
+          if (payload.new && payload.new.audit_round === roundNumber) {
+            queryClient.invalidateQueries({ queryKey: ['round-transcription-locations', roundNumber] });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [roundNumber, queryClient]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refetch();
+    setIsRefreshing(false);
+    toast.success('Datos actualizados');
+  };
 
   const saveCountMutation = useMutation({
     mutationFn: async ({ locationId, quantity, operarioId }: { locationId: string; quantity: number; operarioId?: string | null }) => {
@@ -246,9 +279,9 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
             {locations.length} ubicación(es) pendiente(s)
           </span>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Recargar
+        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+          {isRefreshing ? 'Actualizando...' : 'Recargar'}
         </Button>
       </div>
 
