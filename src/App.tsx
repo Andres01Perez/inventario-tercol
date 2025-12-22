@@ -13,9 +13,6 @@ import InventarioMP from "./pages/superadmin/InventarioMP";
 import InventarioPP from "./pages/superadmin/InventarioPP";
 import GestionUbicacion from "./pages/admin/GestionUbicacion";
 import GestionResponsables from "./pages/admin/GestionResponsables";
-import GestionOperativa from "./pages/GestionOperativa";
-import Asignacion from "./pages/supervisor/Asignacion";
-import Transcripcion from "./pages/supervisor/Transcripcion";
 
 // Configure QueryClient with proper defaults for multi-user isolation
 const queryClient = new QueryClient({
@@ -68,7 +65,7 @@ const App: React.FC = () => (
             <Route
               path="/admin/gestion-ubicacion"
               element={
-                <ProtectedRoute allowedRoles={['admin_mp', 'admin_pp']}>
+                <ProtectedRoute allowedRoles={['superadmin', 'admin_mp', 'admin_pp']}>
                   <GestionUbicacion />
                 </ProtectedRoute>
               }
@@ -76,34 +73,8 @@ const App: React.FC = () => (
             <Route
               path="/admin/gestion-responsables"
               element={
-                <ProtectedRoute allowedRoles={['admin_mp', 'admin_pp']}>
-                  <GestionResponsables />
-                </ProtectedRoute>
-              }
-            />
-            {/* Gestión Operativa - accessible by superadmin, admin_mp, admin_pp */}
-            <Route
-              path="/gestion-operativa"
-              element={
                 <ProtectedRoute allowedRoles={['superadmin', 'admin_mp', 'admin_pp']}>
-                  <GestionOperativa />
-                </ProtectedRoute>
-              }
-            />
-            {/* Supervisor Routes */}
-            <Route
-              path="/dashboard/asignacion"
-              element={
-                <ProtectedRoute allowedRoles={['supervisor']}>
-                  <Asignacion />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/dashboard/transcripcion"
-              element={
-                <ProtectedRoute allowedRoles={['supervisor']}>
-                  <Transcripcion />
+                  <GestionResponsables />
                 </ProtectedRoute>
               }
             />
