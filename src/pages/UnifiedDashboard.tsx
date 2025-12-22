@@ -473,9 +473,6 @@ const UnifiedDashboard: React.FC = () => {
               </p>
             </div>
             <OperationalPanel 
-              showAssignment={true}
-              showTranscription={true}
-              showValidation={role !== 'supervisor'}
               isAdminMode={role !== 'supervisor'}
               controlFilter={roleConfig.controlFilter}
             />
