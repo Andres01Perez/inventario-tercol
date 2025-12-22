@@ -9,8 +9,13 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
+import GestionOperativa from "./pages/GestionOperativa";
 import InventarioMP from "./pages/superadmin/InventarioMP";
 import InventarioPP from "./pages/superadmin/InventarioPP";
+import Usuarios from "./pages/superadmin/Usuarios";
+import ImportarMaestra from "./pages/superadmin/ImportarMaestra";
+import Criticos from "./pages/superadmin/Criticos";
+import Operarios from "./pages/superadmin/Operarios";
 import GestionUbicacion from "./pages/admin/GestionUbicacion";
 import GestionResponsables from "./pages/admin/GestionResponsables";
 
@@ -44,6 +49,15 @@ const App: React.FC = () => (
                 </ProtectedRoute>
               }
             />
+            {/* Shared Routes */}
+            <Route
+              path="/gestion-operativa"
+              element={
+                <ProtectedRoute allowedRoles={['superadmin', 'admin_mp', 'admin_pp', 'supervisor']}>
+                  <GestionOperativa />
+                </ProtectedRoute>
+              }
+            />
             {/* Superadmin Routes */}
             <Route
               path="/superadmin/inventario-mp"
@@ -58,6 +72,38 @@ const App: React.FC = () => (
               element={
                 <ProtectedRoute allowedRoles={['superadmin']}>
                   <InventarioPP />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/superadmin/usuarios"
+              element={
+                <ProtectedRoute allowedRoles={['superadmin']}>
+                  <Usuarios />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/superadmin/importar"
+              element={
+                <ProtectedRoute allowedRoles={['superadmin']}>
+                  <ImportarMaestra />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/superadmin/criticos"
+              element={
+                <ProtectedRoute allowedRoles={['superadmin']}>
+                  <Criticos />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/superadmin/operarios"
+              element={
+                <ProtectedRoute allowedRoles={['superadmin']}>
+                  <Operarios />
                 </ProtectedRoute>
               }
             />
