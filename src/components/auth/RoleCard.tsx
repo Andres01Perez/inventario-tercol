@@ -13,7 +13,7 @@ const RoleCard = ({ title, description, icon: Icon, permissions, delay = 0 }: Ro
   return (
     <div 
       className={cn(
-        "glass-card group cursor-pointer animate-slide-up",
+        "glass-card-interactive group cursor-pointer animate-slide-up",
         "border border-border/50 hover:border-primary/30"
       )}
       style={{ animationDelay: `${delay}ms` }}

@@ -122,18 +122,20 @@
     box-shadow: var(--glass-shadow);
   }
 
+  /* Tarjeta base - sin animación de movimiento */
   .glass-card {
-    @apply glass rounded-2xl p-6 transition-all duration-300;
-  }
-
-  .glass-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 40px 0 rgba(178, 0, 0, 0.15);
-  }
-
-  .glass-card-static {
     @apply glass rounded-2xl p-6;
     box-shadow: var(--glass-shadow);
+  }
+
+  /* Solo para elementos interactivos (botones, tarjetas clickeables) */
+  .glass-card-interactive {
+    @apply glass-card transition-all duration-300;
+  }
+
+  .glass-card-interactive:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px 0 rgba(178, 0, 0, 0.15);
   }
 
   .glass-button {

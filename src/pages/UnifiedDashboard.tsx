@@ -373,7 +373,7 @@ const UnifiedDashboard: React.FC = () => {
       <button
         onClick={action.onClick}
         disabled={action.disabled}
-        className={`glass-card text-left transition-all group ${action.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-primary/50'}`}
+        className={`glass-card-interactive text-left group ${action.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-primary/50'}`}
       >
         <div className="flex items-start gap-4">
           <div className={`p-3 rounded-xl ${action.bgColor} ${action.iconColor} ${!action.disabled && action.hoverBg} ${!action.disabled && 'group-hover:text-white'} transition-colors`}>
