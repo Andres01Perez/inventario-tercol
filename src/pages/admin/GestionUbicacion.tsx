@@ -87,11 +87,17 @@ const GestionUbicacion: React.FC = () => {
   const [filterObservacion, setFilterObservacion] = useState('');
   const [filterSupervisor, setFilterSupervisor] = useState<string>('all');
 
+  const isSuperadmin = role === 'superadmin';
   const isAdminMP = role === 'admin_mp';
-  const adminTypeLabel = isAdminMP ? 'Materia Prima' : 'Producto en Proceso';
-  const AdminIcon = isAdminMP ? Package : Boxes;
-  const adminColorClass = isAdminMP ? 'text-orange-500' : 'text-emerald-500';
-  const adminBgClass = isAdminMP ? 'bg-orange-500/10' : 'bg-emerald-500/10';
+  const isAdminPP = role === 'admin_pp';
+  
+  const adminTypeLabel = isSuperadmin 
+    ? 'Todas las referencias' 
+    : isAdminMP ? 'Materia Prima' : 'Producto en Proceso';
+  const AdminIcon = isSuperadmin ? Package : isAdminMP ? Package : Boxes;
+  const adminColorClass = isSuperadmin ? 'text-primary' : isAdminMP ? 'text-orange-500' : 'text-emerald-500';
+  const adminBgClass = isSuperadmin ? 'bg-primary/10' : isAdminMP ? 'bg-orange-500/10' : 'bg-emerald-500/10';
+  const adminRoleLabel = isSuperadmin ? 'Superadmin' : isAdminMP ? 'Admin MP' : 'Admin PP';
 
   // Fetch supervisors for the filter dropdown
   const { data: supervisors } = useQuery({
@@ -136,10 +142,13 @@ const GestionUbicacion: React.FC = () => {
         .from('inventory_master')
         .select('referencia, material_type, control', { count: 'exact' });
 
-      if (isAdminMP) {
-        query = query.not('control', 'is', null);
-      } else {
-        query = query.is('control', null);
+      // Superadmin ve todo, admins filtran por tipo de control
+      if (!isSuperadmin) {
+        if (isAdminMP) {
+          query = query.not('control', 'is', null);
+        } else {
+          query = query.is('control', null);
+        }
       }
 
       if (filterTipo !== 'all') {
@@ -354,7 +363,7 @@ const GestionUbicacion: React.FC = () => {
               </Button>
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-foreground">{profile?.full_name}</p>
-                <p className="text-xs text-muted-foreground">Admin {isAdminMP ? 'MP' : 'PP'}</p>
+                <p className="text-xs text-muted-foreground">{adminRoleLabel}</p>
               </div>
             </div>
           </div>
