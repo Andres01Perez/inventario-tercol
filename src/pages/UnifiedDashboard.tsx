@@ -195,42 +195,204 @@ const UnifiedDashboard: React.FC = () => {
     ];
   }, [role, stats, roleConfig]);
 
-  // Quick actions based on role - now all navigate to dedicated pages
-  const quickActions = useMemo(() => {
+  // Type for action button
+  interface ActionItem {
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    description: string;
+    onClick?: () => void;
+    iconColor: string;
+    bgColor: string;
+    hoverBg: string;
+    badge?: number;
+    badgeLabel?: string;
+    disabled?: boolean;
+  }
+
+  // Quick actions based on role - with specific colors per action
+  const quickActions: ActionItem[] = useMemo(() => {
+    const baseActions: Record<string, ActionItem> = {
+      gestionOperativa: { 
+        label: 'Gestión Operativa', 
+        icon: ClipboardList, 
+        description: 'Asignar operarios y transcribir conteos',
+        onClick: () => navigate('/gestion-operativa'),
+        iconColor: 'text-blue-500',
+        bgColor: 'bg-blue-500/10',
+        hoverBg: 'group-hover:bg-blue-500',
+      },
+      criticos: { 
+        label: 'Críticos (C5)', 
+        icon: AlertTriangle, 
+        description: 'Referencias que requieren cierre forzado',
+        onClick: () => navigate('/superadmin/criticos'),
+        iconColor: 'text-red-500',
+        bgColor: 'bg-red-500/10',
+        hoverBg: 'group-hover:bg-red-500',
+      },
+      importar: { 
+        label: 'Importar Maestra', 
+        icon: Upload, 
+        description: 'Cargar inventario desde archivo',
+        onClick: () => navigate('/superadmin/importar'),
+        iconColor: 'text-purple-500',
+        bgColor: 'bg-purple-500/10',
+        hoverBg: 'group-hover:bg-purple-500',
+      },
+      usuarios: { 
+        label: 'Gestionar Usuarios', 
+        icon: Users, 
+        description: 'Asignar roles y permisos',
+        onClick: () => navigate('/superadmin/usuarios'),
+        iconColor: 'text-emerald-500',
+        bgColor: 'bg-emerald-500/10',
+        hoverBg: 'group-hover:bg-emerald-500',
+      },
+      operarios: { 
+        label: 'Gestionar Operarios', 
+        icon: UserCog, 
+        description: 'Administrar operarios del sistema',
+        onClick: () => navigate('/superadmin/operarios'),
+        iconColor: 'text-amber-500',
+        bgColor: 'bg-amber-500/10',
+        hoverBg: 'group-hover:bg-amber-500',
+      },
+      inventarioMP: { 
+        label: 'Inventario MP', 
+        icon: Package, 
+        description: 'CRUD Materia Prima',
+        onClick: () => navigate('/superadmin/inventario-mp'),
+        iconColor: 'text-orange-500',
+        bgColor: 'bg-orange-500/10',
+        hoverBg: 'group-hover:bg-orange-500',
+      },
+      inventarioPP: { 
+        label: 'Inventario PP', 
+        icon: Boxes, 
+        description: 'CRUD Producto en Proceso',
+        onClick: () => navigate('/superadmin/inventario-pp'),
+        iconColor: 'text-teal-500',
+        bgColor: 'bg-teal-500/10',
+        hoverBg: 'group-hover:bg-teal-500',
+      },
+      ubicaciones: { 
+        label: 'Gestionar Ubicaciones', 
+        icon: MapPin, 
+        description: 'Asignar ubicaciones y supervisores',
+        onClick: () => navigate('/admin/gestion-ubicacion'),
+        iconColor: 'text-cyan-500',
+        bgColor: 'bg-cyan-500/10',
+        hoverBg: 'group-hover:bg-cyan-500',
+      },
+      responsables: { 
+        label: 'Asignar Responsables', 
+        icon: Users, 
+        description: 'Asignación masiva de líderes de conteo',
+        onClick: () => navigate('/admin/gestion-responsables'),
+        iconColor: 'text-indigo-500',
+        bgColor: 'bg-indigo-500/10',
+        hoverBg: 'group-hover:bg-indigo-500',
+      },
+      reportes: { 
+        label: 'Ver Reportes', 
+        icon: FileSpreadsheet, 
+        description: 'Exportar informes de inventario',
+        disabled: true,
+        iconColor: 'text-slate-500',
+        bgColor: 'bg-slate-500/10',
+        hoverBg: 'group-hover:bg-slate-500',
+      },
+    };
+
     if (role === 'supervisor') {
-      return [
-        { 
-          label: 'Gestión Operativa', 
-          icon: ClipboardList, 
-          description: 'Asigna operarios y transcribe conteos para tus ubicaciones',
-          onClick: () => navigate('/gestion-operativa'),
-          badge: (stats?.withoutOperario || 0) + (stats?.pendingC1 || 0) + (stats?.pendingC2 || 0),
-          badgeLabel: 'pendientes',
-          badgeColor: 'bg-amber-500/10 text-amber-500',
-        },
-      ];
+      return [{
+        ...baseActions.gestionOperativa,
+        description: 'Asigna operarios y transcribe conteos para tus ubicaciones',
+        badge: (stats?.withoutOperario || 0) + (stats?.pendingC1 || 0) + (stats?.pendingC2 || 0),
+        badgeLabel: 'pendientes',
+      }];
     }
 
     if (role === 'admin_mp' || role === 'admin_pp') {
       return [
-        { label: 'Gestión Operativa', icon: ClipboardList, description: 'Asignar operarios y transcribir conteos', onClick: () => navigate('/gestion-operativa') },
-        { label: 'Gestionar Ubicaciones', icon: MapPin, description: 'Asignar ubicaciones y supervisores', onClick: () => navigate('/admin/gestion-ubicacion') },
-        { label: 'Asignar Responsables', icon: Users, description: 'Asignación masiva de líderes de conteo', onClick: () => navigate('/admin/gestion-responsables') },
-        { label: 'Ver Reportes', icon: FileSpreadsheet, description: 'Exportar informes de inventario', disabled: true },
+        baseActions.gestionOperativa,
+        baseActions.ubicaciones,
+        baseActions.responsables,
+        baseActions.reportes,
       ];
     }
 
     // Superadmin
     return [
-      { label: 'Gestión Operativa', icon: ClipboardList, description: 'Asignar operarios a ubicaciones', onClick: () => navigate('/gestion-operativa') },
-      { label: 'Críticos (C5)', icon: AlertTriangle, description: 'Referencias que requieren cierre forzado', onClick: () => navigate('/superadmin/criticos'), badge: stats?.criticos || 0, badgeColor: 'bg-red-500/10 text-red-500' },
-      { label: 'Importar Maestra', icon: Upload, description: 'Cargar inventario desde archivo', onClick: () => navigate('/superadmin/importar') },
-      { label: 'Gestionar Usuarios', icon: Users, description: 'Asignar roles y permisos', onClick: () => navigate('/superadmin/usuarios') },
-      { label: 'Gestionar Operarios', icon: UserCog, description: 'Administrar operarios del sistema', onClick: () => navigate('/superadmin/operarios') },
-      { label: 'Inventario MP', icon: Package, description: 'CRUD Materia Prima', onClick: () => navigate('/superadmin/inventario-mp') },
-      { label: 'Inventario PP', icon: Boxes, description: 'CRUD Producto en Proceso', onClick: () => navigate('/superadmin/inventario-pp') },
+      baseActions.gestionOperativa,
+      { ...baseActions.criticos, badge: stats?.criticos || 0 },
+      baseActions.importar,
+      baseActions.usuarios,
+      baseActions.operarios,
+      baseActions.inventarioMP,
+      baseActions.inventarioPP,
     ];
   }, [role, stats, navigate]);
+
+  // Reusable ActionButton component
+  const ActionButton = ({ action }: { action: ActionItem }) => {
+    const isLargeCard = quickActions.length <= 2;
+    
+    if (isLargeCard) {
+      return (
+        <Card 
+          className="cursor-pointer hover:border-primary/50 transition-all group"
+          onClick={action.onClick}
+        >
+          <CardContent className="p-8">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className={`p-4 rounded-2xl ${action.bgColor} ${action.iconColor} ${action.hoverBg} group-hover:text-white transition-colors`}>
+                <action.icon className="w-12 h-12" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-foreground">{action.label}</h3>
+                <p className="text-muted-foreground mt-1">{action.description}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {action.badge && action.badge > 0 && (
+                  <Badge variant="secondary" className={`${action.bgColor} ${action.iconColor}`}>
+                    {action.badge} {action.badgeLabel || ''}
+                  </Badge>
+                )}
+                <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    return (
+      <button
+        onClick={action.onClick}
+        disabled={action.disabled}
+        className={`glass-card text-left transition-all group ${action.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-primary/50'}`}
+      >
+        <div className="flex items-start gap-4">
+          <div className={`p-3 rounded-xl ${action.bgColor} ${action.iconColor} ${!action.disabled && action.hoverBg} ${!action.disabled && 'group-hover:text-white'} transition-colors`}>
+            <action.icon className="w-6 h-6" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <p className="font-medium text-foreground">{action.label}</p>
+              {action.badge && action.badge > 0 && (
+                <Badge variant="secondary" className={`${action.bgColor} ${action.iconColor}`}>
+                  {action.badge}
+                </Badge>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground">{action.description}</p>
+            {action.disabled && <p className="text-xs text-muted-foreground italic mt-1">Próximamente</p>}
+          </div>
+        </div>
+      </button>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -261,7 +423,7 @@ const UnifiedDashboard: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Content - Only Overview */}
+      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-8">
           {/* Welcome */}
@@ -317,69 +479,14 @@ const UnifiedDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* Quick Actions */}
+          {/* Quick Actions - Unified template */}
           <div>
             <h3 className="text-lg font-semibold text-foreground mb-4">Acciones Rápidas</h3>
-            {role === 'supervisor' ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {quickActions.map((action) => (
-                  <Card 
-                    key={action.label}
-                    className="cursor-pointer hover:border-primary/50 transition-all group"
-                    onClick={action.onClick}
-                  >
-                    <CardContent className="p-8">
-                      <div className="flex flex-col items-center text-center space-y-4">
-                        <div className="p-4 rounded-2xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                          <action.icon className="w-12 h-12" />
-                        </div>
-                        <div>
-                          <h3 className="text-xl font-bold text-foreground">{action.label}</h3>
-                          <p className="text-muted-foreground mt-1">{action.description}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {action.badge && action.badge > 0 && (
-                            <Badge variant="secondary" className={action.badgeColor}>
-                              {action.badge} {action.badgeLabel || 'pendientes'}
-                            </Badge>
-                          )}
-                          <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {quickActions.map((action) => (
-                  <button
-                    key={action.label}
-                    onClick={action.onClick}
-                    disabled={action.disabled}
-                    className={`glass-card text-left transition-all group ${action.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-primary/50'}`}
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className={`p-3 rounded-xl ${action.label.includes('Crítico') ? 'bg-red-500/10 text-red-500' : `${roleConfig.bgClass} ${roleConfig.colorClass}`} ${!action.disabled && 'group-hover:bg-primary group-hover:text-primary-foreground'} transition-colors`}>
-                        <action.icon className="w-6 h-6" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-foreground">{action.label}</p>
-                          {action.badge && action.badge > 0 && (
-                            <Badge variant="secondary" className={action.badgeColor}>
-                              {action.badge}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground">{action.description}</p>
-                        {action.disabled && <p className="text-xs text-muted-foreground italic mt-1">Próximamente</p>}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className={`grid gap-4 ${quickActions.length <= 2 ? 'grid-cols-1 md:grid-cols-2 gap-6' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'}`}>
+              {quickActions.map((action) => (
+                <ActionButton key={action.label} action={action} />
+              ))}
+            </div>
           </div>
         </div>
       </main>
