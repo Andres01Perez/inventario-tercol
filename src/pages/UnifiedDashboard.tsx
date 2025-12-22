@@ -326,6 +326,8 @@ const UnifiedDashboard: React.FC = () => {
     return [
       baseActions.gestionOperativa,
       { ...baseActions.criticos, badge: stats?.criticos || 0 },
+      baseActions.ubicaciones,
+      baseActions.responsables,
       baseActions.importar,
       baseActions.usuarios,
       baseActions.operarios,
