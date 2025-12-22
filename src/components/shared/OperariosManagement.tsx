@@ -9,7 +9,8 @@ import {
   Edit2,
   Trash2,
   Check,
-  X
+  X,
+  Upload
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,6 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import OperariosImport from './OperariosImport';
 
 interface Operario {
   id: string;
@@ -54,6 +56,7 @@ const OperariosManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [editingOperario, setEditingOperario] = useState<Operario | null>(null);
   const [formData, setFormData] = useState({ full_name: '', turno: 1 });
   const [saving, setSaving] = useState(false);
@@ -241,6 +244,28 @@ const OperariosManagement: React.FC = () => {
               className="pl-9"
             />
           </div>
+          {/* Botón Importar */}
+          <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Upload className="w-4 h-4 mr-2" />
+                Importar
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Importar Operarios desde Excel</DialogTitle>
+              </DialogHeader>
+              <OperariosImport
+                onSuccess={() => {
+                  fetchOperarios();
+                }}
+                onClose={() => setIsImportDialogOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
+
+          {/* Botón Agregar */}
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={() => handleOpenDialog()}>
