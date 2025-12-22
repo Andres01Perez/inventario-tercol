@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -12,8 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { toast } from 'sonner';
-import { Loader2, CheckCircle2, Play, RefreshCw, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Loader2, CheckCircle2, RefreshCw, AlertTriangle, ArrowRight, Eye } from 'lucide-react';
 
 interface ValidationPanelProps {
   isAdminMode?: boolean;
@@ -39,7 +38,6 @@ const ValidationPanel: React.FC<ValidationPanelProps> = ({
   controlFilter = 'all',
 }) => {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
 
   // Fetch references with their location counts
   const { data: referencesData = [], isLoading, refetch } = useQuery({
@@ -151,36 +149,6 @@ const ValidationPanel: React.FC<ValidationPanelProps> = ({
     enabled: !!user?.id,
   });
 
-  const validateMutation = useMutation({
-    mutationFn: async (reference: string) => {
-      const { data, error } = await supabase.rpc('validate_and_close_round', {
-        _reference: reference,
-        _admin_id: user!.id,
-      });
-      if (error) throw error;
-      return data as { success: boolean; action?: string; error?: string; reason?: string; new_round?: number };
-    },
-    onSuccess: (result, reference) => {
-      if (!result.success) {
-        toast.error(`Error: ${result.error}`);
-        return;
-      }
-
-      if (result.action === 'closed') {
-        toast.success(`✅ ${reference} - AUDITADO (${result.reason === 'matches_erp' ? 'coincide con ERP' : 'consistencia física'})`);
-      } else if (result.action === 'next_round') {
-        toast.warning(`⚠️ ${reference} - Pasó a Conteo ${result.new_round} (sin coincidencias)`);
-      }
-
-      queryClient.invalidateQueries({ queryKey: ['validation-references'] });
-      queryClient.invalidateQueries({ queryKey: ['round-assignment-locations'] });
-      queryClient.invalidateQueries({ queryKey: ['round-transcription-locations'] });
-    },
-    onError: (error: Error) => {
-      toast.error(`Error de validación: ${error.message}`);
-    },
-  });
-
   const completeReferences = useMemo(() => 
     referencesData.filter(r => r.isComplete), 
     [referencesData]
@@ -213,9 +181,12 @@ const ValidationPanel: React.FC<ValidationPanelProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Panel de Validación</h3>
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Eye className="w-5 h-5" />
+            Panel de Monitoreo
+          </h3>
           <p className="text-sm text-muted-foreground">
-            Valida referencias con C1 y C2 completos para cerrar o escalar a C3
+            Vista de solo lectura - La validación ocurre automáticamente al completar C1 y C2
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -224,13 +195,25 @@ const ValidationPanel: React.FC<ValidationPanelProps> = ({
         </Button>
       </div>
 
-      {/* Complete references - ready to validate */}
+      {/* Info banner */}
+      <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 flex items-start gap-3">
+        <CheckCircle2 className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+        <div>
+          <p className="font-medium text-blue-600 dark:text-blue-400">Validación Automática Activa</p>
+          <p className="text-sm text-muted-foreground">
+            Cuando una referencia tenga C1 y C2 completos, se validará automáticamente al guardar el último conteo.
+            Si coincide con ERP o hay consistencia física, se marcará como AUDITADO. De lo contrario, pasará a C3.
+          </p>
+        </div>
+      </div>
+
+      {/* Complete references - will auto-validate */}
       {completeReferences.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Badge className="bg-green-500/10 text-green-500">
               <CheckCircle2 className="w-3 h-3 mr-1" />
-              Listas para Validar
+              Completas (Pendiente validación automática)
             </Badge>
             <span className="text-sm text-muted-foreground">
               {completeReferences.length} referencia(s)
@@ -248,7 +231,6 @@ const ValidationPanel: React.FC<ValidationPanelProps> = ({
                   <TableHead className="text-right">Suma C2</TableHead>
                   <TableHead className="text-right">ERP</TableHead>
                   <TableHead className="text-center">Predicción</TableHead>
-                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -279,22 +261,6 @@ const ValidationPanel: React.FC<ValidationPanelProps> = ({
                             → C3
                           </Badge>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          onClick={() => validateMutation.mutate(ref.referencia)}
-                          disabled={validateMutation.isPending}
-                        >
-                          {validateMutation.isPending ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <>
-                              <Play className="w-4 h-4 mr-1" />
-                              Validar
-                            </>
-                          )}
-                        </Button>
                       </TableCell>
                     </TableRow>
                   );

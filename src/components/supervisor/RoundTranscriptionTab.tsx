@@ -156,6 +156,50 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
     toast.success('Datos actualizados');
   };
 
+  // Function to check and auto-validate when C1+C2 are complete for a reference
+  const checkAndAutoValidate = async (masterReference: string) => {
+    // Get all locations for this reference
+    const { data: refLocations } = await supabase
+      .from('locations')
+      .select('id')
+      .eq('master_reference', masterReference);
+
+    if (!refLocations || refLocations.length === 0) return;
+
+    const locationIds = refLocations.map(l => l.id);
+
+    // Count C1 and C2 for these locations
+    const { data: counts } = await supabase
+      .from('inventory_counts')
+      .select('audit_round')
+      .in('location_id', locationIds)
+      .in('audit_round', [1, 2]);
+
+    const c1Count = counts?.filter(c => c.audit_round === 1).length || 0;
+    const c2Count = counts?.filter(c => c.audit_round === 2).length || 0;
+
+    // If both C1 and C2 are complete, run validation
+    if (c1Count === refLocations.length && c2Count === refLocations.length) {
+      const { data: result } = await supabase.rpc('validate_and_close_round', {
+        _reference: masterReference,
+        _admin_id: user!.id,
+      });
+
+      const validationResult = result as { success?: boolean; action?: string; new_round?: number } | null;
+
+      if (validationResult?.action === 'closed') {
+        toast.success(`✅ ${masterReference} - AUDITADO automáticamente`);
+      } else if (validationResult?.action === 'next_round') {
+        toast.warning(`⚠️ ${masterReference} - Pasó a Conteo ${validationResult.new_round} (sin coincidencias)`);
+        // Refresh C3 assignment tab
+        queryClient.invalidateQueries({ queryKey: ['round-assignment-locations', 3] });
+      }
+
+      // Refresh validation panel
+      queryClient.invalidateQueries({ queryKey: ['validation-references'] });
+    }
+  };
+
   const saveCountMutation = useMutation({
     mutationFn: async ({ locationId, quantity, operarioId }: { locationId: string; quantity: number; operarioId?: string | null }) => {
       const { error } = await supabase
@@ -168,11 +212,24 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
           operario_id: operarioId || null,
         });
       if (error) throw error;
+
+      // Get the master_reference for this location
+      const { data: location } = await supabase
+        .from('locations')
+        .select('master_reference')
+        .eq('id', locationId)
+        .single();
+
+      return { locationId, masterReference: location?.master_reference };
     },
-    onSuccess: (_, variables) => {
+    onSuccess: async (result, variables) => {
       toast.success(`Conteo ${roundNumber} guardado`);
+      
+      // CRITICAL: Immediately invalidate THIS round's query to remove item from UI
+      queryClient.invalidateQueries({ queryKey: ['round-transcription-locations', roundNumber] });
       queryClient.invalidateQueries({ queryKey: ['round-locations'] });
       queryClient.invalidateQueries({ queryKey: ['supervisor-stats'] });
+      
       setSavingIds(prev => {
         const next = new Set(prev);
         next.delete(variables.locationId);
@@ -184,6 +241,11 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
         delete next[variables.locationId];
         return next;
       });
+
+      // If this is C1 or C2, check if we should auto-validate
+      if (roundNumber <= 2 && result.masterReference) {
+        await checkAndAutoValidate(result.masterReference);
+      }
     },
     onError: (error: Error, variables) => {
       toast.error(`Error: ${error.message}`);
