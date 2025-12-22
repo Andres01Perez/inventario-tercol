@@ -16,7 +16,6 @@ import {
   ClipboardList,
   AlertTriangle,
   ArrowRight,
-  ClipboardCheck,
   FileSpreadsheet,
   AlertCircle
 } from 'lucide-react';
@@ -27,10 +26,10 @@ import UserManagement from '@/components/superadmin/UserManagement';
 import OperariosManagement from '@/components/shared/OperariosManagement';
 import MasterDataImport from '@/components/superadmin/MasterDataImport';
 import RoundTranscriptionTab from '@/components/supervisor/RoundTranscriptionTab';
-import ValidationPanel from '@/components/supervisor/ValidationPanel';
+
 import OperationalPanel from '@/components/shared/OperationalPanel';
 
-type TabType = 'overview' | 'operativo' | 'ubicaciones' | 'responsables' | 'users' | 'operarios' | 'import' | 'critico' | 'validacion' | 'inventario-mp' | 'inventario-pp';
+type TabType = 'overview' | 'operativo' | 'ubicaciones' | 'responsables' | 'users' | 'operarios' | 'import' | 'critico' | 'inventario-mp' | 'inventario-pp';
 
 const UnifiedDashboard: React.FC = () => {
   const { profile, role, signOut } = useAuth();
@@ -87,7 +86,6 @@ const UnifiedDashboard: React.FC = () => {
     if (role === 'admin_mp' || role === 'admin_pp') {
       return [
         ...baseTabs,
-        { id: 'validacion' as TabType, label: 'Validación', icon: ClipboardCheck },
         { id: 'ubicaciones' as TabType, label: 'Ubicaciones', icon: MapPin },
         { id: 'responsables' as TabType, label: 'Responsables', icon: Users },
       ];
@@ -96,7 +94,6 @@ const UnifiedDashboard: React.FC = () => {
     if (role === 'superadmin') {
       return [
         ...baseTabs,
-        { id: 'validacion' as TabType, label: 'Validación', icon: ClipboardCheck },
         { id: 'critico' as TabType, label: 'Críticos', icon: AlertTriangle },
         { id: 'import' as TabType, label: 'Importar', icon: Upload },
         { id: 'users' as TabType, label: 'Usuarios', icon: Users },
@@ -269,7 +266,7 @@ const UnifiedDashboard: React.FC = () => {
         { label: 'Gestión Operativa', icon: ClipboardList, description: 'Asignar operarios y transcribir conteos', onClick: () => setActiveTab('operativo') },
         { label: 'Gestionar Ubicaciones', icon: MapPin, description: 'Asignar ubicaciones y supervisores', onClick: () => navigate('/admin/gestion-ubicacion') },
         { label: 'Asignar Responsables', icon: Users, description: 'Asignación masiva de líderes de conteo', onClick: () => navigate('/admin/gestion-responsables') },
-        { label: 'Ver Conteos', icon: ClipboardCheck, description: 'Monitorear progreso de conteos', disabled: true },
+        { label: 'Ver Conteos', icon: ClipboardList, description: 'Monitorear progreso de conteos', disabled: true },
         { label: 'Ver Reportes', icon: FileSpreadsheet, description: 'Exportar informes de inventario', disabled: true },
       ];
     }
@@ -479,23 +476,6 @@ const UnifiedDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* VALIDACIÓN TAB */}
-        {activeTab === 'validacion' && (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
-                <ClipboardCheck className="w-6 h-6 text-primary" />
-                Panel de Validación
-              </h2>
-              <p className="text-muted-foreground">
-                Valida referencias con C1 y C2 completos para cerrar o escalar a C3.
-              </p>
-            </div>
-            <div className="glass-card">
-              <ValidationPanel isAdminMode={true} controlFilter={roleConfig.controlFilter} />
-            </div>
-          </div>
-        )}
 
         {/* CRÍTICOS TAB (Superadmin only) */}
         {activeTab === 'critico' && role === 'superadmin' && (
