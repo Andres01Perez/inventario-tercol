@@ -79,13 +79,9 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
   const [filterUbicacion, setFilterUbicacion] = useState('');
   const [filterEstado, setFilterEstado] = useState<'all' | 'pendiente' | 'asignado' | 'contado'>('all');
 
-  // Determine which master audit_round to filter by
-  // For rounds 1 and 2, master is at audit_round=1
-  // For rounds 3, 4, master audit_round matches the round number
-  const masterAuditRound = roundNumber <= 2 ? 1 : roundNumber;
 
   const { data: locations = [], isLoading, refetch } = useQuery({
-    queryKey: ['round-assignment-locations', roundNumber, user?.id, isAdminMode, controlFilter, masterAuditRound],
+    queryKey: ['round-assignment-locations', roundNumber, user?.id, isAdminMode, controlFilter],
     queryFn: async () => {
       let query = supabase
         .from('locations')
@@ -99,8 +95,13 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
           operario_c3:operarios!locations_operario_c3_id_fkey(id, full_name, turno),
           operario_c4:operarios!locations_operario_c4_id_fkey(id, full_name, turno),
           inventory_master!inner(referencia, material_type, control, audit_round)
-        `)
-        .eq('inventory_master.audit_round', masterAuditRound);
+        `);
+
+      // For C3 and C4: only show references that escalated to that round
+      // For C1 and C2: show ALL locations (no audit_round filter)
+      if (roundNumber >= 3) {
+        query = query.eq('inventory_master.audit_round', roundNumber);
+      }
 
       // Only filter by supervisor if NOT admin mode
       if (!isAdminMode) {
