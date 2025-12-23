@@ -713,6 +713,19 @@ const GestionUbicacion: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* Dialog de importación */}
+      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Importar Ubicaciones</DialogTitle>
+          </DialogHeader>
+          <LocationsImport 
+            onSuccess={() => { refetch(); }}
+            onClose={() => setShowImportDialog(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
