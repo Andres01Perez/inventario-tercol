@@ -199,6 +199,7 @@ export type Database = {
           assigned_admin_id: string | null
           assigned_supervisor_id: string | null
           created_at: string | null
+          discovered_at_round: number | null
           id: string
           location_detail: string | null
           location_name: string | null
@@ -223,6 +224,7 @@ export type Database = {
           assigned_admin_id?: string | null
           assigned_supervisor_id?: string | null
           created_at?: string | null
+          discovered_at_round?: number | null
           id?: string
           location_detail?: string | null
           location_name?: string | null
@@ -247,6 +249,7 @@ export type Database = {
           assigned_admin_id?: string | null
           assigned_supervisor_id?: string | null
           created_at?: string | null
+          discovered_at_round?: number | null
           id?: string
           location_detail?: string | null
           location_name?: string | null
