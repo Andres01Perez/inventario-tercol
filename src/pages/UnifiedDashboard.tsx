@@ -70,23 +70,12 @@ const UnifiedDashboard: React.FC = () => {
       if (role === 'supervisor') {
         const { data: locations } = await supabase
           .from('locations')
-          .select('id, operario_id')
+          .select('id, operario_c1_id, status_c1, status_c2')
           .eq('assigned_supervisor_id', profile!.id);
         
-        const locationIds = locations?.map(l => l.id) || [];
-        
-        const { data: counts } = locationIds.length > 0 
-          ? await supabase
-              .from('inventory_counts')
-              .select('location_id, audit_round')
-              .in('location_id', locationIds)
-          : { data: [] };
-        
-        const c1Ids = new Set((counts || []).filter(c => c.audit_round === 1).map(c => c.location_id));
-        const c2Ids = new Set((counts || []).filter(c => c.audit_round === 2).map(c => c.location_id));
-        const pendingC1 = (locations || []).filter(l => !c1Ids.has(l.id)).length;
-        const pendingC2 = (locations || []).filter(l => !c2Ids.has(l.id)).length;
-        const withOperario = (locations || []).filter(l => l.operario_id).length;
+        const pendingC1 = (locations || []).filter(l => l.status_c1 !== 'contado').length;
+        const pendingC2 = (locations || []).filter(l => l.status_c2 !== 'contado').length;
+        const withOperario = (locations || []).filter(l => l.operario_c1_id).length;
         const withoutOperario = (locations || []).length - withOperario;
 
         return {

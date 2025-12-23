@@ -209,8 +209,11 @@ export type Database = {
           operario_c2_id: string | null
           operario_c3_id: string | null
           operario_c4_id: string | null
-          operario_id: string | null
           punto_referencia: string | null
+          status_c1: string | null
+          status_c2: string | null
+          status_c3: string | null
+          status_c4: string | null
           subcategoria: string | null
           updated_at: string | null
         }
@@ -228,8 +231,11 @@ export type Database = {
           operario_c2_id?: string | null
           operario_c3_id?: string | null
           operario_c4_id?: string | null
-          operario_id?: string | null
           punto_referencia?: string | null
+          status_c1?: string | null
+          status_c2?: string | null
+          status_c3?: string | null
+          status_c4?: string | null
           subcategoria?: string | null
           updated_at?: string | null
         }
@@ -247,8 +253,11 @@ export type Database = {
           operario_c2_id?: string | null
           operario_c3_id?: string | null
           operario_c4_id?: string | null
-          operario_id?: string | null
           punto_referencia?: string | null
+          status_c1?: string | null
+          status_c2?: string | null
+          status_c3?: string | null
+          status_c4?: string | null
           subcategoria?: string | null
           updated_at?: string | null
         }
@@ -291,13 +300,6 @@ export type Database = {
           {
             foreignKeyName: "locations_operario_c4_id_fkey"
             columns: ["operario_c4_id"]
-            isOneToOne: false
-            referencedRelation: "operarios"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "locations_operario_id_fkey"
-            columns: ["operario_id"]
             isOneToOne: false
             referencedRelation: "operarios"
             referencedColumns: ["id"]

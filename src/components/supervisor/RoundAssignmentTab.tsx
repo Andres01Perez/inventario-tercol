@@ -38,13 +38,15 @@ interface Location {
   operario_c2_id: string | null;
   operario_c3_id: string | null;
   operario_c4_id: string | null;
+  status_c1: string | null;
+  status_c2: string | null;
+  status_c3: string | null;
+  status_c4: string | null;
   operario_c1: { id: string; full_name: string; turno: number | null } | null;
   operario_c2: { id: string; full_name: string; turno: number | null } | null;
   operario_c3: { id: string; full_name: string; turno: number | null } | null;
   operario_c4: { id: string; full_name: string; turno: number | null } | null;
   inventory_master: { referencia: string; material_type: string; control: string | null; audit_round: number | null } | null;
-  // Added for UI state
-  hasCounted?: boolean;
 }
 
 interface RoundAssignmentTabProps {
@@ -71,11 +73,11 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [bulkOperarioId, setBulkOperarioId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showOnlyPending, setShowOnlyPending] = useState(false);
   
   // Filter states
   const [filterTipo, setFilterTipo] = useState<string>('all');
   const [filterUbicacion, setFilterUbicacion] = useState('');
+  const [filterEstado, setFilterEstado] = useState<'all' | 'pendiente' | 'asignado' | 'contado'>('all');
 
   // Determine which master audit_round to filter by
   // For rounds 1 and 2, master is at audit_round=1
@@ -91,6 +93,7 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
           id, master_reference, location_name, location_detail,
           subcategoria, observaciones, punto_referencia, metodo_conteo,
           operario_c1_id, operario_c2_id, operario_c3_id, operario_c4_id,
+          status_c1, status_c2, status_c3, status_c4,
           operario_c1:operarios!locations_operario_c1_id_fkey(id, full_name, turno),
           operario_c2:operarios!locations_operario_c2_id_fkey(id, full_name, turno),
           operario_c3:operarios!locations_operario_c3_id_fkey(id, full_name, turno),
@@ -116,22 +119,8 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
 
       if (!data || data.length === 0) return [];
 
-      // Get existing counts for this round to mark locations as "counted"
-      const locationIds = data.map(l => l.id);
-      
-      const { data: existingCounts } = await supabase
-        .from('inventory_counts')
-        .select('location_id')
-        .in('location_id', locationIds)
-        .eq('audit_round', roundNumber);
-
-      const countedLocationIds = new Set(existingCounts?.map(c => c.location_id) || []);
-
-      // Return ALL locations but mark which ones have been counted
-      return (data as unknown as Location[]).map(loc => ({
-        ...loc,
-        hasCounted: countedLocationIds.has(loc.id)
-      }));
+      // Return ALL locations - status is now stored in DB columns
+      return data as unknown as Location[];
     },
     enabled: !!user?.id,
   });
@@ -160,12 +149,23 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
     },
   });
 
+  // Get status for current round from DB
+  const getStatusForRound = (loc: Location): string => {
+    switch (roundNumber) {
+      case 1: return loc.status_c1 || 'pendiente';
+      case 2: return loc.status_c2 || 'pendiente';
+      case 3: return loc.status_c3 || 'pendiente';
+      case 4: return loc.status_c4 || 'pendiente';
+      default: return 'pendiente';
+    }
+  };
+
   const filteredLocations = useMemo(() => {
     let filtered = locations;
     
-    // Show only pending (not counted) if toggle is on
-    if (showOnlyPending) {
-      filtered = filtered.filter(loc => !loc.hasCounted);
+    // Estado filter (using DB status columns)
+    if (filterEstado !== 'all') {
+      filtered = filtered.filter(loc => getStatusForRound(loc) === filterEstado);
     }
     
     // Search term filter
@@ -193,7 +193,7 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
     }
     
     return filtered;
-  }, [locations, searchTerm, filterTipo, filterUbicacion, showOnlyPending]);
+  }, [locations, searchTerm, filterTipo, filterUbicacion, filterEstado, roundNumber]);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -258,10 +258,10 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
     }
   };
 
-  // Stats for badges
-  const pendingCount = locations.filter(l => !l.hasCounted).length;
-  const assignedCount = locations.filter(l => getCurrentOperarioId(l) !== null).length;
-  const countedCount = locations.filter(l => l.hasCounted).length;
+  // Stats for badges (using DB status columns)
+  const pendingCount = locations.filter(l => getStatusForRound(l) === 'pendiente').length;
+  const assignedCount = locations.filter(l => getStatusForRound(l) === 'asignado').length;
+  const countedCount = locations.filter(l => getStatusForRound(l) === 'contado').length;
 
   // Get round-specific styling
   const getRoundConfig = () => {
@@ -322,19 +322,10 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
             {countedCount} contados
           </Badge>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant={showOnlyPending ? "default" : "outline"}
-            size="sm"
-            onClick={() => setShowOnlyPending(!showOnlyPending)}
-          >
-            {showOnlyPending ? 'Ver todos' : 'Solo pendientes'}
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? 'Actualizando...' : 'Recargar'}
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+          {isRefreshing ? 'Actualizando...' : 'Recargar'}
+        </Button>
       </div>
 
       {/* Search and Filters */}
@@ -379,6 +370,22 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
             className="w-[140px] h-9"
           />
         </div>
+
+        {/* Estado filter */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Estado:</span>
+          <Select value={filterEstado} onValueChange={(v) => setFilterEstado(v as typeof filterEstado)}>
+            <SelectTrigger className="w-[130px] h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="pendiente">Pendiente</SelectItem>
+              <SelectItem value="asignado">Asignado</SelectItem>
+              <SelectItem value="contado">Contado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Table */}
@@ -411,9 +418,8 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
               filteredLocations.map((loc) => {
                 const currentOperario = getCurrentOperario(loc);
                 const currentOperarioId = getCurrentOperarioId(loc);
-                const isPending = !currentOperarioId && !loc.hasCounted;
-                const isAssigned = !!currentOperarioId && !loc.hasCounted;
-                const isCounted = loc.hasCounted;
+                const status = getStatusForRound(loc);
+                const isCounted = status === 'contado';
                 
                 return (
                   <TableRow 
@@ -431,12 +437,12 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
                       />
                     </TableCell>
                     <TableCell>
-                      {isCounted ? (
+                      {status === 'contado' ? (
                         <Badge className="bg-green-500/20 text-green-600 border-green-500/30 gap-1">
                           <CheckCircle2 className="w-3 h-3" />
                           Contado
                         </Badge>
-                      ) : isAssigned ? (
+                      ) : status === 'asignado' ? (
                         <Badge className="bg-blue-500/20 text-blue-600 border-blue-500/30 gap-1">
                           <UserCheck className="w-3 h-3" />
                           Asignado

@@ -34,8 +34,9 @@ interface Location {
   observaciones: string | null;
   punto_referencia: string | null;
   metodo_conteo: string | null;
-  operario_id: string | null;
-  operarios: { id: string; full_name: string; turno: number | null } | null;
+  operario_c1_id: string | null;
+  status_c1: string | null;
+  operario_c1: { id: string; full_name: string; turno: number | null } | null;
   inventory_master: { referencia: string; material_type: string; control: string | null } | null;
 }
 
@@ -64,8 +65,8 @@ const AssignmentTab: React.FC<AssignmentTabProps> = ({ isAdminMode = false, cont
         .select(`
           id, master_reference, location_name, location_detail,
           subcategoria, observaciones, punto_referencia, metodo_conteo,
-          operario_id,
-          operarios:operarios!locations_operario_id_fkey(id, full_name, turno),
+          operario_c1_id, status_c1,
+          operario_c1:operarios!locations_operario_c1_id_fkey(id, full_name, turno),
           inventory_master!inner(referencia, material_type, control)
         `);
 
@@ -92,7 +93,7 @@ const AssignmentTab: React.FC<AssignmentTabProps> = ({ isAdminMode = false, cont
     mutationFn: async ({ locationIds, operarioId }: { locationIds: string[]; operarioId: string | null }) => {
       const { error } = await supabase
         .from('locations')
-        .update({ operario_id: operarioId })
+        .update({ operario_c1_id: operarioId })
         .in('id', locationIds);
 
       if (error) throw error;
@@ -317,9 +318,10 @@ const AssignmentTab: React.FC<AssignmentTabProps> = ({ isAdminMode = false, cont
                   </TableCell>
                   <TableCell>
                     <OperarioSelect
-                      value={loc.operario_id}
+                      value={loc.operario_c1_id}
                       onChange={(operarioId) => handleIndividualAssign(loc.id, operarioId)}
                       placeholder="Seleccionar..."
+                      disabled={loc.status_c1 === 'contado'}
                     />
                   </TableCell>
                 </TableRow>
