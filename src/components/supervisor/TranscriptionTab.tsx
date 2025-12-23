@@ -26,6 +26,8 @@ interface Location {
   punto_referencia: string | null;
   metodo_conteo: string | null;
   operario_c1_id: string | null;
+  validated_at_round: number | null;
+  validated_quantity: number | null;
   operario_c1: { id: string; full_name: string } | null;
   inventory_master: { referencia: string; material_type: string } | null;
 }
@@ -58,11 +60,13 @@ const TranscriptionTab: React.FC = () => {
         .select(`
           id, master_reference, location_name, location_detail,
           subcategoria, observaciones, punto_referencia, metodo_conteo,
-          operario_c1_id,
+          operario_c1_id, validated_at_round, validated_quantity,
           operario_c1:operarios!locations_operario_c1_id_fkey(id, full_name),
           inventory_master!inner(referencia, material_type)
         `)
-        .eq('assigned_supervisor_id', user!.id);
+        .eq('assigned_supervisor_id', user!.id)
+        // Excluir ubicaciones ya validadas
+        .is('validated_at_round', null);
 
       if (error) throw error;
       return data as Location[];

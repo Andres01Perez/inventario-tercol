@@ -216,6 +216,8 @@ export type Database = {
           status_c4: string | null
           subcategoria: string | null
           updated_at: string | null
+          validated_at_round: number | null
+          validated_quantity: number | null
         }
         Insert: {
           assigned_admin_id?: string | null
@@ -238,6 +240,8 @@ export type Database = {
           status_c4?: string | null
           subcategoria?: string | null
           updated_at?: string | null
+          validated_at_round?: number | null
+          validated_quantity?: number | null
         }
         Update: {
           assigned_admin_id?: string | null
@@ -260,6 +264,8 @@ export type Database = {
           status_c4?: string | null
           subcategoria?: string | null
           updated_at?: string | null
+          validated_at_round?: number | null
+          validated_quantity?: number | null
         }
         Relationships: [
           {
@@ -411,6 +417,10 @@ export type Database = {
         Returns: boolean
       }
       is_any_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_location_validated: {
+        Args: { _location_id: string }
+        Returns: boolean
+      }
       is_superadmin: { Args: { _user_id: string }; Returns: boolean }
       validate_and_close_round: {
         Args: { _admin_id: string; _reference: string }
