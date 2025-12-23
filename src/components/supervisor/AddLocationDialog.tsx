@@ -101,7 +101,18 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
         throw new Error('Referencia y ubicación son requeridos');
       }
 
-      // 1. Insert location
+      // 1. Get current audit_round from inventory_master
+      const { data: master, error: masterError } = await supabase
+        .from('inventory_master')
+        .select('audit_round')
+        .eq('referencia', referencia)
+        .single();
+
+      if (masterError) throw masterError;
+
+      const currentAuditRound = master?.audit_round || 1;
+      
+      // 2. Insert location with discovered_at_round if adding in later rounds
       const { data: newLocation, error: locError } = await supabase
         .from('locations')
         .insert({
@@ -113,14 +124,15 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
           punto_referencia: puntoReferencia || null,
           metodo_conteo: metodoConteo || null,
           assigned_supervisor_id: user!.id,
-          operario_id: defaultOperarioId || null,
+          // Set discovered_at_round if adding location after round 1
+          discovered_at_round: currentAuditRound > 1 ? currentAuditRound : null,
         })
         .select('id')
         .single();
 
       if (locError) throw locError;
 
-      // 2. Insert initial count if quantity provided
+      // 3. Insert initial count if quantity provided (use current audit_round)
       const qty = parseFloat(cantidad);
       if (!isNaN(qty) && qty >= 0) {
         const { error: countError } = await supabase
@@ -128,14 +140,14 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
           .insert({
             location_id: newLocation.id,
             supervisor_id: user!.id,
-            audit_round: 1,
+            audit_round: currentAuditRound <= 2 ? currentAuditRound : currentAuditRound,
             quantity_counted: qty,
           });
 
         if (countError) throw countError;
       }
 
-      return newLocation;
+      return { newLocation, currentAuditRound };
     },
     onSuccess: () => {
       toast.success('Item agregado correctamente');
