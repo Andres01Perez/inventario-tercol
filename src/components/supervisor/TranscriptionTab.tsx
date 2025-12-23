@@ -25,8 +25,8 @@ interface Location {
   observaciones: string | null;
   punto_referencia: string | null;
   metodo_conteo: string | null;
-  operario_id: string | null;
-  operarios: { id: string; full_name: string } | null;
+  operario_c1_id: string | null;
+  operario_c1: { id: string; full_name: string } | null;
   inventory_master: { referencia: string; material_type: string } | null;
 }
 
@@ -58,8 +58,8 @@ const TranscriptionTab: React.FC = () => {
         .select(`
           id, master_reference, location_name, location_detail,
           subcategoria, observaciones, punto_referencia, metodo_conteo,
-          operario_id,
-          operarios:operarios!locations_operario_id_fkey(id, full_name),
+          operario_c1_id,
+          operario_c1:operarios!locations_operario_c1_id_fkey(id, full_name),
           inventory_master!inner(referencia, material_type)
         `)
         .eq('assigned_supervisor_id', user!.id);
@@ -166,8 +166,8 @@ const TranscriptionTab: React.FC = () => {
     const groups: Record<string, { operarioName: string; locations: Location[] }> = {};
 
     locations.forEach(loc => {
-      const key = loc.operario_id || 'unassigned';
-      const name = loc.operarios?.full_name || 'Sin Operario Asignado';
+      const key = loc.operario_c1_id || 'unassigned';
+      const name = loc.operario_c1?.full_name || 'Sin Operario Asignado';
 
       if (!groups[key]) {
         groups[key] = { operarioName: name, locations: [] };
