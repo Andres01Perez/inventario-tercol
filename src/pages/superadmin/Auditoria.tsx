@@ -76,6 +76,7 @@ interface AuditRow {
   countHistory: any;
   validatedAtRound: number | null;
   validatedQuantity: number | null;
+  discoveredAtRound: number | null;
   counts: {
     c1: number | null;
     c2: number | null;
@@ -180,7 +181,8 @@ const Auditoria: React.FC = () => {
           metodo_conteo,
           observaciones,
           validated_at_round,
-          validated_quantity
+          validated_quantity,
+          discovered_at_round
         `)
         .order('master_reference');
 
@@ -239,6 +241,7 @@ const Auditoria: React.FC = () => {
           countHistory: master?.count_history || [],
           validatedAtRound: loc.validated_at_round,
           validatedQuantity: loc.validated_quantity,
+          discoveredAtRound: loc.discovered_at_round,
           counts: countsMap.get(loc.id) || { c1: null, c2: null, c3: null, c4: null, c5: null },
         };
       });
@@ -328,7 +331,12 @@ const Auditoria: React.FC = () => {
     });
   };
 
-  const renderCountCell = (value: number | null, erp: number, round: number, currentRound: number) => {
+  const renderCountCell = (value: number | null, erp: number, round: number, currentRound: number, discoveredAtRound: number | null = null) => {
+    // Si la ubicación fue descubierta en un round posterior, mostrar "-" para rounds anteriores
+    if (discoveredAtRound !== null && round < discoveredAtRound) {
+      return <span className="text-muted-foreground/50">-</span>;
+    }
+    
     if (value === null) {
       return <span className="text-muted-foreground">-</span>;
     }
@@ -480,13 +488,19 @@ const Auditoria: React.FC = () => {
         {/* Expanded location rows */}
         {isExpanded && group.rows.map((row, idx) => {
           const isValidated = row.validatedAtRound !== null;
+          const isDiscovered = row.discoveredAtRound !== null;
           return (
-            <TableRow key={row.locationId} className={`${isValidated ? 'bg-green-500/10' : 'bg-muted/20'} hover:bg-muted/40`}>
+            <TableRow key={row.locationId} className={`${isValidated ? 'bg-green-500/10' : isDiscovered ? 'bg-amber-500/10' : 'bg-muted/20'} hover:bg-muted/40`}>
               <TableCell className="pl-10">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-muted-foreground text-sm">
                     {idx === group.rows.length - 1 ? '└' : '├'} Ubicación {idx + 1}
                   </span>
+                  {isDiscovered && (
+                    <Badge className="bg-amber-500/20 text-amber-600 border-amber-500/30 text-xs">
+                      Descubierta C{row.discoveredAtRound}
+                    </Badge>
+                  )}
                   {isValidated && (
                     <Badge className="bg-green-500/20 text-green-600 border-green-500/30 text-xs gap-1">
                       <CheckCircle2 className="w-3 h-3" />
@@ -500,11 +514,11 @@ const Auditoria: React.FC = () => {
                 <LocationInfoPopover row={row} />
               </TableCell>
               <TableCell className="text-right text-muted-foreground">-</TableCell>
-              <TableCell className="text-right">{renderCountCell(row.counts.c1, row.cantTotalErp, 1, row.auditRound)}</TableCell>
-              <TableCell className="text-right">{renderCountCell(row.counts.c2, row.cantTotalErp, 2, row.auditRound)}</TableCell>
-              <TableCell className="text-right">{renderCountCell(row.counts.c3, row.cantTotalErp, 3, row.auditRound)}</TableCell>
-              <TableCell className="text-right">{renderCountCell(row.counts.c4, row.cantTotalErp, 4, row.auditRound)}</TableCell>
-              <TableCell className="text-right">{renderCountCell(row.counts.c5, row.cantTotalErp, 5, row.auditRound)}</TableCell>
+              <TableCell className="text-right">{renderCountCell(row.counts.c1, row.cantTotalErp, 1, row.auditRound, row.discoveredAtRound)}</TableCell>
+              <TableCell className="text-right">{renderCountCell(row.counts.c2, row.cantTotalErp, 2, row.auditRound, row.discoveredAtRound)}</TableCell>
+              <TableCell className="text-right">{renderCountCell(row.counts.c3, row.cantTotalErp, 3, row.auditRound, row.discoveredAtRound)}</TableCell>
+              <TableCell className="text-right">{renderCountCell(row.counts.c4, row.cantTotalErp, 4, row.auditRound, row.discoveredAtRound)}</TableCell>
+              <TableCell className="text-right">{renderCountCell(row.counts.c5, row.cantTotalErp, 5, row.auditRound, row.discoveredAtRound)}</TableCell>
               <TableCell></TableCell>
               <TableCell></TableCell>
             </TableRow>
