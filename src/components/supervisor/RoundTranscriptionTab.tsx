@@ -200,6 +200,56 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
     }
   };
 
+  // Function to check and auto-validate for rounds 3 and 4
+  const checkAndAutoValidateHigherRounds = async (masterReference: string, currentRound: 3 | 4) => {
+    // Get all locations for this reference
+    const { data: refLocations } = await supabase
+      .from('locations')
+      .select('id')
+      .eq('master_reference', masterReference);
+
+    if (!refLocations || refLocations.length === 0) return;
+
+    const locationIds = refLocations.map(l => l.id);
+
+    // Check if all locations have counts for this round
+    const { data: counts } = await supabase
+      .from('inventory_counts')
+      .select('location_id')
+      .in('location_id', locationIds)
+      .eq('audit_round', currentRound);
+
+    const countedLocationIds = new Set(counts?.map(c => c.location_id) || []);
+
+    // If not all locations have counts for this round, don't validate yet
+    if (countedLocationIds.size < refLocations.length) return;
+
+    // All locations are complete for this round, run validation
+    const { data: result } = await supabase.rpc('validate_and_close_round', {
+      _reference: masterReference,
+      _admin_id: user!.id,
+    });
+
+    const validationResult = result as { success?: boolean; action?: string; new_round?: number } | null;
+
+    if (validationResult?.action === 'closed') {
+      toast.success(`✅ ${masterReference} - AUDITADO automáticamente`);
+    } else if (validationResult?.action === 'next_round') {
+      const nextRound = validationResult.new_round || currentRound + 1;
+      toast.warning(`⚠️ ${masterReference} - Pasó a Conteo ${nextRound} (sin coincidencias)`);
+      // Refresh next round assignment tab
+      queryClient.invalidateQueries({ queryKey: ['round-assignment-locations', nextRound] });
+    } else if (validationResult?.action === 'escalate_to_superadmin') {
+      toast.error(`🚨 ${masterReference} - Escalado a SUPERADMIN (Crítico C5)`);
+      // Refresh critical references
+      queryClient.invalidateQueries({ queryKey: ['critical-references'] });
+    }
+
+    // Refresh validation panel and other queries
+    queryClient.invalidateQueries({ queryKey: ['validation-references'] });
+    queryClient.invalidateQueries({ queryKey: ['round-transcription-locations'] });
+  };
+
   const saveCountMutation = useMutation({
     mutationFn: async ({ locationId, quantity, operarioId }: { locationId: string; quantity: number; operarioId?: string | null }) => {
       const { error } = await supabase
@@ -242,9 +292,13 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
         return next;
       });
 
-      // If this is C1 or C2, check if we should auto-validate
-      if (roundNumber <= 2 && result.masterReference) {
-        await checkAndAutoValidate(result.masterReference);
+      // Auto-validate based on round number
+      if (result.masterReference) {
+        if (roundNumber <= 2) {
+          await checkAndAutoValidate(result.masterReference);
+        } else if (roundNumber === 3 || roundNumber === 4) {
+          await checkAndAutoValidateHigherRounds(result.masterReference, roundNumber);
+        }
       }
     },
     onError: (error: Error, variables) => {
