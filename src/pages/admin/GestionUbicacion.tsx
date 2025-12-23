@@ -371,7 +371,7 @@ const GestionUbicacion: React.FC = () => {
                 Importar
               </Button>
               <Button 
-                variant="ghost" 
+                variant="outline" 
                 size="sm" 
                 onClick={() => navigate('/admin/gestion-responsables')}
                 className="gap-2"
