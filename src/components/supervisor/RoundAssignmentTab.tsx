@@ -291,12 +291,9 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
   if (filteredLocations.length === 0 && locations.length === 0) {
     return (
       <div className="text-center py-12">
-        <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-4" />
+        <CheckCircle2 className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
         <p className="text-muted-foreground">
-          {roundNumber >= 3 
-            ? `No hay referencias en ${roundConfig.label.replace('Asignar ', '')}`
-            : `Todas las ubicaciones ya fueron contadas para ${roundConfig.label.replace('Asignar ', '')}`
-          }
+          No hay tareas de asignación pendientes para {roundConfig.label.replace('Asignar ', '')}
         </p>
       </div>
     );
