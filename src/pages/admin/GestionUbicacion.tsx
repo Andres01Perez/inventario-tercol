@@ -14,8 +14,16 @@ import {
   X,
   Plus,
   Trash2,
-  Users
+  Users,
+  Upload
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import LocationsImport from '@/components/shared/LocationsImport';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -86,6 +94,7 @@ const GestionUbicacion: React.FC = () => {
   const [filterUbicacion, setFilterUbicacion] = useState('');
   const [filterObservacion, setFilterObservacion] = useState('');
   const [filterSupervisor, setFilterSupervisor] = useState<string>('all');
+  const [showImportDialog, setShowImportDialog] = useState(false);
 
   const isSuperadmin = role === 'superadmin';
   const isAdminMP = role === 'admin_mp';
@@ -352,6 +361,15 @@ const GestionUbicacion: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-3">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setShowImportDialog(true)}
+                className="gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                Importar
+              </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
