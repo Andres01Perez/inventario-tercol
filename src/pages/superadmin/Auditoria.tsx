@@ -4,15 +4,15 @@ import { supabase } from '@/integrations/supabase/client';
 import AppLayout from '@/components/layout/AppLayout';
 import { 
   Search, 
-  Filter, 
   ChevronDown,
+  ChevronRight,
   MoreVertical,
-  Eye,
   CheckCircle2,
   XCircle,
   Edit3,
   History,
-  FileSearch
+  FileSearch,
+  Info
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -46,6 +46,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
   Pagination,
   PaginationContent,
   PaginationItem,
@@ -62,6 +67,9 @@ interface AuditRow {
   locationName: string | null;
   locationDetail: string | null;
   subcategoria: string | null;
+  puntoReferencia: string | null;
+  metodoConteo: string | null;
+  observaciones: string | null;
   cantTotalErp: number;
   statusSlug: string;
   auditRound: number;
@@ -100,7 +108,50 @@ const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secon
   cerrado_forzado: { label: 'Cerrado Forzado', variant: 'default' },
 };
 
-const ITEMS_PER_PAGE = 30; // Groups per page
+const ITEMS_PER_PAGE = 30;
+
+const LocationInfoPopover: React.FC<{ row: AuditRow }> = ({ row }) => (
+  <Popover>
+    <PopoverTrigger asChild>
+      <Button variant="ghost" size="icon" className="h-7 w-7">
+        <Info className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+      </Button>
+    </PopoverTrigger>
+    <PopoverContent className="w-72" align="start">
+      <div className="space-y-3">
+        <h4 className="font-semibold text-sm">Información de Ubicación</h4>
+        <div className="space-y-2 text-sm">
+          <div>
+            <span className="text-muted-foreground">Ubicación:</span>{' '}
+            <span className="font-medium">{row.locationName || '-'}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Detalle:</span>{' '}
+            <span className="font-medium">{row.locationDetail || '-'}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Subcategoría:</span>{' '}
+            <span className="font-medium">{row.subcategoria || '-'}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Punto de Referencia:</span>{' '}
+            <span className="font-medium">{row.puntoReferencia || '-'}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Método de Conteo:</span>{' '}
+            <span className="font-medium">{row.metodoConteo || '-'}</span>
+          </div>
+          {row.observaciones && (
+            <div>
+              <span className="text-muted-foreground">Observaciones:</span>{' '}
+              <span className="font-medium">{row.observaciones}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </PopoverContent>
+  </Popover>
+);
 
 const Auditoria: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -110,12 +161,11 @@ const Auditoria: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [selectedHistory, setSelectedHistory] = useState<{ referencia: string; history: any[] } | null>(null);
+  const [expandedRefs, setExpandedRefs] = useState<Set<string>>(new Set());
 
-  // Fetch all locations with their inventory master and counts
   const { data: auditData, isLoading } = useQuery({
     queryKey: ['audit-full-view'],
     queryFn: async () => {
-      // Get all locations with inventory_master
       const { data: locations, error: locError } = await supabase
         .from('locations')
         .select(`
@@ -123,14 +173,16 @@ const Auditoria: React.FC = () => {
           master_reference,
           location_name,
           location_detail,
-          subcategoria
+          subcategoria,
+          punto_referencia,
+          metodo_conteo,
+          observaciones
         `)
         .order('master_reference');
 
       if (locError) throw locError;
       if (!locations || locations.length === 0) return { rows: [], uniqueLocations: [] };
 
-      // Get all inventory_master data
       const uniqueRefs = [...new Set(locations.map(l => l.master_reference))];
       const { data: masters, error: masterError } = await supabase
         .from('inventory_master')
@@ -139,10 +191,8 @@ const Auditoria: React.FC = () => {
 
       if (masterError) throw masterError;
 
-      // Create lookup map for masters
       const masterMap = new Map(masters?.map(m => [m.referencia, m]) || []);
 
-      // Get all inventory_counts
       const locationIds = locations.map(l => l.id);
       const { data: counts, error: countsError } = await supabase
         .from('inventory_counts')
@@ -151,7 +201,6 @@ const Auditoria: React.FC = () => {
 
       if (countsError) throw countsError;
 
-      // Group counts by location
       const countsMap = new Map<string, { c1: number | null; c2: number | null; c3: number | null; c4: number | null; c5: number | null }>();
       
       locations.forEach(loc => {
@@ -168,7 +217,6 @@ const Auditoria: React.FC = () => {
         }
       });
 
-      // Build final rows
       const rows: AuditRow[] = locations.map(loc => {
         const master = masterMap.get(loc.master_reference);
         return {
@@ -178,6 +226,9 @@ const Auditoria: React.FC = () => {
           locationName: loc.location_name,
           locationDetail: loc.location_detail,
           subcategoria: loc.subcategoria,
+          puntoReferencia: loc.punto_referencia,
+          metodoConteo: loc.metodo_conteo,
+          observaciones: loc.observaciones,
           cantTotalErp: master?.cant_total_erp || 0,
           statusSlug: master?.status_slug || 'pendiente',
           auditRound: master?.audit_round || 1,
@@ -186,43 +237,32 @@ const Auditoria: React.FC = () => {
         };
       });
 
-      // Get unique locations for filter
       const uniqueLocations = [...new Set(locations.map(l => l.location_name).filter(Boolean))] as string[];
 
       return { rows, uniqueLocations };
     },
   });
 
-  // Filter data
   const filteredData = useMemo(() => {
     if (!auditData?.rows) return [];
 
     return auditData.rows.filter(row => {
-      // Search filter
       if (searchQuery && !row.referencia.toLowerCase().includes(searchQuery.toLowerCase())) {
         return false;
       }
-
-      // Material type filter
       if (materialTypeFilter !== 'all' && row.materialType !== materialTypeFilter) {
         return false;
       }
-
-      // Status filter
       if (statusFilter !== 'all' && row.statusSlug !== statusFilter) {
         return false;
       }
-
-      // Location filter
       if (locationFilter !== 'all' && row.locationName !== locationFilter) {
         return false;
       }
-
       return true;
     });
   }, [auditData?.rows, searchQuery, materialTypeFilter, statusFilter, locationFilter]);
 
-  // Group by reference
   const groupedData = useMemo(() => {
     const groups = new Map<string, AuditRow[]>();
     
@@ -232,7 +272,6 @@ const Auditoria: React.FC = () => {
       groups.set(row.referencia, existing);
     });
 
-    // Calculate totals for each group
     const calculateSum = (rows: AuditRow[], key: keyof AuditRow['counts']): number | null => {
       const validCounts = rows.map(r => r.counts[key]).filter(v => v !== null) as number[];
       return validCounts.length > 0 ? validCounts.reduce((a, b) => a + b, 0) : null;
@@ -256,14 +295,12 @@ const Auditoria: React.FC = () => {
     }));
   }, [filteredData]);
 
-  // Pagination by groups
   const totalPages = Math.ceil(groupedData.length / ITEMS_PER_PAGE);
   const paginatedGroups = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
     return groupedData.slice(start, start + ITEMS_PER_PAGE);
   }, [groupedData, currentPage]);
 
-  // Reset to page 1 when filters change
   React.useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, materialTypeFilter, statusFilter, locationFilter]);
@@ -271,6 +308,18 @@ const Auditoria: React.FC = () => {
   const handleViewHistory = (referencia: string, history: any[]) => {
     setSelectedHistory({ referencia, history });
     setHistoryDialogOpen(true);
+  };
+
+  const toggleExpand = (referencia: string) => {
+    setExpandedRefs(prev => {
+      const next = new Set(prev);
+      if (next.has(referencia)) {
+        next.delete(referencia);
+      } else {
+        next.add(referencia);
+      }
+      return next;
+    });
   };
 
   const renderCountCell = (value: number | null, erp: number, round: number, currentRound: number) => {
@@ -294,6 +343,157 @@ const Auditoria: React.FC = () => {
       <Badge variant={config.variant} className="whitespace-nowrap">
         {config.label}
       </Badge>
+    );
+  };
+
+  const renderGroupRows = (group: GroupedReference) => {
+    const hasMultipleLocations = group.rows.length > 1;
+    const isExpanded = expandedRefs.has(group.referencia);
+
+    // Single location: render one row with all info
+    if (!hasMultipleLocations) {
+      const row = group.rows[0];
+      return (
+        <TableRow key={group.referencia} className="hover:bg-muted/30">
+          <TableCell className="font-medium">
+            <div className="flex items-center gap-2">
+              <span>{group.referencia}</span>
+            </div>
+          </TableCell>
+          <TableCell>
+            <Badge variant="outline" className={group.materialType === 'MP' ? 'border-orange-500/50 text-orange-600' : 'border-emerald-500/50 text-emerald-600'}>
+              {group.materialType}
+            </Badge>
+          </TableCell>
+          <TableCell>
+            <LocationInfoPopover row={row} />
+          </TableCell>
+          <TableCell className="text-right font-bold">{group.cantTotalErp}</TableCell>
+          <TableCell className="text-right">{renderCountCell(group.totals.c1, group.cantTotalErp, 1, group.auditRound)}</TableCell>
+          <TableCell className="text-right">{renderCountCell(group.totals.c2, group.cantTotalErp, 2, group.auditRound)}</TableCell>
+          <TableCell className="text-right">{renderCountCell(group.totals.c3, group.cantTotalErp, 3, group.auditRound)}</TableCell>
+          <TableCell className="text-right">{renderCountCell(group.totals.c4, group.cantTotalErp, 4, group.auditRound)}</TableCell>
+          <TableCell className="text-right">{renderCountCell(group.totals.c5, group.cantTotalErp, 5, group.auditRound)}</TableCell>
+          <TableCell>{getStatusBadge(group.statusSlug)}</TableCell>
+          <TableCell>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleViewHistory(group.referencia, group.countHistory)}>
+                  <History className="w-4 h-4 mr-2" />
+                  Ver Historial
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled>
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Validar Manualmente
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled>
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Cerrar Forzado
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled>
+                  <Edit3 className="w-4 h-4 mr-2" />
+                  Editar Conteo
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </TableCell>
+        </TableRow>
+      );
+    }
+
+    // Multiple locations: collapsible accordion
+    return (
+      <React.Fragment key={group.referencia}>
+        {/* Main row (always visible) */}
+        <TableRow 
+          className="hover:bg-muted/30 cursor-pointer"
+          onClick={() => toggleExpand(group.referencia)}
+        >
+          <TableCell className="font-medium">
+            <div className="flex items-center gap-2">
+              {isExpanded ? (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              )}
+              <span>{group.referencia}</span>
+              <Badge variant="secondary" className="text-xs">
+                {group.rows.length} ubic.
+              </Badge>
+            </div>
+          </TableCell>
+          <TableCell>
+            <Badge variant="outline" className={group.materialType === 'MP' ? 'border-orange-500/50 text-orange-600' : 'border-emerald-500/50 text-emerald-600'}>
+              {group.materialType}
+            </Badge>
+          </TableCell>
+          <TableCell></TableCell>
+          <TableCell className="text-right font-bold">{group.cantTotalErp}</TableCell>
+          <TableCell className="text-right font-bold">{renderCountCell(group.totals.c1, group.cantTotalErp, 1, group.auditRound)}</TableCell>
+          <TableCell className="text-right font-bold">{renderCountCell(group.totals.c2, group.cantTotalErp, 2, group.auditRound)}</TableCell>
+          <TableCell className="text-right font-bold">{renderCountCell(group.totals.c3, group.cantTotalErp, 3, group.auditRound)}</TableCell>
+          <TableCell className="text-right font-bold">{renderCountCell(group.totals.c4, group.cantTotalErp, 4, group.auditRound)}</TableCell>
+          <TableCell className="text-right font-bold">{renderCountCell(group.totals.c5, group.cantTotalErp, 5, group.auditRound)}</TableCell>
+          <TableCell>{getStatusBadge(group.statusSlug)}</TableCell>
+          <TableCell onClick={(e) => e.stopPropagation()}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleViewHistory(group.referencia, group.countHistory)}>
+                  <History className="w-4 h-4 mr-2" />
+                  Ver Historial
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled>
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Validar Manualmente
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled>
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Cerrar Forzado
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled>
+                  <Edit3 className="w-4 h-4 mr-2" />
+                  Editar Conteo
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </TableCell>
+        </TableRow>
+
+        {/* Expanded location rows */}
+        {isExpanded && group.rows.map((row, idx) => (
+          <TableRow key={row.locationId} className="bg-muted/20 hover:bg-muted/40">
+            <TableCell className="pl-10">
+              <span className="text-muted-foreground text-sm">
+                {idx === group.rows.length - 1 ? '└' : '├'} Ubicación {idx + 1}
+              </span>
+            </TableCell>
+            <TableCell></TableCell>
+            <TableCell>
+              <LocationInfoPopover row={row} />
+            </TableCell>
+            <TableCell className="text-right text-muted-foreground">-</TableCell>
+            <TableCell className="text-right">{renderCountCell(row.counts.c1, row.cantTotalErp, 1, row.auditRound)}</TableCell>
+            <TableCell className="text-right">{renderCountCell(row.counts.c2, row.cantTotalErp, 2, row.auditRound)}</TableCell>
+            <TableCell className="text-right">{renderCountCell(row.counts.c3, row.cantTotalErp, 3, row.auditRound)}</TableCell>
+            <TableCell className="text-right">{renderCountCell(row.counts.c4, row.cantTotalErp, 4, row.auditRound)}</TableCell>
+            <TableCell className="text-right">{renderCountCell(row.counts.c5, row.cantTotalErp, 5, row.auditRound)}</TableCell>
+            <TableCell></TableCell>
+            <TableCell></TableCell>
+          </TableRow>
+        ))}
+      </React.Fragment>
     );
   };
 
@@ -380,8 +580,7 @@ const Auditoria: React.FC = () => {
               <TableRow className="bg-muted/50">
                 <TableHead className="font-semibold">Referencia</TableHead>
                 <TableHead className="font-semibold">Tipo</TableHead>
-                <TableHead className="font-semibold">Ubicación</TableHead>
-                <TableHead className="font-semibold">Detalle</TableHead>
+                <TableHead className="font-semibold w-[60px]">Info</TableHead>
                 <TableHead className="font-semibold text-right">ERP</TableHead>
                 <TableHead className="font-semibold text-right">C1</TableHead>
                 <TableHead className="font-semibold text-right">C2</TableHead>
@@ -396,7 +595,7 @@ const Auditoria: React.FC = () => {
               {isLoading ? (
                 Array.from({ length: 10 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 12 }).map((_, j) => (
+                    {Array.from({ length: 11 }).map((_, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-5 w-full" />
                       </TableCell>
@@ -405,7 +604,7 @@ const Auditoria: React.FC = () => {
                 ))
               ) : paginatedGroups.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={12} className="h-32 text-center">
+                  <TableCell colSpan={11} className="h-32 text-center">
                     <div className="flex flex-col items-center gap-2 text-muted-foreground">
                       <FileSearch className="w-8 h-8" />
                       <span>No se encontraron registros</span>
@@ -413,100 +612,7 @@ const Auditoria: React.FC = () => {
                   </TableCell>
                 </TableRow>
               ) : (
-                paginatedGroups.map((group) => (
-                  <React.Fragment key={group.referencia}>
-                    {/* Location rows */}
-                    {group.rows.map((row, rowIndex) => (
-                      <TableRow key={row.locationId} className="hover:bg-muted/30">
-                        {/* Only show reference and type on first row */}
-                        <TableCell className="font-medium">
-                          {rowIndex === 0 ? row.referencia : ''}
-                        </TableCell>
-                        <TableCell>
-                          {rowIndex === 0 ? (
-                            <Badge variant="outline" className={row.materialType === 'MP' ? 'border-orange-500/50 text-orange-600' : 'border-emerald-500/50 text-emerald-600'}>
-                              {row.materialType}
-                            </Badge>
-                          ) : null}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{row.locationName || '-'}</TableCell>
-                        <TableCell className="text-muted-foreground">{row.locationDetail || '-'}</TableCell>
-                        {/* ERP empty on location rows */}
-                        <TableCell className="text-right text-muted-foreground">-</TableCell>
-                        <TableCell className="text-right">
-                          {renderCountCell(row.counts.c1, row.cantTotalErp, 1, row.auditRound)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {renderCountCell(row.counts.c2, row.cantTotalErp, 2, row.auditRound)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {renderCountCell(row.counts.c3, row.cantTotalErp, 3, row.auditRound)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {renderCountCell(row.counts.c4, row.cantTotalErp, 4, row.auditRound)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {renderCountCell(row.counts.c5, row.cantTotalErp, 5, row.auditRound)}
-                        </TableCell>
-                        {/* Status and actions empty on location rows */}
-                        <TableCell></TableCell>
-                        <TableCell></TableCell>
-                      </TableRow>
-                    ))}
-                    
-                    {/* Total row */}
-                    <TableRow className="bg-muted/40 border-b-2 border-border">
-                      <TableCell colSpan={4} className="text-right font-medium text-muted-foreground">
-                        Total ({group.rows.length} ubicación{group.rows.length !== 1 ? 'es' : ''}):
-                      </TableCell>
-                      <TableCell className="text-right font-bold">{group.cantTotalErp}</TableCell>
-                      <TableCell className="text-right font-bold">
-                        {renderCountCell(group.totals.c1, group.cantTotalErp, 1, group.auditRound)}
-                      </TableCell>
-                      <TableCell className="text-right font-bold">
-                        {renderCountCell(group.totals.c2, group.cantTotalErp, 2, group.auditRound)}
-                      </TableCell>
-                      <TableCell className="text-right font-bold">
-                        {renderCountCell(group.totals.c3, group.cantTotalErp, 3, group.auditRound)}
-                      </TableCell>
-                      <TableCell className="text-right font-bold">
-                        {renderCountCell(group.totals.c4, group.cantTotalErp, 4, group.auditRound)}
-                      </TableCell>
-                      <TableCell className="text-right font-bold">
-                        {renderCountCell(group.totals.c5, group.cantTotalErp, 5, group.auditRound)}
-                      </TableCell>
-                      <TableCell>{getStatusBadge(group.statusSlug)}</TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleViewHistory(group.referencia, group.countHistory)}>
-                              <History className="w-4 h-4 mr-2" />
-                              Ver Historial
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem disabled>
-                              <CheckCircle2 className="w-4 h-4 mr-2" />
-                              Validar Manualmente
-                            </DropdownMenuItem>
-                            <DropdownMenuItem disabled>
-                              <XCircle className="w-4 h-4 mr-2" />
-                              Cerrar Forzado
-                            </DropdownMenuItem>
-                            <DropdownMenuItem disabled>
-                              <Edit3 className="w-4 h-4 mr-2" />
-                              Editar Conteo
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  </React.Fragment>
-                ))
+                paginatedGroups.map((group) => renderGroupRows(group))
               )}
             </TableBody>
           </Table>
