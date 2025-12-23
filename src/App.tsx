@@ -15,6 +15,7 @@ import InventarioPP from "./pages/superadmin/InventarioPP";
 import Usuarios from "./pages/superadmin/Usuarios";
 import ImportarMaestra from "./pages/superadmin/ImportarMaestra";
 import Criticos from "./pages/superadmin/Criticos";
+import Auditoria from "./pages/superadmin/Auditoria";
 import Operarios from "./pages/superadmin/Operarios";
 import GestionUbicacion from "./pages/admin/GestionUbicacion";
 import GestionResponsables from "./pages/admin/GestionResponsables";
@@ -104,6 +105,14 @@ const App: React.FC = () => (
               element={
                 <ProtectedRoute allowedRoles={['superadmin']}>
                   <Operarios />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/superadmin/auditoria"
+              element={
+                <ProtectedRoute allowedRoles={['superadmin']}>
+                  <Auditoria />
                 </ProtectedRoute>
               }
             />
