@@ -42,6 +42,8 @@ interface Location {
   status_c2: string | null;
   status_c3: string | null;
   status_c4: string | null;
+  validated_at_round: number | null;
+  validated_quantity: number | null;
   operario_c1: { id: string; full_name: string; turno: number | null } | null;
   operario_c2: { id: string; full_name: string; turno: number | null } | null;
   operario_c3: { id: string; full_name: string; turno: number | null } | null;
@@ -90,12 +92,15 @@ const RoundAssignmentTab: React.FC<RoundAssignmentTabProps> = ({
           subcategoria, observaciones, punto_referencia, metodo_conteo,
           operario_c1_id, operario_c2_id, operario_c3_id, operario_c4_id,
           status_c1, status_c2, status_c3, status_c4,
+          validated_at_round, validated_quantity,
           operario_c1:operarios!locations_operario_c1_id_fkey(id, full_name, turno),
           operario_c2:operarios!locations_operario_c2_id_fkey(id, full_name, turno),
           operario_c3:operarios!locations_operario_c3_id_fkey(id, full_name, turno),
           operario_c4:operarios!locations_operario_c4_id_fkey(id, full_name, turno),
           inventory_master!inner(referencia, material_type, control, audit_round)
-        `);
+        `)
+        // Excluir ubicaciones ya validadas para C3 y C4
+        .is('validated_at_round', null);
 
       // For C3 and C4: only show references that escalated to that round
       // For C1 and C2: show ALL locations (no audit_round filter)
