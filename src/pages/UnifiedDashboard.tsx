@@ -17,7 +17,8 @@ import {
   AlertTriangle,
   ArrowRight,
   FileSpreadsheet,
-  AlertCircle
+  AlertCircle,
+  FileSearch
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -291,6 +292,15 @@ const UnifiedDashboard: React.FC = () => {
         bgColor: 'bg-slate-500/10',
         hoverBg: 'group-hover:bg-slate-500',
       },
+      auditoria: { 
+        label: 'Auditoría General', 
+        icon: FileSearch, 
+        description: 'Vista completa de referencias y conteos',
+        onClick: () => navigate('/superadmin/auditoria'),
+        iconColor: 'text-violet-500',
+        bgColor: 'bg-violet-500/10',
+        hoverBg: 'group-hover:bg-violet-500',
+      },
     };
 
     if (role === 'supervisor') {
@@ -314,6 +324,7 @@ const UnifiedDashboard: React.FC = () => {
     // Superadmin
     return [
       baseActions.gestionOperativa,
+      baseActions.auditoria,
       { ...baseActions.criticos, badge: stats?.criticos || 0 },
       baseActions.ubicaciones,
       baseActions.responsables,

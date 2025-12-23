@@ -1,0 +1,530 @@
+import React, { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import AppLayout from '@/components/layout/AppLayout';
+import { 
+  Search, 
+  Filter, 
+  ChevronDown,
+  MoreVertical,
+  Eye,
+  CheckCircle2,
+  XCircle,
+  Edit3,
+  History,
+  FileSearch
+} from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
+import { Skeleton } from '@/components/ui/skeleton';
+
+interface AuditRow {
+  locationId: string;
+  referencia: string;
+  materialType: string;
+  locationName: string | null;
+  locationDetail: string | null;
+  subcategoria: string | null;
+  cantTotalErp: number;
+  statusSlug: string;
+  auditRound: number;
+  countHistory: any;
+  counts: {
+    c1: number | null;
+    c2: number | null;
+    c3: number | null;
+    c4: number | null;
+    c5: number | null;
+  };
+}
+
+const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
+  pendiente: { label: 'Pendiente', variant: 'secondary' },
+  auditado: { label: 'Auditado', variant: 'default' },
+  conflicto: { label: 'Conflicto', variant: 'outline' },
+  critico: { label: 'Crítico', variant: 'destructive' },
+  cerrado_forzado: { label: 'Cerrado Forzado', variant: 'default' },
+};
+
+const ITEMS_PER_PAGE = 50;
+
+const Auditoria: React.FC = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [materialTypeFilter, setMaterialTypeFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [locationFilter, setLocationFilter] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [selectedHistory, setSelectedHistory] = useState<{ referencia: string; history: any[] } | null>(null);
+
+  // Fetch all locations with their inventory master and counts
+  const { data: auditData, isLoading } = useQuery({
+    queryKey: ['audit-full-view'],
+    queryFn: async () => {
+      // Get all locations with inventory_master
+      const { data: locations, error: locError } = await supabase
+        .from('locations')
+        .select(`
+          id,
+          master_reference,
+          location_name,
+          location_detail,
+          subcategoria
+        `)
+        .order('master_reference');
+
+      if (locError) throw locError;
+      if (!locations || locations.length === 0) return { rows: [], uniqueLocations: [] };
+
+      // Get all inventory_master data
+      const uniqueRefs = [...new Set(locations.map(l => l.master_reference))];
+      const { data: masters, error: masterError } = await supabase
+        .from('inventory_master')
+        .select('referencia, material_type, cant_total_erp, status_slug, audit_round, count_history')
+        .in('referencia', uniqueRefs);
+
+      if (masterError) throw masterError;
+
+      // Create lookup map for masters
+      const masterMap = new Map(masters?.map(m => [m.referencia, m]) || []);
+
+      // Get all inventory_counts
+      const locationIds = locations.map(l => l.id);
+      const { data: counts, error: countsError } = await supabase
+        .from('inventory_counts')
+        .select('location_id, audit_round, quantity_counted')
+        .in('location_id', locationIds);
+
+      if (countsError) throw countsError;
+
+      // Group counts by location
+      const countsMap = new Map<string, { c1: number | null; c2: number | null; c3: number | null; c4: number | null; c5: number | null }>();
+      
+      locations.forEach(loc => {
+        countsMap.set(loc.id, { c1: null, c2: null, c3: null, c4: null, c5: null });
+      });
+
+      counts?.forEach(count => {
+        const existing = countsMap.get(count.location_id);
+        if (existing) {
+          const key = `c${count.audit_round}` as keyof typeof existing;
+          if (key in existing) {
+            existing[key] = count.quantity_counted;
+          }
+        }
+      });
+
+      // Build final rows
+      const rows: AuditRow[] = locations.map(loc => {
+        const master = masterMap.get(loc.master_reference);
+        return {
+          locationId: loc.id,
+          referencia: loc.master_reference,
+          materialType: master?.material_type || 'MP',
+          locationName: loc.location_name,
+          locationDetail: loc.location_detail,
+          subcategoria: loc.subcategoria,
+          cantTotalErp: master?.cant_total_erp || 0,
+          statusSlug: master?.status_slug || 'pendiente',
+          auditRound: master?.audit_round || 1,
+          countHistory: master?.count_history || [],
+          counts: countsMap.get(loc.id) || { c1: null, c2: null, c3: null, c4: null, c5: null },
+        };
+      });
+
+      // Get unique locations for filter
+      const uniqueLocations = [...new Set(locations.map(l => l.location_name).filter(Boolean))] as string[];
+
+      return { rows, uniqueLocations };
+    },
+  });
+
+  // Filter and paginate data
+  const filteredData = useMemo(() => {
+    if (!auditData?.rows) return [];
+
+    return auditData.rows.filter(row => {
+      // Search filter
+      if (searchQuery && !row.referencia.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+
+      // Material type filter
+      if (materialTypeFilter !== 'all' && row.materialType !== materialTypeFilter) {
+        return false;
+      }
+
+      // Status filter
+      if (statusFilter !== 'all' && row.statusSlug !== statusFilter) {
+        return false;
+      }
+
+      // Location filter
+      if (locationFilter !== 'all' && row.locationName !== locationFilter) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [auditData?.rows, searchQuery, materialTypeFilter, statusFilter, locationFilter]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredData.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredData, currentPage]);
+
+  // Reset to page 1 when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, materialTypeFilter, statusFilter, locationFilter]);
+
+  const handleViewHistory = (referencia: string, history: any[]) => {
+    setSelectedHistory({ referencia, history });
+    setHistoryDialogOpen(true);
+  };
+
+  const renderCountCell = (value: number | null, erp: number, round: number, currentRound: number) => {
+    if (value === null) {
+      return <span className="text-muted-foreground">-</span>;
+    }
+
+    const matchesErp = value === erp;
+    const isCurrentRound = round <= currentRound;
+
+    return (
+      <span className={`font-medium ${matchesErp ? 'text-green-600 dark:text-green-400' : isCurrentRound ? 'text-foreground' : 'text-muted-foreground'}`}>
+        {value}
+      </span>
+    );
+  };
+
+  const getStatusBadge = (status: string) => {
+    const config = STATUS_CONFIG[status] || STATUS_CONFIG.pendiente;
+    return (
+      <Badge variant={config.variant} className="whitespace-nowrap">
+        {config.label}
+      </Badge>
+    );
+  };
+
+  return (
+    <AppLayout title="Auditoría General" showBackButton>
+      <div className="space-y-6">
+        {/* Filters */}
+        <div className="flex flex-col lg:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por referencia..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Select value={materialTypeFilter} onValueChange={setMaterialTypeFilter}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los tipos</SelectItem>
+                <SelectItem value="MP">Materia Prima</SelectItem>
+                <SelectItem value="PP">Producto Proceso</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Estado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los estados</SelectItem>
+                <SelectItem value="pendiente">Pendiente</SelectItem>
+                <SelectItem value="auditado">Auditado</SelectItem>
+                <SelectItem value="conflicto">Conflicto</SelectItem>
+                <SelectItem value="critico">Crítico</SelectItem>
+                <SelectItem value="cerrado_forzado">Cerrado Forzado</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={locationFilter} onValueChange={setLocationFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Ubicación" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las ubicaciones</SelectItem>
+                {auditData?.uniqueLocations.map(loc => (
+                  <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Results count */}
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <span>
+            Mostrando {paginatedData.length} de {filteredData.length} registros
+          </span>
+          {filteredData.length !== (auditData?.rows.length || 0) && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => {
+                setSearchQuery('');
+                setMaterialTypeFilter('all');
+                setStatusFilter('all');
+                setLocationFilter('all');
+              }}
+            >
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
+
+        {/* Table */}
+        <div className="rounded-lg border border-border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead className="font-semibold">Referencia</TableHead>
+                <TableHead className="font-semibold">Tipo</TableHead>
+                <TableHead className="font-semibold">Ubicación</TableHead>
+                <TableHead className="font-semibold">Detalle</TableHead>
+                <TableHead className="font-semibold text-right">ERP</TableHead>
+                <TableHead className="font-semibold text-right">C1</TableHead>
+                <TableHead className="font-semibold text-right">C2</TableHead>
+                <TableHead className="font-semibold text-right">C3</TableHead>
+                <TableHead className="font-semibold text-right">C4</TableHead>
+                <TableHead className="font-semibold text-right">C5</TableHead>
+                <TableHead className="font-semibold">Estado</TableHead>
+                <TableHead className="font-semibold w-[60px]">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                Array.from({ length: 10 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 12 }).map((_, j) => (
+                      <TableCell key={j}>
+                        <Skeleton className="h-5 w-full" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : paginatedData.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={12} className="h-32 text-center">
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                      <FileSearch className="w-8 h-8" />
+                      <span>No se encontraron registros</span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedData.map((row) => (
+                  <TableRow key={row.locationId} className="hover:bg-muted/30">
+                    <TableCell className="font-medium">{row.referencia}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={row.materialType === 'MP' ? 'border-orange-500/50 text-orange-600' : 'border-emerald-500/50 text-emerald-600'}>
+                        {row.materialType}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{row.locationName || '-'}</TableCell>
+                    <TableCell className="text-muted-foreground">{row.locationDetail || '-'}</TableCell>
+                    <TableCell className="text-right font-medium">{row.cantTotalErp}</TableCell>
+                    <TableCell className="text-right">
+                      {renderCountCell(row.counts.c1, row.cantTotalErp, 1, row.auditRound)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {renderCountCell(row.counts.c2, row.cantTotalErp, 2, row.auditRound)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {renderCountCell(row.counts.c3, row.cantTotalErp, 3, row.auditRound)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {renderCountCell(row.counts.c4, row.cantTotalErp, 4, row.auditRound)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {renderCountCell(row.counts.c5, row.cantTotalErp, 5, row.auditRound)}
+                    </TableCell>
+                    <TableCell>{getStatusBadge(row.statusSlug)}</TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleViewHistory(row.referencia, row.countHistory)}>
+                            <History className="w-4 h-4 mr-2" />
+                            Ver Historial
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem disabled>
+                            <CheckCircle2 className="w-4 h-4 mr-2" />
+                            Validar Manualmente
+                          </DropdownMenuItem>
+                          <DropdownMenuItem disabled>
+                            <XCircle className="w-4 h-4 mr-2" />
+                            Cerrar Forzado
+                          </DropdownMenuItem>
+                          <DropdownMenuItem disabled>
+                            <Edit3 className="w-4 h-4 mr-2" />
+                            Editar Conteo
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+              
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum: number;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                
+                return (
+                  <PaginationItem key={pageNum}>
+                    <PaginationLink 
+                      onClick={() => setCurrentPage(pageNum)}
+                      isActive={currentPage === pageNum}
+                      className="cursor-pointer"
+                    >
+                      {pageNum}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+              })}
+              
+              <PaginationItem>
+                <PaginationNext 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        )}
+      </div>
+
+      {/* History Dialog */}
+      <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Historial de Conteos - {selectedHistory?.referencia}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 max-h-[400px] overflow-y-auto">
+            {selectedHistory?.history && selectedHistory.history.length > 0 ? (
+              selectedHistory.history.map((entry, idx) => (
+                <div key={idx} className="p-4 rounded-lg bg-muted/50 border border-border">
+                  <div className="flex items-center justify-between mb-2">
+                    <Badge variant="outline">Ronda {entry.round}</Badge>
+                    {entry.closed_by_superadmin && (
+                      <Badge variant="destructive">Cerrado por Superadmin</Badge>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    {entry.sum_c1 !== undefined && (
+                      <div>
+                        <span className="text-muted-foreground">C1:</span>{' '}
+                        <span className="font-medium">{entry.sum_c1}</span>
+                      </div>
+                    )}
+                    {entry.sum_c2 !== undefined && (
+                      <div>
+                        <span className="text-muted-foreground">C2:</span>{' '}
+                        <span className="font-medium">{entry.sum_c2}</span>
+                      </div>
+                    )}
+                    {entry.sum !== undefined && (
+                      <div>
+                        <span className="text-muted-foreground">Suma:</span>{' '}
+                        <span className="font-medium">{entry.sum}</span>
+                      </div>
+                    )}
+                    {entry.erp !== undefined && (
+                      <div>
+                        <span className="text-muted-foreground">ERP:</span>{' '}
+                        <span className="font-medium">{entry.erp}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No hay historial de conteos registrado
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </AppLayout>
+  );
+};
+
+export default Auditoria;
