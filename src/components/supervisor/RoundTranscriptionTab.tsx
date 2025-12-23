@@ -202,17 +202,32 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
 
   // Function to check and auto-validate for rounds 3 and 4
   const checkAndAutoValidateHigherRounds = async (masterReference: string, currentRound: 3 | 4) => {
-    // Get all locations for this reference
+    // Get only NON-VALIDATED locations for this reference
     const { data: refLocations } = await supabase
       .from('locations')
       .select('id')
-      .eq('master_reference', masterReference);
+      .eq('master_reference', masterReference)
+      .is('validated_at_round', null); // Only locations NOT yet validated
 
-    if (!refLocations || refLocations.length === 0) return;
+    // If no pending locations, try to validate anyway (might close the reference)
+    if (!refLocations || refLocations.length === 0) {
+      // All locations are already validated, run validation to close reference
+      const { data: result } = await supabase.rpc('validate_and_close_round', {
+        _reference: masterReference,
+        _admin_id: user!.id,
+      });
+
+      const validationResult = result as { success?: boolean; action?: string } | null;
+      if (validationResult?.action === 'closed') {
+        toast.success(`✅ ${masterReference} - AUDITADO automáticamente`);
+        queryClient.invalidateQueries({ queryKey: ['validation-references'] });
+      }
+      return;
+    }
 
     const locationIds = refLocations.map(l => l.id);
 
-    // Check if all locations have counts for this round
+    // Check if all PENDING locations have counts for this round
     const { data: counts } = await supabase
       .from('inventory_counts')
       .select('location_id')
@@ -221,7 +236,7 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
 
     const countedLocationIds = new Set(counts?.map(c => c.location_id) || []);
 
-    // If not all locations have counts for this round, don't validate yet
+    // If not all PENDING locations have counts for this round, don't validate yet
     if (countedLocationIds.size < refLocations.length) return;
 
     // All locations are complete for this round, run validation
