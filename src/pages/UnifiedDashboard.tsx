@@ -199,148 +199,183 @@ const UnifiedDashboard: React.FC = () => {
     disabled?: boolean;
   }
 
-  // Quick actions based on role - with specific colors per action
-  const quickActions: ActionItem[] = useMemo(() => {
-    const baseActions: Record<string, ActionItem> = {
-      gestionOperativa: { 
-        label: 'Gestión Operativa', 
-        icon: ClipboardList, 
-        description: 'Asignar operarios y transcribir conteos',
-        onClick: () => navigate('/gestion-operativa'),
-        iconColor: 'text-blue-500',
-        bgColor: 'bg-blue-500/10',
-        hoverBg: 'group-hover:bg-blue-500',
-      },
-      criticos: { 
-        label: 'Críticos (C5)', 
-        icon: AlertTriangle, 
-        description: 'Referencias que requieren cierre forzado',
-        onClick: () => navigate('/superadmin/criticos'),
-        iconColor: 'text-red-500',
-        bgColor: 'bg-red-500/10',
-        hoverBg: 'group-hover:bg-red-500',
-      },
-      importar: { 
-        label: 'Importar Maestra', 
-        icon: Upload, 
-        description: 'Cargar inventario desde archivo',
-        onClick: () => navigate('/superadmin/importar'),
-        iconColor: 'text-purple-500',
-        bgColor: 'bg-purple-500/10',
-        hoverBg: 'group-hover:bg-purple-500',
-      },
-      usuarios: { 
-        label: 'Gestionar Usuarios', 
-        icon: Users, 
-        description: 'Asignar roles y permisos',
-        onClick: () => navigate('/superadmin/usuarios'),
-        iconColor: 'text-emerald-500',
-        bgColor: 'bg-emerald-500/10',
-        hoverBg: 'group-hover:bg-emerald-500',
-      },
-      operarios: { 
-        label: 'Gestionar Operarios', 
-        icon: UserCog, 
-        description: 'Administrar operarios del sistema',
-        onClick: () => navigate('/superadmin/operarios'),
-        iconColor: 'text-amber-500',
-        bgColor: 'bg-amber-500/10',
-        hoverBg: 'group-hover:bg-amber-500',
-      },
-      inventarioMP: { 
-        label: 'Inventario MP', 
-        icon: Package, 
-        description: 'CRUD Materia Prima',
-        onClick: () => navigate('/superadmin/inventario-mp'),
-        iconColor: 'text-orange-500',
-        bgColor: 'bg-orange-500/10',
-        hoverBg: 'group-hover:bg-orange-500',
-      },
-      inventarioPP: { 
-        label: 'Inventario PP', 
-        icon: Boxes, 
-        description: 'CRUD Producto en Proceso',
-        onClick: () => navigate('/superadmin/inventario-pp'),
-        iconColor: 'text-teal-500',
-        bgColor: 'bg-teal-500/10',
-        hoverBg: 'group-hover:bg-teal-500',
-      },
-      ubicaciones: { 
-        label: 'Gestionar Ubicaciones', 
-        icon: MapPin, 
-        description: 'Asignar ubicaciones y supervisores',
-        onClick: () => navigate('/admin/gestion-ubicacion'),
-        iconColor: 'text-cyan-500',
-        bgColor: 'bg-cyan-500/10',
-        hoverBg: 'group-hover:bg-cyan-500',
-      },
-      responsables: { 
-        label: 'Asignar Responsables', 
-        icon: Users, 
-        description: 'Asignación masiva de líderes de conteo',
-        onClick: () => navigate('/admin/gestion-responsables'),
-        iconColor: 'text-indigo-500',
-        bgColor: 'bg-indigo-500/10',
-        hoverBg: 'group-hover:bg-indigo-500',
-      },
-      reportes: { 
-        label: 'Ver Reportes', 
-        icon: FileSpreadsheet, 
-        description: 'Exportar informes de inventario',
-        disabled: true,
-        iconColor: 'text-slate-500',
-        bgColor: 'bg-slate-500/10',
-        hoverBg: 'group-hover:bg-slate-500',
-      },
-      auditoria: { 
-        label: 'Auditoría General', 
-        icon: FileSearch, 
-        description: 'Vista completa de referencias y conteos',
-        onClick: () => navigate('/superadmin/auditoria'),
-        iconColor: 'text-violet-500',
-        bgColor: 'bg-violet-500/10',
-        hoverBg: 'group-hover:bg-violet-500',
-      },
-    };
+  // Category type
+  interface ActionCategory {
+    name: string;
+    icon: React.ComponentType<{ className?: string }>;
+    actions: ActionItem[];
+  }
 
+  // Base actions definitions
+  const baseActions: Record<string, ActionItem> = useMemo(() => ({
+    gestionOperativa: { 
+      label: 'Gestión Operativa', 
+      icon: ClipboardList, 
+      description: 'Asignar operarios y transcribir conteos',
+      onClick: () => navigate('/gestion-operativa'),
+      iconColor: 'text-blue-500',
+      bgColor: 'bg-blue-500/10',
+      hoverBg: 'group-hover:bg-blue-500',
+    },
+    criticos: { 
+      label: 'Críticos (C5)', 
+      icon: AlertTriangle, 
+      description: 'Referencias que requieren cierre forzado',
+      onClick: () => navigate('/superadmin/criticos'),
+      iconColor: 'text-red-500',
+      bgColor: 'bg-red-500/10',
+      hoverBg: 'group-hover:bg-red-500',
+    },
+    importar: { 
+      label: 'Importar Maestra', 
+      icon: Upload, 
+      description: 'Cargar inventario desde archivo',
+      onClick: () => navigate('/superadmin/importar'),
+      iconColor: 'text-purple-500',
+      bgColor: 'bg-purple-500/10',
+      hoverBg: 'group-hover:bg-purple-500',
+    },
+    usuarios: { 
+      label: 'Gestionar Usuarios', 
+      icon: Users, 
+      description: 'Asignar roles y permisos',
+      onClick: () => navigate('/superadmin/usuarios'),
+      iconColor: 'text-emerald-500',
+      bgColor: 'bg-emerald-500/10',
+      hoverBg: 'group-hover:bg-emerald-500',
+    },
+    operarios: { 
+      label: 'Gestionar Operarios', 
+      icon: UserCog, 
+      description: 'Administrar operarios del sistema',
+      onClick: () => navigate('/superadmin/operarios'),
+      iconColor: 'text-amber-500',
+      bgColor: 'bg-amber-500/10',
+      hoverBg: 'group-hover:bg-amber-500',
+    },
+    inventarioMP: { 
+      label: 'Inventario MP', 
+      icon: Package, 
+      description: 'CRUD Materia Prima',
+      onClick: () => navigate('/superadmin/inventario-mp'),
+      iconColor: 'text-orange-500',
+      bgColor: 'bg-orange-500/10',
+      hoverBg: 'group-hover:bg-orange-500',
+    },
+    inventarioPP: { 
+      label: 'Inventario PP', 
+      icon: Boxes, 
+      description: 'CRUD Producto en Proceso',
+      onClick: () => navigate('/superadmin/inventario-pp'),
+      iconColor: 'text-teal-500',
+      bgColor: 'bg-teal-500/10',
+      hoverBg: 'group-hover:bg-teal-500',
+    },
+    ubicaciones: { 
+      label: 'Gestionar Ubicaciones', 
+      icon: MapPin, 
+      description: 'Asignar ubicaciones y supervisores',
+      onClick: () => navigate('/admin/gestion-ubicacion'),
+      iconColor: 'text-cyan-500',
+      bgColor: 'bg-cyan-500/10',
+      hoverBg: 'group-hover:bg-cyan-500',
+    },
+    responsables: { 
+      label: 'Asignar Responsables', 
+      icon: Users, 
+      description: 'Asignación masiva de líderes de conteo',
+      onClick: () => navigate('/admin/gestion-responsables'),
+      iconColor: 'text-indigo-500',
+      bgColor: 'bg-indigo-500/10',
+      hoverBg: 'group-hover:bg-indigo-500',
+    },
+    auditoria: { 
+      label: 'Auditoría General', 
+      icon: FileSearch, 
+      description: 'Vista completa de referencias y conteos',
+      onClick: () => navigate('/superadmin/auditoria'),
+      iconColor: 'text-violet-500',
+      bgColor: 'bg-violet-500/10',
+      hoverBg: 'group-hover:bg-violet-500',
+    },
+  }), [navigate]);
+
+  // Action categories based on role
+  const actionCategories: ActionCategory[] = useMemo(() => {
+    const categories: ActionCategory[] = [];
+
+    // 1. ADMINISTRACIÓN (solo superadmin)
+    if (role === 'superadmin') {
+      categories.push({
+        name: 'Administración',
+        icon: Shield,
+        actions: [
+          baseActions.usuarios,
+          baseActions.importar,
+          baseActions.operarios,
+        ]
+      });
+    }
+
+    // 2. AUDITORÍA (solo superadmin)
+    if (role === 'superadmin') {
+      categories.push({
+        name: 'Auditoría',
+        icon: FileSearch,
+        actions: [
+          baseActions.inventarioMP,
+          baseActions.inventarioPP,
+          baseActions.auditoria,
+        ]
+      });
+    }
+
+    // 3. GENERAL (superadmin y admins)
+    if (role === 'superadmin' || role === 'admin_mp' || role === 'admin_pp') {
+      categories.push({
+        name: 'General',
+        icon: MapPin,
+        actions: [
+          baseActions.ubicaciones,
+          baseActions.responsables,
+        ]
+      });
+    }
+
+    // 4. OPERACIÓN (todos los roles)
+    const operacionActions: ActionItem[] = [];
+    
+    if (role === 'superadmin') {
+      operacionActions.push({ ...baseActions.criticos, badge: stats?.criticos || 0 });
+    }
+    
     if (role === 'supervisor') {
-      return [{
+      const pendingTotal = (stats?.withoutOperario || 0) + (stats?.pendingC1 || 0) + (stats?.pendingC2 || 0);
+      operacionActions.push({
         ...baseActions.gestionOperativa,
         description: 'Asigna operarios y transcribe conteos para tus ubicaciones',
-        badge: (stats?.withoutOperario || 0) + (stats?.pendingC1 || 0) + (stats?.pendingC2 || 0),
+        badge: pendingTotal,
         badgeLabel: 'pendientes',
-      }];
+      });
+    } else {
+      operacionActions.push(baseActions.gestionOperativa);
     }
 
-    if (role === 'admin_mp' || role === 'admin_pp') {
-      return [
-        baseActions.gestionOperativa,
-        baseActions.ubicaciones,
-        baseActions.responsables,
-        baseActions.reportes,
-      ];
-    }
+    categories.push({
+      name: 'Operación',
+      icon: ClipboardList,
+      actions: operacionActions
+    });
 
-    // Superadmin
-    return [
-      baseActions.gestionOperativa,
-      baseActions.auditoria,
-      { ...baseActions.criticos, badge: stats?.criticos || 0 },
-      baseActions.ubicaciones,
-      baseActions.responsables,
-      baseActions.importar,
-      baseActions.usuarios,
-      baseActions.operarios,
-      baseActions.inventarioMP,
-      baseActions.inventarioPP,
-    ];
-  }, [role, stats, navigate]);
+    return categories;
+  }, [role, stats, baseActions]);
+
+  // Check if supervisor with only 1 action (for large card display)
+  const isSingleActionLayout = role === 'supervisor';
 
   // Reusable ActionButton component
-  const ActionButton = ({ action }: { action: ActionItem }) => {
-    const isLargeCard = quickActions.length <= 2;
-    
-    if (isLargeCard) {
+  const ActionButton = ({ action, isLarge = false }: { action: ActionItem; isLarge?: boolean }) => {
+    if (isLarge) {
       return (
         <Card 
           className="cursor-pointer hover:border-primary/50 transition-all group"
@@ -356,7 +391,7 @@ const UnifiedDashboard: React.FC = () => {
                 <p className="text-muted-foreground mt-1">{action.description}</p>
               </div>
               <div className="flex items-center gap-2">
-                {action.badge && action.badge > 0 && (
+                {action.badge !== undefined && action.badge > 0 && (
                   <Badge variant="secondary" className={`${action.bgColor} ${action.iconColor}`}>
                     {action.badge} {action.badgeLabel || ''}
                   </Badge>
@@ -382,7 +417,7 @@ const UnifiedDashboard: React.FC = () => {
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <p className="font-medium text-foreground">{action.label}</p>
-              {action.badge && action.badge > 0 && (
+              {action.badge !== undefined && action.badge > 0 && (
                 <Badge variant="secondary" className={`${action.bgColor} ${action.iconColor}`}>
                   {action.badge}
                 </Badge>
@@ -481,14 +516,24 @@ const UnifiedDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* Quick Actions - Unified template */}
-          <div>
-            <h3 className="text-lg font-semibold text-foreground mb-4">Acciones Rápidas</h3>
-            <div className={`grid gap-4 ${quickActions.length <= 2 ? 'grid-cols-1 md:grid-cols-2 gap-6' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'}`}>
-              {quickActions.map((action) => (
-                <ActionButton key={action.label} action={action} />
-              ))}
-            </div>
+          {/* Quick Actions - Categorized */}
+          <div className="space-y-6">
+            {actionCategories.map((category) => (
+              <div key={category.name}>
+                {/* Category Header */}
+                <div className="flex items-center gap-2 mb-3">
+                  <category.icon className="w-5 h-5 text-muted-foreground" />
+                  <h3 className="text-lg font-semibold text-foreground">{category.name}</h3>
+                </div>
+                
+                {/* Actions Grid */}
+                <div className={`grid gap-4 ${isSingleActionLayout ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
+                  {category.actions.map((action) => (
+                    <ActionButton key={action.label} action={action} isLarge={isSingleActionLayout} />
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </main>
