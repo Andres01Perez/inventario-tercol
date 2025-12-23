@@ -461,7 +461,7 @@ const UnifiedDashboard: React.FC = () => {
           </div>
 
           {/* Critical Alert (Superadmin only) */}
-          {role === 'superadmin' && stats?.criticos && stats.criticos > 0 && (
+          {role === 'superadmin' && stats?.criticos !== undefined && stats.criticos > 0 && (
             <div 
               className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 flex items-center justify-between cursor-pointer hover:bg-red-500/20 transition-colors"
               onClick={() => navigate('/superadmin/criticos')}
