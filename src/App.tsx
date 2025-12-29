@@ -10,6 +10,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
 import GestionOperativa from "./pages/GestionOperativa";
+import ConteoRound from "./pages/ConteoRound";
 import InventarioMP from "./pages/superadmin/InventarioMP";
 import InventarioPP from "./pages/superadmin/InventarioPP";
 import Usuarios from "./pages/superadmin/Usuarios";
@@ -56,6 +57,14 @@ const App: React.FC = () => (
               element={
                 <ProtectedRoute allowedRoles={['superadmin', 'admin_mp', 'admin_pp', 'supervisor']}>
                   <GestionOperativa />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/gestion-operativa/conteo/:round"
+              element={
+                <ProtectedRoute allowedRoles={['superadmin', 'admin_mp', 'admin_pp', 'supervisor']}>
+                  <ConteoRound />
                 </ProtectedRoute>
               }
             />

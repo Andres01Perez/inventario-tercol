@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import AppLayout from '@/components/layout/AppLayout';
-import OperationalPanel from '@/components/shared/OperationalPanel';
+import RoundSelectorCards from '@/components/shared/RoundSelectorCards';
 
 const GestionOperativa: React.FC = () => {
   const { role } = useAuth();
@@ -42,15 +42,15 @@ const GestionOperativa: React.FC = () => {
     >
       <div className="space-y-6">
         <div>
-          <h2 className="text-xl font-semibold text-foreground">Gestión de Conteos por Rondas</h2>
+          <h2 className="text-xl font-semibold text-foreground">Selecciona una Ronda de Conteo</h2>
           <p className="text-muted-foreground">
             {role === 'supervisor'
               ? 'Asigna operarios y transcribe conteos para tus ubicaciones'
-              : `Gestiona ubicaciones y transcribe conteos`
+              : 'Gestiona ubicaciones y transcribe conteos'
             }
           </p>
         </div>
-        <OperationalPanel
+        <RoundSelectorCards
           isAdminMode={isAdminMode}
           controlFilter={controlFilter}
         />
