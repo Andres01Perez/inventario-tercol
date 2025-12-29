@@ -32,6 +32,14 @@ interface CountHistoryEntry {
   sum_c1?: number;
   sum_c2?: number;
   sum?: number;
+  sum_validated?: number;
+}
+
+interface CountSummary {
+  c1: number;
+  c2: number;
+  c3: number;
+  c4: number;
 }
 
 interface CriticalReference {
@@ -41,6 +49,7 @@ interface CriticalReference {
   cant_total_erp: number | null;
   count_history: CountHistoryEntry[] | null;
   locations: Location[];
+  count_summary?: CountSummary;
 }
 
 interface CriticalReferenceCardProps {
@@ -70,24 +79,30 @@ const CriticalReferenceCard: React.FC<CriticalReferenceCardProps> = ({ reference
     });
   }, [quantities, reference.locations]);
 
-  // Extract count history
+  // Extract count history - use count_summary if available (from actual counts), fallback to count_history
   const countHistory = useMemo(() => {
+    // If we have count_summary (calculated from inventory_counts), use it
+    if (reference.count_summary) {
+      return reference.count_summary;
+    }
+    
+    // Fallback to parsing count_history from the master record
     const history = reference.count_history || [];
     let c1 = 0, c2 = 0, c3 = 0, c4 = 0;
 
     history.forEach(entry => {
       if (entry.round === 1) {
-        c1 = entry.sum_c1 || 0;
+        c1 = entry.sum_c1 || entry.sum_validated || 0;
         c2 = entry.sum_c2 || 0;
       } else if (entry.round === 3) {
-        c3 = entry.sum || 0;
+        c3 = entry.sum || entry.sum_validated || 0;
       } else if (entry.round === 4) {
-        c4 = entry.sum || 0;
+        c4 = entry.sum || entry.sum_validated || 0;
       }
     });
 
     return { c1, c2, c3, c4 };
-  }, [reference.count_history]);
+  }, [reference.count_history, reference.count_summary]);
 
   const saveAndCloseMutation = useMutation({
     mutationFn: async () => {
