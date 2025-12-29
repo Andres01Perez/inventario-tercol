@@ -231,7 +231,7 @@ const OperariosImport: React.FC<OperariosImportProps> = ({ onSuccess, onClose })
             <p className="font-medium text-foreground mb-2">Formato esperado:</p>
             <div className="flex gap-4 text-muted-foreground">
               <code className="bg-background px-2 py-1 rounded">nombre</code>
-              <code className="bg-background px-2 py-1 rounded">turno (1 o 2)</code>
+              <code className="bg-background px-2 py-1 rounded">turno (1, 2 o 3)</code>
             </div>
           </div>
         </>
