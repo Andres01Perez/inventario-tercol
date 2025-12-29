@@ -1,10 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
 import { 
   ArrowLeft, 
   LogOut, 
-  Package, 
+  Package,
   Boxes, 
   Shield, 
   Settings,
@@ -26,6 +27,7 @@ interface AppLayoutProps {
   showBackButton?: boolean;
   backPath?: string;
   roleConfig?: RoleConfig;
+  fullWidth?: boolean;
 }
 
 const getRoleConfig = (role: string | null): RoleConfig => {
@@ -75,6 +77,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   showBackButton = false,
   backPath = '/dashboard',
   roleConfig: customRoleConfig,
+  fullWidth = false,
 }) => {
   const { profile, role, signOut } = useAuth();
   const navigate = useNavigate();
@@ -121,7 +124,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className={cn(
+        "mx-auto px-4 sm:px-6 lg:px-8 py-8",
+        fullWidth ? "max-w-full" : "max-w-7xl"
+      )}>
         {children}
       </main>
     </div>
