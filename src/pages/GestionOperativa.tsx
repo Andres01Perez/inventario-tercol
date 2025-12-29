@@ -6,20 +6,6 @@ import RoundSelectorCards from '@/components/shared/RoundSelectorCards';
 const GestionOperativa: React.FC = () => {
   const { role } = useAuth();
 
-  // Determine control filter based on role
-  const controlFilter = React.useMemo(() => {
-    switch (role) {
-      case 'admin_mp':
-        return 'not_null' as const;
-      case 'admin_pp':
-        return 'null' as const;
-      default:
-        return 'all' as const;
-    }
-  }, [role]);
-
-  const isAdminMode = role !== 'supervisor';
-
   const subtitle = React.useMemo(() => {
     switch (role) {
       case 'admin_mp':
@@ -50,10 +36,7 @@ const GestionOperativa: React.FC = () => {
             }
           </p>
         </div>
-        <RoundSelectorCards
-          isAdminMode={isAdminMode}
-          controlFilter={controlFilter}
-        />
+        <RoundSelectorCards />
       </div>
     </AppLayout>
   );
