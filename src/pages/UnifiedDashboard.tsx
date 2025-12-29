@@ -477,29 +477,6 @@ const UnifiedDashboard: React.FC = () => {
               }
             </p>
           </div>
-
-
-          {/* Critical Alert (Superadmin only) */}
-          {role === 'superadmin' && stats?.criticos !== undefined && stats.criticos > 0 && (
-            <div 
-              className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 flex items-center justify-between cursor-pointer hover:bg-red-500/20 transition-colors"
-              onClick={() => navigate('/superadmin/criticos')}
-            >
-              <div className="flex items-center gap-3">
-                <AlertTriangle className="w-6 h-6 text-red-500" />
-                <div>
-                  <p className="font-semibold text-red-600 dark:text-red-400">
-                    {stats.criticos} Referencia(s) Crítica(s)
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Requieren tu intervención para cierre forzado (Conteo 5)
-                  </p>
-                </div>
-              </div>
-              <Badge variant="destructive">Ver ahora</Badge>
-            </div>
-          )}
-
           {/* Quick Actions - Categorized */}
           <div className="space-y-6">
             {actionCategories.map((category) => (
