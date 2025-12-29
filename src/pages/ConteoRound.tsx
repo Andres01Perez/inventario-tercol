@@ -68,6 +68,7 @@ const ConteoRound: React.FC = () => {
       subtitle={subtitle}
       showBackButton={true}
       backPath="/gestion-operativa"
+      fullWidth={true}
     >
       <div className="space-y-4 h-full">
         {/* Panel Toggle Controls */}
