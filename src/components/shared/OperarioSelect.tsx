@@ -52,7 +52,8 @@ const OperarioSelect: React.FC<OperarioSelectProps> = ({
           .order('full_name', { ascending: true });
 
         if (filterTurno !== undefined) {
-          query = query.eq('turno', filterTurno);
+          // Turno 3 es "comodín" y aparece en ambos filtros (1 y 2)
+          query = query.in('turno', [filterTurno, 3]);
         }
 
         const { data, error } = await query;

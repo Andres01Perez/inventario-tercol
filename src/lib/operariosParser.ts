@@ -108,7 +108,7 @@ export const parseOperariosExcel = async (file: File): Promise<OperariosParseRes
       let turno = 1;
       if (turnoValue !== undefined && turnoValue !== null && turnoValue !== '') {
         const turnoNum = parseInt(turnoValue.toString());
-        if (isNaN(turnoNum) || (turnoNum !== 1 && turnoNum !== 2)) {
+        if (isNaN(turnoNum) || turnoNum < 1 || turnoNum > 3) {
           warnings.push(`Fila ${rowNumber}: Turno inválido "${turnoValue}", usando turno 1`);
           turno = 1;
         } else {
@@ -146,7 +146,7 @@ export const generateOperariosTemplate = (): void => {
   const templateData = [
     { nombre: 'Juan Pérez', turno: 1 },
     { nombre: 'María García', turno: 2 },
-    { nombre: 'Carlos López', turno: 1 },
+    { nombre: 'Carlos López', turno: 3 },
   ];
 
   const worksheet = XLSX.utils.json_to_sheet(templateData);
