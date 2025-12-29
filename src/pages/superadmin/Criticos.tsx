@@ -161,13 +161,6 @@ const Criticos: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-              <p className="text-sm text-muted-foreground">
-                <span className="font-bold text-red-500">{criticalReferences.length}</span> referencia(s) requieren cierre forzado.
-                Revisa el historial de conteos y registra tu conteo personal para cada ubicación.
-              </p>
-            </div>
-
             {criticalReferences.map(reference => (
               <CriticalReferenceCard
                 key={reference.referencia}
