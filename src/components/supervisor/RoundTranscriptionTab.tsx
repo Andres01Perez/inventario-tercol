@@ -202,67 +202,111 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
 
   // Function to check and auto-validate for rounds 3 and 4
   const checkAndAutoValidateHigherRounds = async (masterReference: string, currentRound: 3 | 4) => {
-    // Get only NON-VALIDATED locations for this reference
-    const { data: refLocations } = await supabase
-      .from('locations')
-      .select('id')
-      .eq('master_reference', masterReference)
-      .is('validated_at_round', null); // Only locations NOT yet validated
+    console.log(`[Validación C${currentRound}] Iniciando para ${masterReference}`);
+    
+    try {
+      // Get only NON-VALIDATED locations for this reference
+      const { data: refLocations, error: locError } = await supabase
+        .from('locations')
+        .select('id')
+        .eq('master_reference', masterReference)
+        .is('validated_at_round', null); // Only locations NOT yet validated
 
-    // If no pending locations, try to validate anyway (might close the reference)
-    if (!refLocations || refLocations.length === 0) {
-      // All locations are already validated, run validation to close reference
-      const { data: result } = await supabase.rpc('validate_and_close_round', {
+      if (locError) {
+        console.error(`[Validación C${currentRound}] Error obteniendo ubicaciones:`, locError);
+        return;
+      }
+
+      console.log(`[Validación C${currentRound}] Ubicaciones pendientes: ${refLocations?.length || 0}`);
+
+      // If no pending locations, try to validate anyway (might close the reference)
+      if (!refLocations || refLocations.length === 0) {
+        console.log(`[Validación C${currentRound}] Todas validadas, intentando cerrar referencia`);
+        const { data: result, error: rpcError } = await supabase.rpc('validate_and_close_round', {
+          _reference: masterReference,
+          _admin_id: user!.id,
+        });
+
+        if (rpcError) {
+          console.error(`[Validación C${currentRound}] Error RPC:`, rpcError);
+          return;
+        }
+
+        const validationResult = result as { success?: boolean; action?: string } | null;
+        console.log(`[Validación C${currentRound}] Resultado:`, validationResult);
+        
+        if (validationResult?.action === 'closed') {
+          toast.success(`✅ ${masterReference} - AUDITADO automáticamente`);
+          queryClient.invalidateQueries({ queryKey: ['validation-references'] });
+        }
+        return;
+      }
+
+      const locationIds = refLocations.map(l => l.id);
+
+      // Check if all PENDING locations have counts for this round
+      const { data: counts, error: countsError } = await supabase
+        .from('inventory_counts')
+        .select('location_id')
+        .in('location_id', locationIds)
+        .eq('audit_round', currentRound);
+
+      if (countsError) {
+        console.error(`[Validación C${currentRound}] Error obteniendo conteos:`, countsError);
+        return;
+      }
+
+      const countedLocationIds = new Set(counts?.map(c => c.location_id) || []);
+      console.log(`[Validación C${currentRound}] Conteos encontrados: ${countedLocationIds.size}/${refLocations.length}`);
+
+      // If not all PENDING locations have counts for this round, don't validate yet
+      if (countedLocationIds.size < refLocations.length) {
+        console.log(`[Validación C${currentRound}] Faltan conteos, no se valida aún`);
+        return;
+      }
+
+      // All locations are complete for this round, run validation
+      console.log(`[Validación C${currentRound}] Todos los conteos completos, ejecutando validación RPC`);
+      const { data: result, error: rpcError } = await supabase.rpc('validate_and_close_round', {
         _reference: masterReference,
         _admin_id: user!.id,
       });
 
-      const validationResult = result as { success?: boolean; action?: string } | null;
+      if (rpcError) {
+        console.error(`[Validación C${currentRound}] Error RPC:`, rpcError);
+        toast.error(`Error en validación: ${rpcError.message}`);
+        return;
+      }
+
+      const validationResult = result as { success?: boolean; action?: string; new_round?: number; error?: string } | null;
+      console.log(`[Validación C${currentRound}] Resultado validación:`, validationResult);
+
+      if (validationResult?.error) {
+        console.error(`[Validación C${currentRound}] Error en resultado:`, validationResult.error);
+        toast.error(`Error: ${validationResult.error}`);
+        return;
+      }
+
       if (validationResult?.action === 'closed') {
         toast.success(`✅ ${masterReference} - AUDITADO automáticamente`);
-        queryClient.invalidateQueries({ queryKey: ['validation-references'] });
+      } else if (validationResult?.action === 'next_round') {
+        const nextRound = validationResult.new_round || currentRound + 1;
+        toast.warning(`⚠️ ${masterReference} - Pasó a Conteo ${nextRound} (sin coincidencias)`);
+        // Refresh next round assignment tab
+        queryClient.invalidateQueries({ queryKey: ['round-assignment-locations', nextRound] });
+      } else if (validationResult?.action === 'escalate_to_superadmin') {
+        toast.error(`🚨 ${masterReference} - Escalado a SUPERADMIN (Crítico C5)`);
+        // Refresh critical references
+        queryClient.invalidateQueries({ queryKey: ['critical-references'] });
       }
-      return;
+
+      // Refresh validation panel and other queries
+      queryClient.invalidateQueries({ queryKey: ['validation-references'] });
+      queryClient.invalidateQueries({ queryKey: ['round-transcription-locations'] });
+    } catch (err) {
+      console.error(`[Validación C${currentRound}] Error inesperado:`, err);
+      toast.error('Error inesperado durante la validación');
     }
-
-    const locationIds = refLocations.map(l => l.id);
-
-    // Check if all PENDING locations have counts for this round
-    const { data: counts } = await supabase
-      .from('inventory_counts')
-      .select('location_id')
-      .in('location_id', locationIds)
-      .eq('audit_round', currentRound);
-
-    const countedLocationIds = new Set(counts?.map(c => c.location_id) || []);
-
-    // If not all PENDING locations have counts for this round, don't validate yet
-    if (countedLocationIds.size < refLocations.length) return;
-
-    // All locations are complete for this round, run validation
-    const { data: result } = await supabase.rpc('validate_and_close_round', {
-      _reference: masterReference,
-      _admin_id: user!.id,
-    });
-
-    const validationResult = result as { success?: boolean; action?: string; new_round?: number } | null;
-
-    if (validationResult?.action === 'closed') {
-      toast.success(`✅ ${masterReference} - AUDITADO automáticamente`);
-    } else if (validationResult?.action === 'next_round') {
-      const nextRound = validationResult.new_round || currentRound + 1;
-      toast.warning(`⚠️ ${masterReference} - Pasó a Conteo ${nextRound} (sin coincidencias)`);
-      // Refresh next round assignment tab
-      queryClient.invalidateQueries({ queryKey: ['round-assignment-locations', nextRound] });
-    } else if (validationResult?.action === 'escalate_to_superadmin') {
-      toast.error(`🚨 ${masterReference} - Escalado a SUPERADMIN (Crítico C5)`);
-      // Refresh critical references
-      queryClient.invalidateQueries({ queryKey: ['critical-references'] });
-    }
-
-    // Refresh validation panel and other queries
-    queryClient.invalidateQueries({ queryKey: ['validation-references'] });
-    queryClient.invalidateQueries({ queryKey: ['round-transcription-locations'] });
   };
 
   const saveCountMutation = useMutation({
@@ -309,14 +353,19 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
 
       // Auto-validate based on round number
       if (result.masterReference) {
+        console.log(`[SaveCount] Conteo ${roundNumber} guardado para ${result.masterReference}, iniciando validación automática...`);
+        
         if (roundNumber <= 2) {
           await checkAndAutoValidate(result.masterReference);
         } else if (roundNumber === 3 || roundNumber === 4) {
           await checkAndAutoValidateHigherRounds(result.masterReference, roundNumber);
         }
+      } else {
+        console.warn('[SaveCount] No se encontró masterReference, saltando validación automática');
       }
     },
     onError: (error: Error, variables) => {
+      console.error('[SaveCount] Error:', error);
       toast.error(`Error: ${error.message}`);
       setSavingIds(prev => {
         const next = new Set(prev);
