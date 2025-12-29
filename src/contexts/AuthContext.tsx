@@ -18,6 +18,7 @@ interface AuthContextType {
   profile: Profile | null;
   role: AppRole;
   loading: boolean;
+  roleLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -40,9 +41,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<Profile | null>(null);
   const [role, setRole] = useState<AppRole>(null);
   const [loading, setLoading] = useState(true);
+  const [roleLoading, setRoleLoading] = useState(true);
   
   // Track current user ID to prevent race conditions
   const currentUserIdRef = useRef<string | null>(null);
+  // Track if initial auth has been completed to prevent duplicate fetches
+  const initializedRef = useRef(false);
   const queryClientRef = useRef<ReturnType<typeof useQueryClient> | null>(null);
 
   // Get queryClient safely (will be set when component mounts inside QueryClientProvider)
@@ -56,6 +60,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (queryClientRef.current) {
       queryClientRef.current.clear();
     }
+    // Clear role cache on logout
+    sessionStorage.removeItem('cached_role');
+    sessionStorage.removeItem('cached_user_id');
   }, []);
 
   const fetchUserData = useCallback(async (userId: string) => {
@@ -64,48 +71,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    setRoleLoading(true);
+
     try {
-      // Fetch profile
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
+      // Fetch profile and role in parallel for better performance
+      const [profileResult, roleResult] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle(),
+        supabase
+          .rpc('get_user_role', { _user_id: userId })
+      ]);
 
       // Check again if user is still the same
       if (currentUserIdRef.current !== userId) {
         return;
       }
 
-      if (profileError) {
-        console.error('Error fetching profile:', profileError);
+      // Handle profile
+      if (profileResult.error) {
+        console.error('Error fetching profile:', profileResult.error);
       } else {
-        setProfile(profileData);
+        setProfile(profileResult.data);
       }
 
-      // Fetch role using the get_user_role function
-      const { data: roleData, error: roleError } = await supabase
-        .rpc('get_user_role', { _user_id: userId });
-
-      // Check again if user is still the same
-      if (currentUserIdRef.current !== userId) {
-        return;
-      }
-
-      if (roleError) {
-        console.error('Error fetching role:', roleError);
+      // Handle role
+      if (roleResult.error) {
+        console.error('Error fetching role:', roleResult.error);
         setRole(null);
+        sessionStorage.removeItem('cached_role');
+        sessionStorage.removeItem('cached_user_id');
       } else {
         // roleData can be 'superadmin' | 'admin' | 'admin_mp' | 'admin_pp' | 'supervisor' | 'operario' | null
         // We exclude 'operario' from UI access
+        const roleData = roleResult.data;
         if (roleData === 'operario') {
           setRole(null);
+          sessionStorage.removeItem('cached_role');
         } else {
           setRole(roleData as AppRole);
+          // Cache role for faster reloads
+          if (roleData) {
+            sessionStorage.setItem('cached_role', roleData);
+            sessionStorage.setItem('cached_user_id', userId);
+          }
         }
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
+    } finally {
+      if (currentUserIdRef.current === userId) {
+        setRoleLoading(false);
+      }
     }
   }, []);
 
@@ -117,6 +136,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     let isMounted = true;
+
+    // Try to restore cached role for instant UI while fetching fresh data
+    const cachedRole = sessionStorage.getItem('cached_role');
+    const cachedUserId = sessionStorage.getItem('cached_user_id');
 
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -133,9 +156,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Handle user changes
         if (event === 'SIGNED_OUT') {
           currentUserIdRef.current = null;
+          initializedRef.current = false;
           setProfile(null);
           setRole(null);
           setLoading(false);
+          setRoleLoading(false);
           // Clear all cached data on logout
           clearAllCaches();
           return;
@@ -145,24 +170,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // If user changed, clear cache to prevent data leakage
           if (previousUserId && previousUserId !== newUserId) {
             clearAllCaches();
+            initializedRef.current = false;
           }
         }
 
         // Defer Supabase calls with setTimeout to prevent deadlocks
         if (newSession?.user) {
           currentUserIdRef.current = newSession.user.id;
-          setTimeout(() => {
-            if (isMounted && currentUserIdRef.current === newSession.user.id) {
-              fetchUserData(newSession.user.id).finally(() => {
-                if (isMounted) setLoading(false);
-              });
-            }
-          }, 0);
+          
+          // Only fetch if not already initialized (prevents double fetch)
+          if (!initializedRef.current) {
+            initializedRef.current = true;
+            setTimeout(() => {
+              if (isMounted && currentUserIdRef.current === newSession.user.id) {
+                fetchUserData(newSession.user.id).finally(() => {
+                  if (isMounted) setLoading(false);
+                });
+              }
+            }, 0);
+          }
         } else {
           currentUserIdRef.current = null;
           setProfile(null);
           setRole(null);
           setLoading(false);
+          setRoleLoading(false);
         }
       }
     );
@@ -179,10 +211,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (existingSession?.user) {
           currentUserIdRef.current = existingSession.user.id;
+          
+          // Apply cached role immediately if user matches (for faster UX)
+          if (cachedRole && cachedUserId === existingSession.user.id) {
+            setRole(cachedRole as AppRole);
+            setRoleLoading(false);
+          }
+          
+          // Mark as initialized to prevent onAuthStateChange from double-fetching
+          initializedRef.current = true;
           await fetchUserData(existingSession.user.id);
+        } else {
+          setRoleLoading(false);
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
+        setRoleLoading(false);
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -199,6 +243,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [fetchUserData, clearAllCaches]);
 
   const signIn = async (email: string, password: string) => {
+    // Reset initialized flag to allow fresh fetch on sign in
+    initializedRef.current = false;
+    setRoleLoading(true);
+    
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -225,6 +273,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     // Clear cache BEFORE signing out to ensure clean state
     clearAllCaches();
+    initializedRef.current = false;
     
     await supabase.auth.signOut();
     
@@ -242,6 +291,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     profile,
     role,
     loading,
+    roleLoading,
     signIn,
     signUp,
     signOut,

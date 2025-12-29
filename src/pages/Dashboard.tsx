@@ -6,12 +6,16 @@ import UnifiedDashboard from './UnifiedDashboard';
 import PendingApproval from './PendingApproval';
 
 const Dashboard: React.FC = () => {
-  const { role, loading, user } = useAuth();
+  const { role, loading, roleLoading, user } = useAuth();
 
-  if (loading) {
+  // Wait for both session and role to be fully loaded
+  if (loading || roleLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Cargando...</p>
+        </div>
       </div>
     );
   }
