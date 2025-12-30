@@ -60,7 +60,7 @@ const OperarioSelect: React.FC<OperarioSelectProps> = ({
             {selectedOperario ? (
               <>
                 <UserCog className="h-4 w-4 shrink-0" />
-                {selectedOperario.full_name} (T{selectedOperario.turno || 1})
+                {selectedOperario.full_name}
               </>
             ) : (
               <span className="text-muted-foreground">{placeholder}</span>
@@ -102,7 +102,7 @@ const OperarioSelect: React.FC<OperarioSelectProps> = ({
                       value === operario.id ? 'opacity-100' : 'opacity-0'
                     )}
                   />
-                  <span>{operario.full_name} (T{operario.turno || 1})</span>
+                  <span>{operario.full_name}</span>
                 </CommandItem>
               ))}
             </CommandGroup>
