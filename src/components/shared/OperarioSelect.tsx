@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import React, { useState } from 'react';
 import { Check, ChevronsUpDown, Loader2, UserCog } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -16,12 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-
-interface Operario {
-  id: string;
-  full_name: string;
-  turno: number | null;
-}
+import { useOperarios } from '@/hooks/useOperarios';
 
 interface OperarioSelectProps {
   value: string | null;
@@ -39,39 +33,11 @@ const OperarioSelect: React.FC<OperarioSelectProps> = ({
   filterTurno,
 }) => {
   const [open, setOpen] = useState(false);
-  const [operarios, setOperarios] = useState<Operario[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchOperarios = async () => {
-      try {
-        let query = supabase
-          .from('operarios')
-          .select('id, full_name, turno')
-          .eq('is_active', true)
-          .order('full_name', { ascending: true });
-
-        if (filterTurno !== undefined) {
-          // Turno 3 es "comodín" y aparece en ambos filtros (1 y 2)
-          query = query.in('turno', [filterTurno, 3]);
-        }
-
-        const { data, error } = await query;
-        if (error) throw error;
-        setOperarios(data || []);
-      } catch (error) {
-        console.error('Error fetching operarios:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchOperarios();
-  }, [filterTurno]);
+  const { data: operarios = [], isLoading } = useOperarios(filterTurno);
 
   const selectedOperario = operarios.find(o => o.id === value);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <Button variant="outline" disabled className="w-full justify-start">
         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
