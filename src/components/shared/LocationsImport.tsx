@@ -9,7 +9,6 @@ import {
 } from '@/lib/locationsParser';
 import {
   Upload,
-  FileSpreadsheet,
   Download,
   Loader2,
   CheckCircle2,
@@ -20,8 +19,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -32,8 +29,7 @@ import {
 } from '@/components/ui/table';
 
 interface LocationWithStatus extends ParsedLocation {
-  status: 'valid' | 'invalid_reference' | 'duplicate';
-  existingLocationId?: string;
+  status: 'valid';
 }
 
 interface LocationsImportProps {
@@ -41,14 +37,13 @@ interface LocationsImportProps {
   onClose: () => void;
 }
 
-type ImportState = 'idle' | 'parsing' | 'validating' | 'preview' | 'importing' | 'success' | 'error';
+type ImportState = 'idle' | 'parsing' | 'preview' | 'importing' | 'success' | 'error';
 
 const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose }) => {
   const [state, setState] = useState<ImportState>('idle');
   const [parsedData, setParsedData] = useState<LocationWithStatus[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
-  const [updateExisting, setUpdateExisting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [importStats, setImportStats] = useState({ created: 0, updated: 0, skipped: 0 });
   const { toast } = useToast();
@@ -78,60 +73,12 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
       }
 
       setWarnings(result.warnings);
-      setState('validating');
 
-      // Validate references against inventory_master
-      const uniqueRefs = [...new Set(result.data.map(loc => loc.master_reference))];
-      
-      const { data: existingRefs, error: refsError } = await supabase
-        .from('inventory_master')
-        .select('referencia')
-        .in('referencia', uniqueRefs);
-
-      if (refsError) throw refsError;
-
-      const validRefsSet = new Set((existingRefs || []).map(r => r.referencia));
-
-      // Check for existing locations in database (for duplicate detection: referencia + ubicación detallada + punto referencia)
-      // Solo buscar duplicados para el admin actual
-      let existingLocationsQuery = supabase
-        .from('locations')
-        .select('id, master_reference, location_detail, punto_referencia')
-        .in('master_reference', uniqueRefs);
-      
-      if (profile?.id) {
-        existingLocationsQuery = existingLocationsQuery.eq('assigned_admin_id', profile.id);
-      }
-      
-      const { data: existingLocations } = await existingLocationsQuery;
-
-      const existingLocationsMap = new Map<string, string>();
-      existingLocations?.forEach(loc => {
-        const key = `${loc.master_reference.toLowerCase()}|${(loc.location_detail || '').toLowerCase()}|${(loc.punto_referencia || '').toLowerCase()}`;
-        existingLocationsMap.set(key, loc.id);
-      });
-
-      // Build data with status
-      const dataWithStatus: LocationWithStatus[] = result.data.map(loc => {
-        const refIsValid = validRefsSet.has(loc.master_reference);
-        const locKey = `${loc.master_reference.toLowerCase()}|${(loc.location_detail || '').toLowerCase()}|${(loc.punto_referencia || '').toLowerCase()}`;
-        const existingId = existingLocationsMap.get(locKey);
-
-        let status: 'valid' | 'invalid_reference' | 'duplicate';
-        if (!refIsValid) {
-          status = 'invalid_reference';
-        } else if (existingId) {
-          status = 'duplicate';
-        } else {
-          status = 'valid';
-        }
-
-        return {
-          ...loc,
-          status,
-          existingLocationId: existingId,
-        };
-      });
+      // Sin validación de referencias - ir directo al preview
+      const dataWithStatus: LocationWithStatus[] = result.data.map(loc => ({
+        ...loc,
+        status: 'valid' as const,
+      }));
 
       setParsedData(dataWithStatus);
       setState('preview');
@@ -161,25 +108,20 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
     setState('importing');
     setProgress(0);
 
-    const toCreate = parsedData.filter(loc => loc.status === 'valid');
-    const toUpdate = updateExisting ? parsedData.filter(loc => loc.status === 'duplicate') : [];
-    const total = toCreate.length + toUpdate.length;
+    const toCreate = parsedData;
+    const total = toCreate.length;
     
     if (total === 0) {
-      setErrors(['No hay ubicaciones válidas para importar']);
+      setErrors(['No hay ubicaciones para importar']);
       setState('error');
       return;
     }
 
     let processed = 0;
     let created = 0;
-    let updated = 0;
-    let skipped = parsedData.filter(loc => 
-      loc.status === 'invalid_reference' || (loc.status === 'duplicate' && !updateExisting)
-    ).length;
 
     try {
-      // Insert new locations in batches of 500 (Supabase handles up to 1000)
+      // Insert locations in batches of 500
       const insertBatchSize = 500;
       for (let i = 0; i < toCreate.length; i += insertBatchSize) {
         const batch = toCreate.slice(i, i + insertBatchSize);
@@ -203,44 +145,12 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
         setProgress(Math.round((processed / total) * 100));
       }
 
-      // Update existing locations in parallel batches
-      const updateBatchSize = 100;
-      for (let i = 0; i < toUpdate.length; i += updateBatchSize) {
-        const batch = toUpdate.slice(i, i + updateBatchSize);
-        
-        // Execute updates in parallel within each batch
-        const updatePromises = batch
-          .filter(loc => loc.existingLocationId)
-          .map(loc => 
-            supabase
-              .from('locations')
-              .update({
-                subcategoria: loc.subcategoria,
-                observaciones: loc.observaciones,
-                location_detail: loc.location_detail,
-                punto_referencia: loc.punto_referencia,
-                metodo_conteo: loc.metodo_conteo,
-              })
-              .eq('id', loc.existingLocationId!)
-          );
-        
-        const results = await Promise.all(updatePromises);
-        
-        // Check for errors
-        const failedUpdate = results.find(r => r.error);
-        if (failedUpdate?.error) throw failedUpdate.error;
-        
-        updated += batch.filter(loc => loc.existingLocationId).length;
-        processed += batch.length;
-        setProgress(Math.round((processed / total) * 100));
-      }
-
-      setImportStats({ created, updated, skipped });
+      setImportStats({ created, updated: 0, skipped: 0 });
       setState('success');
       
       toast({
         title: 'Importación exitosa',
-        description: `${created} creadas, ${updated} actualizadas, ${skipped} omitidas`,
+        description: `${created} ubicaciones importadas`,
       });
 
       onSuccess();
@@ -259,9 +169,7 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
     setProgress(0);
   };
 
-  const validCount = parsedData.filter(loc => loc.status === 'valid').length;
-  const invalidRefCount = parsedData.filter(loc => loc.status === 'invalid_reference').length;
-  const duplicateCount = parsedData.filter(loc => loc.status === 'duplicate').length;
+  const validCount = parsedData.length;
 
   return (
     <div className="space-y-4">
@@ -313,13 +221,11 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
         </>
       )}
 
-      {/* Estado: Parsing / Validating */}
-      {(state === 'parsing' || state === 'validating') && (
+      {/* Estado: Parsing */}
+      {state === 'parsing' && (
         <div className="text-center py-8">
           <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-foreground">
-            {state === 'parsing' ? 'Procesando archivo...' : 'Validando referencias...'}
-          </p>
+          <p className="text-foreground">Procesando archivo...</p>
         </div>
       )}
 
@@ -373,33 +279,9 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
           {/* Resumen */}
           <div className="flex gap-3 flex-wrap">
             <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/30">
-              {validCount} válidas
+              {validCount} ubicaciones a importar
             </Badge>
-            {invalidRefCount > 0 && (
-              <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/30">
-                {invalidRefCount} referencia inválida
-              </Badge>
-            )}
-            {duplicateCount > 0 && (
-              <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/30">
-                {duplicateCount} duplicadas
-              </Badge>
-            )}
           </div>
-
-          {/* Opción para actualizar existentes */}
-          {duplicateCount > 0 && (
-            <div className="flex items-center space-x-2 p-3 bg-muted/50 rounded-lg">
-              <Checkbox
-                id="update-existing-locations"
-                checked={updateExisting}
-                onCheckedChange={(checked) => setUpdateExisting(checked === true)}
-              />
-              <Label htmlFor="update-existing-locations" className="text-sm cursor-pointer">
-                Actualizar ubicaciones existentes (misma referencia + ubicación detallada + punto referencia)
-              </Label>
-            </div>
-          )}
 
           {/* Tabla de preview */}
           <div className="border rounded-lg overflow-hidden max-h-64 overflow-y-auto">
@@ -409,7 +291,6 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
                   <TableHead>Referencia</TableHead>
                   <TableHead>Ubicación</TableHead>
                   <TableHead>Subcategoría</TableHead>
-                  <TableHead>Estado</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -418,24 +299,6 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
                     <TableCell className="font-medium">{loc.master_reference}</TableCell>
                     <TableCell>{loc.location_name || '-'}</TableCell>
                     <TableCell>{loc.subcategoria || '-'}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={
-                          loc.status === 'valid'
-                            ? 'bg-green-500/10 text-green-500 border-green-500/30'
-                            : loc.status === 'duplicate'
-                            ? 'bg-blue-500/10 text-blue-500 border-blue-500/30'
-                            : 'bg-red-500/10 text-red-500 border-red-500/30'
-                        }
-                      >
-                        {loc.status === 'valid' 
-                          ? 'Válida' 
-                          : loc.status === 'duplicate' 
-                          ? 'Existente' 
-                          : 'Ref. no existe'}
-                      </Badge>
-                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -452,9 +315,9 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
             <Button variant="outline" onClick={resetState}>
               Cancelar
             </Button>
-            <Button onClick={handleImport} disabled={validCount === 0 && !updateExisting}>
+            <Button onClick={handleImport} disabled={validCount === 0}>
               <MapPin className="w-4 h-4 mr-2" />
-              Importar {validCount + (updateExisting ? duplicateCount : 0)} ubicaciones
+              Importar {validCount} ubicaciones
             </Button>
           </div>
         </>
