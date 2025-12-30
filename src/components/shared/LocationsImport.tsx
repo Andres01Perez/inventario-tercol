@@ -93,10 +93,17 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
       const validRefsSet = new Set((existingRefs || []).map(r => r.referencia));
 
       // Check for existing locations in database (for duplicate detection: referencia + ubicación detallada + punto referencia)
-      const { data: existingLocations } = await supabase
+      // Solo buscar duplicados para el admin actual
+      let existingLocationsQuery = supabase
         .from('locations')
         .select('id, master_reference, location_detail, punto_referencia')
         .in('master_reference', uniqueRefs);
+      
+      if (profile?.id) {
+        existingLocationsQuery = existingLocationsQuery.eq('assigned_admin_id', profile.id);
+      }
+      
+      const { data: existingLocations } = await existingLocationsQuery;
 
       const existingLocationsMap = new Map<string, string>();
       existingLocations?.forEach(loc => {
@@ -172,10 +179,10 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
     ).length;
 
     try {
-      // Insert new locations in batches
-      const batchSize = 50;
-      for (let i = 0; i < toCreate.length; i += batchSize) {
-        const batch = toCreate.slice(i, i + batchSize);
+      // Insert new locations in batches of 500 (Supabase handles up to 1000)
+      const insertBatchSize = 500;
+      for (let i = 0; i < toCreate.length; i += insertBatchSize) {
+        const batch = toCreate.slice(i, i + insertBatchSize);
         const { error } = await supabase
           .from('locations')
           .insert(batch.map(loc => ({
@@ -196,26 +203,36 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
         setProgress(Math.round((processed / total) * 100));
       }
 
-      // Update existing locations
-      for (const loc of toUpdate) {
-        if (loc.existingLocationId) {
-          const { error } = await supabase
-            .from('locations')
-            .update({
-              subcategoria: loc.subcategoria,
-              observaciones: loc.observaciones,
-              location_detail: loc.location_detail,
-              punto_referencia: loc.punto_referencia,
-              metodo_conteo: loc.metodo_conteo,
-            })
-            .eq('id', loc.existingLocationId);
-
-          if (error) throw error;
-          
-          updated++;
-          processed++;
-          setProgress(Math.round((processed / total) * 100));
-        }
+      // Update existing locations in parallel batches
+      const updateBatchSize = 100;
+      for (let i = 0; i < toUpdate.length; i += updateBatchSize) {
+        const batch = toUpdate.slice(i, i + updateBatchSize);
+        
+        // Execute updates in parallel within each batch
+        const updatePromises = batch
+          .filter(loc => loc.existingLocationId)
+          .map(loc => 
+            supabase
+              .from('locations')
+              .update({
+                subcategoria: loc.subcategoria,
+                observaciones: loc.observaciones,
+                location_detail: loc.location_detail,
+                punto_referencia: loc.punto_referencia,
+                metodo_conteo: loc.metodo_conteo,
+              })
+              .eq('id', loc.existingLocationId!)
+          );
+        
+        const results = await Promise.all(updatePromises);
+        
+        // Check for errors
+        const failedUpdate = results.find(r => r.error);
+        if (failedUpdate?.error) throw failedUpdate.error;
+        
+        updated += batch.filter(loc => loc.existingLocationId).length;
+        processed += batch.length;
+        setProgress(Math.round((processed / total) * 100));
       }
 
       setImportStats({ created, updated, skipped });
