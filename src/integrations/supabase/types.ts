@@ -425,6 +425,8 @@ export type Database = {
         Returns: boolean
       }
       is_superadmin: { Args: { _user_id: string }; Returns: boolean }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       validate_and_close_round: {
         Args: { _admin_id: string; _reference: string }
         Returns: Json

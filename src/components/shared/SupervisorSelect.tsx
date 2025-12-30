@@ -1,6 +1,5 @@
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { useSupervisors } from '@/hooks/useSupervisors';
 import {
   Select,
   SelectContent,
@@ -23,30 +22,7 @@ const SupervisorSelect: React.FC<SupervisorSelectProps> = ({
   placeholder = 'Seleccionar supervisor',
   disabled = false
 }) => {
-  const { data: supervisors, isLoading } = useQuery({
-    queryKey: ['supervisors'],
-    queryFn: async () => {
-      // Get all users with supervisor role
-      const { data: roles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'supervisor');
-
-      if (rolesError) throw rolesError;
-      if (!roles || roles.length === 0) return [];
-
-      const userIds = roles.map(r => r.user_id);
-
-      // Get profiles for these users
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, full_name, email')
-        .in('id', userIds);
-
-      if (profilesError) throw profilesError;
-      return profiles || [];
-    }
-  });
+  const { data: supervisors, isLoading } = useSupervisors();
 
   return (
     <Select
