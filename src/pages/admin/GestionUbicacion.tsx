@@ -151,13 +151,10 @@ const GestionUbicacion: React.FC = () => {
         .from('inventory_master')
         .select('referencia, material_type, control', { count: 'exact' });
 
-      // Superadmin ve todo, admins filtran por tipo de control
-      if (!isSuperadmin) {
-        if (isAdminMP) {
-          query = query.not('control', 'is', null);
-        } else {
-          query = query.is('control', null);
-        }
+      // Superadmin ve todo, admin_mp solo ve referencias con control NOT NULL
+      // admin_pp ve TODAS las referencias para poder agregarles ubicaciones
+      if (!isSuperadmin && isAdminMP) {
+        query = query.not('control', 'is', null);
       }
 
       if (filterTipo !== 'all') {
