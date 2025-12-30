@@ -151,13 +151,10 @@ const GestionResponsables: React.FC = () => {
           inventory_master!inner(material_type, control)
         `, { count: 'exact' });
 
-      // Superadmin ve todo, admins filtran por tipo de control
-      if (!isSuperadmin) {
-        if (isAdminMP) {
-          query = query.not('inventory_master.control', 'is', null);
-        } else {
-          query = query.is('inventory_master.control', null);
-        }
+      // Superadmin ve todo, admin_mp solo ve referencias con control NOT NULL
+      // admin_pp ve TODAS las referencias para poder agregarles ubicaciones
+      if (!isSuperadmin && isAdminMP) {
+        query = query.not('inventory_master.control', 'is', null);
       }
 
       // Filter by material type
