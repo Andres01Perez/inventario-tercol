@@ -177,12 +177,19 @@ const GestionUbicacion: React.FC = () => {
         return { rows: [], total: count || 0 };
       }
 
-      // Fetch ALL locations for the paginated inventory items
+      // Fetch locations for the paginated inventory items
       const referencias = inventoryData.map(i => i.referencia);
-      const { data: locationsData, error: locationsError } = await supabase
+      let locationsQuery = supabase
         .from('locations')
         .select('*')
         .in('master_reference', referencias);
+
+      // Admins solo ven sus propias ubicaciones, superadmin ve todas
+      if (!isSuperadmin && profile?.id) {
+        locationsQuery = locationsQuery.eq('assigned_admin_id', profile.id);
+      }
+
+      const { data: locationsData, error: locationsError } = await locationsQuery;
 
       if (locationsError) throw locationsError;
 

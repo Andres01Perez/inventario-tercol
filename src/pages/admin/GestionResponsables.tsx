@@ -157,6 +157,11 @@ const GestionResponsables: React.FC = () => {
         query = query.not('inventory_master.control', 'is', null);
       }
 
+      // Admins solo ven sus propias ubicaciones
+      if (!isSuperadmin && profile?.id) {
+        query = query.eq('assigned_admin_id', profile.id);
+      }
+
       // Filter by material type
       if (filterTipo === 'MP' || filterTipo === 'PP') {
         query = query.eq('inventory_master.material_type', filterTipo);
