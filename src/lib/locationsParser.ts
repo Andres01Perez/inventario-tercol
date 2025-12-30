@@ -104,10 +104,10 @@ export const parseLocationsExcel = async (file: File): Promise<LocationsParseRes
         return;
       }
 
-      // Detectar duplicados dentro del archivo
-      const comboKey = `${referencia.toLowerCase()}|${(ubicacion || '').toLowerCase()}`;
+      // Detectar duplicados dentro del archivo (referencia + ubicación detallada + punto referencia)
+      const comboKey = `${referencia.toLowerCase()}|${(ubicacionDetallada || '').toLowerCase()}|${(puntoReferencia || '').toLowerCase()}`;
       if (seenCombos.has(comboKey)) {
-        warnings.push(`Fila ${rowNumber}: Combinación duplicada (${referencia} + ${ubicacion || 'sin ubicación'})`);
+        warnings.push(`Fila ${rowNumber}: Combinación duplicada (${referencia} + ${ubicacionDetallada || 'sin detalle'} + ${puntoReferencia || 'sin punto ref'})`);
       } else {
         seenCombos.add(comboKey);
       }
