@@ -43,7 +43,7 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination';
 
-const ITEMS_PER_PAGE = 50;
+const PAGE_SIZE_OPTIONS = [50, 100, 250, 500];
 
 interface LocationWithReference {
   id: string;
@@ -77,6 +77,7 @@ const GestionResponsables: React.FC = () => {
   const [filterUbicacion, setFilterUbicacion] = useState('');
   const [filterObservacion, setFilterObservacion] = useState('');
   const [filterSupervisor, setFilterSupervisor] = useState<string>('all');
+  const [pageSize, setPageSize] = useState(500);
 
   const isSuperadmin = role === 'superadmin';
   const isAdminMP = role === 'admin_mp';
@@ -93,7 +94,7 @@ const GestionResponsables: React.FC = () => {
   // Clear selection when filters change
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [searchTerm, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, currentPage]);
+  }, [searchTerm, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, currentPage, pageSize]);
 
   // Fetch supervisors for the filter dropdown
   const { data: supervisors } = useQuery({
@@ -132,7 +133,7 @@ const GestionResponsables: React.FC = () => {
 
   // OPTIMIZED QUERY: Start from locations with JOIN to inventory_master
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['locations-responsables', role, searchTerm, currentPage, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor],
+    queryKey: ['locations-responsables', role, searchTerm, currentPage, pageSize, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor],
     queryFn: async () => {
       // Single query starting from locations with inner join to inventory_master
       let query = supabase
@@ -190,10 +191,10 @@ const GestionResponsables: React.FC = () => {
       }
 
       // Pagination
-      const from = (currentPage - 1) * ITEMS_PER_PAGE;
+      const from = (currentPage - 1) * pageSize;
       query = query
         .order('master_reference')
-        .range(from, from + ITEMS_PER_PAGE - 1);
+        .range(from, from + pageSize - 1);
 
       const { data: locationsData, error, count } = await query;
       if (error) throw error;
@@ -294,7 +295,7 @@ const GestionResponsables: React.FC = () => {
     }
   });
 
-  const totalPages = Math.ceil((data?.total || 0) / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil((data?.total || 0) / pageSize);
 
   return (
     <div className="min-h-screen bg-background">
@@ -351,6 +352,21 @@ const GestionResponsables: React.FC = () => {
             <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
             Recargar
           </Button>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Mostrar:</span>
+            <Select value={pageSize.toString()} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
+              <SelectTrigger className="w-[100px] h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map(size => (
+                  <SelectItem key={size} value={size.toString()}>
+                    {size} filas
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <span className="text-sm text-muted-foreground">
             {data?.total || 0} ubicaciones
           </span>
