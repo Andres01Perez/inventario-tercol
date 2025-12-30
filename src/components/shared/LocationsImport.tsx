@@ -92,22 +92,22 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
 
       const validRefsSet = new Set((existingRefs || []).map(r => r.referencia));
 
-      // Check for existing locations in database (for duplicate detection)
+      // Check for existing locations in database (for duplicate detection: referencia + ubicación detallada + punto referencia)
       const { data: existingLocations } = await supabase
         .from('locations')
-        .select('id, master_reference, location_name')
+        .select('id, master_reference, location_detail, punto_referencia')
         .in('master_reference', uniqueRefs);
 
       const existingLocationsMap = new Map<string, string>();
       existingLocations?.forEach(loc => {
-        const key = `${loc.master_reference.toLowerCase()}|${(loc.location_name || '').toLowerCase()}`;
+        const key = `${loc.master_reference.toLowerCase()}|${(loc.location_detail || '').toLowerCase()}|${(loc.punto_referencia || '').toLowerCase()}`;
         existingLocationsMap.set(key, loc.id);
       });
 
       // Build data with status
       const dataWithStatus: LocationWithStatus[] = result.data.map(loc => {
         const refIsValid = validRefsSet.has(loc.master_reference);
-        const locKey = `${loc.master_reference.toLowerCase()}|${(loc.location_name || '').toLowerCase()}`;
+        const locKey = `${loc.master_reference.toLowerCase()}|${(loc.location_detail || '').toLowerCase()}|${(loc.punto_referencia || '').toLowerCase()}`;
         const existingId = existingLocationsMap.get(locKey);
 
         let status: 'valid' | 'invalid_reference' | 'duplicate';
@@ -379,7 +379,7 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
                 onCheckedChange={(checked) => setUpdateExisting(checked === true)}
               />
               <Label htmlFor="update-existing-locations" className="text-sm cursor-pointer">
-                Actualizar ubicaciones existentes (misma referencia + ubicación)
+                Actualizar ubicaciones existentes (misma referencia + ubicación detallada + punto referencia)
               </Label>
             </div>
           )}
