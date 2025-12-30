@@ -22,10 +22,14 @@ const ConteoRound: React.FC = () => {
   const { round } = useParams<{ round: string }>();
   const navigate = useNavigate();
   const { role } = useAuth();
-  const [panelView, setPanelView] = useState<PanelView>('both');
-
+  
   const parsedRound = parseInt(round || '1', 10);
   const roundNumber = (parsedRound >= 1 && parsedRound <= 4 ? parsedRound : 1) as 1 | 2 | 3 | 4;
+  
+  // Supervisores no ven asignación en conteos 1 y 2
+  const hideAssignmentForSupervisor = role === 'supervisor' && (roundNumber === 1 || roundNumber === 2);
+  
+  const [panelView, setPanelView] = useState<PanelView>(hideAssignmentForSupervisor ? 'transcription' : 'both');
 
   // Validate round number
   if (parsedRound < 1 || parsedRound > 4) {
@@ -71,38 +75,40 @@ const ConteoRound: React.FC = () => {
       fullWidth={true}
     >
       <div className="space-y-4 h-full">
-        {/* Panel Toggle Controls */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Button
-              variant={panelView === 'assignment' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setPanelView('assignment')}
-              className="gap-2"
-            >
-              <ClipboardList className="h-4 w-4" />
-              Solo Asignación
-            </Button>
-            <Button
-              variant={panelView === 'both' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setPanelView('both')}
-              className="gap-2"
-            >
-              <Columns2 className="h-4 w-4" />
-              Ambos
-            </Button>
-            <Button
-              variant={panelView === 'transcription' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setPanelView('transcription')}
-              className="gap-2"
-            >
-              <FileEdit className="h-4 w-4" />
-              Solo Transcripción
-            </Button>
+        {/* Panel Toggle Controls - Solo mostrar si puede ver asignación */}
+        {!hideAssignmentForSupervisor && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Button
+                variant={panelView === 'assignment' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setPanelView('assignment')}
+                className="gap-2"
+              >
+                <ClipboardList className="h-4 w-4" />
+                Solo Asignación
+              </Button>
+              <Button
+                variant={panelView === 'both' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setPanelView('both')}
+                className="gap-2"
+              >
+                <Columns2 className="h-4 w-4" />
+                Ambos
+              </Button>
+              <Button
+                variant={panelView === 'transcription' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setPanelView('transcription')}
+                className="gap-2"
+              >
+                <FileEdit className="h-4 w-4" />
+                Solo Transcripción
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Panels */}
         <div className="h-[calc(100vh-250px)] min-h-[500px]">
