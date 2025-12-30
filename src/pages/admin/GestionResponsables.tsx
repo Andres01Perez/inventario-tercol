@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import SupervisorSelect from '@/components/shared/SupervisorSelect';
+import { useSupervisors } from '@/hooks/useSupervisors';
 import {
   Pagination,
   PaginationContent,
@@ -96,29 +97,8 @@ const GestionResponsables: React.FC = () => {
     setSelectedIds(new Set());
   }, [searchTerm, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, currentPage, pageSize]);
 
-  // Fetch supervisors for the filter dropdown
-  const { data: supervisors } = useQuery({
-    queryKey: ['supervisors-filter'],
-    queryFn: async () => {
-      const { data: roles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'supervisor');
-      
-      if (rolesError) throw rolesError;
-      if (!roles || roles.length === 0) return [];
-
-      const userIds = roles.map(r => r.user_id);
-
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, full_name, email')
-        .in('id', userIds);
-
-      if (profilesError) throw profilesError;
-      return profiles || [];
-    }
-  });
+  // Use cached supervisors hook
+  const { data: supervisors } = useSupervisors();
 
   const hasActiveFilters = filterTipo !== 'all' || filterSubcategoria || filterUbicacion || filterObservacion || filterSupervisor !== 'all';
 

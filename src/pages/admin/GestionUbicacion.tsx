@@ -45,6 +45,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import EditableCell from '@/components/shared/EditableCell';
 import SupervisorSelect from '@/components/shared/SupervisorSelect';
+import { useSupervisors } from '@/hooks/useSupervisors';
 import {
   Pagination,
   PaginationContent,
@@ -108,29 +109,8 @@ const GestionUbicacion: React.FC = () => {
   const adminBgClass = isSuperadmin ? 'bg-primary/10' : isAdminMP ? 'bg-orange-500/10' : 'bg-emerald-500/10';
   const adminRoleLabel = isSuperadmin ? 'Superadmin' : isAdminMP ? 'Admin MP' : 'Admin PP';
 
-  // Fetch supervisors for the filter dropdown
-  const { data: supervisors } = useQuery({
-    queryKey: ['supervisors-filter'],
-    queryFn: async () => {
-      const { data: roles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'supervisor');
-      
-      if (rolesError) throw rolesError;
-      if (!roles || roles.length === 0) return [];
-
-      const userIds = roles.map(r => r.user_id);
-
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, full_name, email')
-        .in('id', userIds);
-
-      if (profilesError) throw profilesError;
-      return profiles || [];
-    }
-  });
+  // Use cached supervisors hook
+  const { data: supervisors } = useSupervisors();
 
   const hasActiveFilters = filterTipo !== 'all' || filterSubcategoria || filterUbicacion || filterObservacion || filterSupervisor !== 'all';
 
@@ -143,116 +123,123 @@ const GestionUbicacion: React.FC = () => {
     setCurrentPage(1);
   };
 
-  // Fetch inventory items with their associated locations - supporting 1:N relationship
+  // OPTIMIZED QUERY: Start from locations with JOIN to inventory_master, server-side filtering
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['admin-inventory', profile?.id, role, searchTerm, currentPage, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor],
     queryFn: async () => {
+      // Single query starting from locations with inner join to inventory_master
       let query = supabase
-        .from('inventory_master')
-        .select('referencia, material_type, control', { count: 'exact' });
+        .from('locations')
+        .select(`
+          id,
+          master_reference,
+          subcategoria,
+          observaciones,
+          location_name,
+          location_detail,
+          punto_referencia,
+          metodo_conteo,
+          assigned_supervisor_id,
+          assigned_admin_id,
+          inventory_master!inner(referencia, material_type, control)
+        `, { count: 'exact' });
 
-      // Superadmin ve todo, admin_mp solo ve referencias con control NOT NULL
-      // admin_pp ve TODAS las referencias para poder agregarles ubicaciones
+      // Role-based filtering
       if (!isSuperadmin && isAdminMP) {
-        query = query.not('control', 'is', null);
+        query = query.not('inventory_master.control', 'is', null);
       }
 
-      if (filterTipo !== 'all') {
-        query = query.eq('material_type', filterTipo as 'MP' | 'PP');
+      // Admins solo ven sus propias ubicaciones
+      if (!isSuperadmin && profile?.id) {
+        query = query.eq('assigned_admin_id', profile.id);
       }
 
+      // Filter by material type
+      if (filterTipo === 'MP' || filterTipo === 'PP') {
+        query = query.eq('inventory_master.material_type', filterTipo);
+      }
+
+      // Search by reference - server side
       if (searchTerm) {
-        query = query.ilike('referencia', `%${searchTerm}%`);
+        query = query.ilike('master_reference', `%${searchTerm}%`);
       }
 
-      query = query.order('referencia');
+      // Filter by subcategoria - server side
+      if (filterSubcategoria) {
+        query = query.ilike('subcategoria', `%${filterSubcategoria}%`);
+      }
 
+      // Filter by location name - server side
+      if (filterUbicacion) {
+        query = query.ilike('location_name', `%${filterUbicacion}%`);
+      }
+
+      // Filter by observaciones - server side
+      if (filterObservacion) {
+        query = query.ilike('observaciones', `%${filterObservacion}%`);
+      }
+
+      // Filter by supervisor - server side
+      if (filterSupervisor !== 'all') {
+        query = query.eq('assigned_supervisor_id', filterSupervisor);
+      }
+
+      // Pagination
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
-      query = query.range(from, from + ITEMS_PER_PAGE - 1);
+      query = query
+        .order('master_reference')
+        .range(from, from + ITEMS_PER_PAGE - 1);
 
-      const { data: inventoryData, error: inventoryError, count } = await query;
-      if (inventoryError) throw inventoryError;
+      const { data: locationsData, error, count } = await query;
+      if (error) throw error;
 
-      if (!inventoryData || inventoryData.length === 0) {
+      if (!locationsData || locationsData.length === 0) {
         return { rows: [], total: count || 0 };
       }
 
-      // Fetch locations for the paginated inventory items
-      const referencias = inventoryData.map(i => i.referencia);
-      let locationsQuery = supabase
-        .from('locations')
-        .select('*')
-        .in('master_reference', referencias);
-
-      // Admins solo ven sus propias ubicaciones, superadmin ve todas
-      if (!isSuperadmin && profile?.id) {
-        locationsQuery = locationsQuery.eq('assigned_admin_id', profile.id);
-      }
-
-      const { data: locationsData, error: locationsError } = await locationsQuery;
-
-      if (locationsError) throw locationsError;
-
-      // Group locations by master_reference (1:N relationship)
-      const locationsMap = new Map<string, LocationData[]>();
-      locationsData?.forEach(location => {
-        const existing = locationsMap.get(location.master_reference) || [];
-        existing.push(location);
-        locationsMap.set(location.master_reference, existing);
+      // Group locations by master_reference for display
+      const groupedByRef = new Map<string, { inv: any; locations: LocationData[] }>();
+      
+      locationsData.forEach((loc: any) => {
+        const ref = loc.master_reference;
+        if (!groupedByRef.has(ref)) {
+          groupedByRef.set(ref, {
+            inv: {
+              referencia: loc.inventory_master.referencia,
+              material_type: loc.inventory_master.material_type,
+              control: loc.inventory_master.control
+            },
+            locations: []
+          });
+        }
+        groupedByRef.get(ref)!.locations.push({
+          id: loc.id,
+          master_reference: loc.master_reference,
+          subcategoria: loc.subcategoria,
+          observaciones: loc.observaciones,
+          location_name: loc.location_name,
+          location_detail: loc.location_detail,
+          punto_referencia: loc.punto_referencia,
+          metodo_conteo: loc.metodo_conteo,
+          assigned_supervisor_id: loc.assigned_supervisor_id,
+          assigned_admin_id: loc.assigned_admin_id
+        });
       });
 
-      // Build rows: one per location (no separate add rows)
-      let rows: LocationRow[] = [];
+      // Build rows: one per location
+      const rows: LocationRow[] = [];
       
-      inventoryData.forEach(inv => {
-        let locations = locationsMap.get(inv.referencia) || [];
-        
-        // Apply client-side filters
-        if (filterSubcategoria) {
-          locations = locations.filter(loc => 
-            loc.subcategoria?.toLowerCase().includes(filterSubcategoria.toLowerCase())
-          );
-        }
-        if (filterUbicacion) {
-          locations = locations.filter(loc => 
-            loc.location_name?.toLowerCase().includes(filterUbicacion.toLowerCase())
-          );
-        }
-        if (filterObservacion) {
-          locations = locations.filter(loc => 
-            loc.observaciones?.toLowerCase().includes(filterObservacion.toLowerCase())
-          );
-        }
-        if (filterSupervisor !== 'all') {
-          locations = locations.filter(loc => 
-            loc.assigned_supervisor_id === filterSupervisor
-          );
-        }
-
-        if (locations.length === 0) {
-          // Reference with no locations - show row with add button only
+      groupedByRef.forEach(({ inv, locations }) => {
+        locations.forEach((loc, index) => {
           rows.push({
             referencia: inv.referencia,
             material_type: inv.material_type as 'MP' | 'PP',
             control: inv.control,
-            location: null,
-            isFirstOfGroup: true,
-            groupSize: 1,
-            hasNoLocations: true
+            location: loc,
+            isFirstOfGroup: index === 0,
+            groupSize: locations.length
           });
-        } else {
-          // Add a row for each existing location
-          locations.forEach((loc, index) => {
-            rows.push({
-              referencia: inv.referencia,
-              material_type: inv.material_type as 'MP' | 'PP',
-              control: inv.control,
-              location: loc,
-              isFirstOfGroup: index === 0,
-              groupSize: locations.length
-            });
-          });
-        }
+        });
       });
 
       return { rows, total: count || 0 };

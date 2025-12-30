@@ -69,7 +69,7 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
   // Determine which master audit_round to filter by
   const masterAuditRound = roundNumber <= 2 ? 1 : roundNumber;
 
-  // Fetch locations based on round logic
+  // OPTIMIZED: Single query - keeps all operario joins for type safety, filter in one query
   const { data: locations = [], isLoading, refetch } = useQuery({
     queryKey: ['round-transcription-locations', roundNumber, user?.id, isAdminMode, controlFilter, masterAuditRound],
     queryFn: async () => {
@@ -81,14 +81,14 @@ const RoundTranscriptionTab: React.FC<RoundTranscriptionTabProps> = ({
           id, master_reference, location_name, location_detail,
           subcategoria, observaciones, punto_referencia, metodo_conteo,
           operario_c1_id, operario_c2_id, operario_c3_id, operario_c4_id,
-          operario_c1:operarios!locations_operario_c1_id_fkey(id, full_name, turno),
-          operario_c2:operarios!locations_operario_c2_id_fkey(id, full_name, turno),
-          operario_c3:operarios!locations_operario_c3_id_fkey(id, full_name, turno),
-          operario_c4:operarios!locations_operario_c4_id_fkey(id, full_name, turno),
+          operario_c1:operarios!locations_operario_c1_id_fkey(id, full_name),
+          operario_c2:operarios!locations_operario_c2_id_fkey(id, full_name),
+          operario_c3:operarios!locations_operario_c3_id_fkey(id, full_name),
+          operario_c4:operarios!locations_operario_c4_id_fkey(id, full_name),
           inventory_master!inner(referencia, material_type, control, audit_round)
         `)
         .eq('inventory_master.audit_round', masterAuditRound)
-        .not(operarioField, 'is', null); // Only locations WITH operario assigned for this round
+        .not(operarioField, 'is', null);
 
       // If not admin mode, filter by supervisor
       if (!isAdminMode) {
