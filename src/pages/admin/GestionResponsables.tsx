@@ -78,6 +78,7 @@ const GestionResponsables: React.FC = () => {
   const [filterUbicacion, setFilterUbicacion] = useState('');
   const [filterObservacion, setFilterObservacion] = useState('');
   const [filterSupervisor, setFilterSupervisor] = useState<string>('all');
+  const [filterPuntoReferencia, setFilterPuntoReferencia] = useState<string>('all');
   const [pageSize, setPageSize] = useState(500);
 
   const isSuperadmin = role === 'superadmin';
@@ -95,12 +96,12 @@ const GestionResponsables: React.FC = () => {
   // Clear selection when filters change
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [searchTerm, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, currentPage, pageSize]);
+  }, [searchTerm, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, filterPuntoReferencia, currentPage, pageSize]);
 
   // Use cached supervisors hook
   const { data: supervisors } = useSupervisors();
 
-  const hasActiveFilters = filterTipo !== 'all' || filterSubcategoria || filterUbicacion || filterObservacion || filterSupervisor !== 'all';
+  const hasActiveFilters = filterTipo !== 'all' || filterSubcategoria || filterUbicacion || filterObservacion || filterSupervisor !== 'all' || filterPuntoReferencia !== 'all';
 
   const clearFilters = () => {
     setFilterTipo('all');
@@ -108,12 +109,35 @@ const GestionResponsables: React.FC = () => {
     setFilterUbicacion('');
     setFilterObservacion('');
     setFilterSupervisor('all');
+    setFilterPuntoReferencia('all');
     setCurrentPage(1);
   };
 
+  // Query para obtener valores únicos de punto_referencia
+  const { data: puntosReferencia } = useQuery({
+    queryKey: ['puntos-referencia-options', role, profile?.id, isSuperadmin],
+    queryFn: async () => {
+      let query = supabase
+        .from('locations')
+        .select('punto_referencia')
+        .not('punto_referencia', 'is', null);
+      
+      if (!isSuperadmin && profile?.id) {
+        query = query.eq('assigned_admin_id', profile.id);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      
+      const uniqueValues = [...new Set(data?.map(d => d.punto_referencia).filter(Boolean))];
+      return uniqueValues.sort() as string[];
+    },
+    enabled: !!role,
+  });
+
   // OPTIMIZED QUERY: Start from locations with JOIN to inventory_master
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['locations-responsables', role, searchTerm, currentPage, pageSize, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor],
+    queryKey: ['locations-responsables', role, searchTerm, currentPage, pageSize, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, filterPuntoReferencia],
     queryFn: async () => {
       // Single query starting from locations with inner join to inventory_master
       let query = supabase
@@ -170,6 +194,11 @@ const GestionResponsables: React.FC = () => {
       // Filter by supervisor
       if (filterSupervisor !== 'all') {
         query = query.eq('assigned_supervisor_id', filterSupervisor);
+      }
+
+      // Filter by punto_referencia
+      if (filterPuntoReferencia !== 'all') {
+        query = query.eq('punto_referencia', filterPuntoReferencia);
       }
 
       // Pagination
@@ -402,6 +431,24 @@ const GestionResponsables: React.FC = () => {
               onChange={(e) => { setFilterObservacion(e.target.value); setCurrentPage(1); }}
               className="w-[140px] h-9"
             />
+          </div>
+
+          {/* Punto Referencia filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Punto Ref:</span>
+            <Select value={filterPuntoReferencia} onValueChange={(value) => { setFilterPuntoReferencia(value); setCurrentPage(1); }}>
+              <SelectTrigger className="w-[160px] h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                {puntosReferencia?.map((punto) => (
+                  <SelectItem key={punto} value={punto}>
+                    {punto}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Líder Conteo filter */}
