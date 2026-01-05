@@ -57,13 +57,13 @@ const PrintableSheet: React.FC<PrintableSheetProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto print:max-w-none print:max-h-none print:overflow-visible print:shadow-none print:border-none">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto print:fixed print:inset-0 print:max-w-none print:max-h-none print:overflow-visible print:h-auto print:w-full print:shadow-none print:border-none print:bg-white">
         <DialogHeader className="print:hidden">
           <DialogTitle>Planilla de Conteo Físico - {roundLabel}</DialogTitle>
         </DialogHeader>
 
         {/* Printable Content */}
-        <div className="print:p-4" id="printable-sheet">
+        <div className="print:p-4 print:block" id="printable-sheet">
           {/* Header */}
           <div className="text-center mb-6 border-b pb-4">
             <h1 className="text-2xl font-bold mb-1">PLANILLA DE CONTEO FÍSICO</h1>
@@ -88,8 +88,8 @@ const PrintableSheet: React.FC<PrintableSheetProps> = ({
           </div>
 
           {/* Table */}
-          <table className="w-full border-collapse text-xs">
-            <thead>
+          <table className="w-full border-collapse text-xs print:text-[10px]">
+            <thead className="print:table-header-group">
               <tr className="border-b-2 border-foreground">
                 <th className="text-left py-2 px-1 w-8">#</th>
                 <th className="text-left py-2 px-1">Tipo</th>
@@ -104,7 +104,7 @@ const PrintableSheet: React.FC<PrintableSheetProps> = ({
             </thead>
             <tbody>
               {locations.map((loc, index) => (
-                <tr key={loc.id} className="border-b border-muted">
+                <tr key={loc.id} className="border-b border-muted print:break-inside-avoid">
                   <td className="py-2 px-1">{index + 1}</td>
                   <td className="py-2 px-1">{loc.inventory_master?.material_type || '-'}</td>
                   <td className="py-2 px-1 font-medium">{loc.master_reference}</td>
@@ -122,7 +122,7 @@ const PrintableSheet: React.FC<PrintableSheetProps> = ({
           </table>
 
           {/* Signatures */}
-          <div className="grid grid-cols-2 gap-8 mt-12 pt-8">
+          <div className="grid grid-cols-2 gap-8 mt-12 pt-8 print-signatures">
             <div className="text-center">
               <div className="border-b border-foreground mb-2 h-8"></div>
               <p className="text-sm text-muted-foreground">Firma Responsable</p>
