@@ -37,17 +37,31 @@ interface LocationsImportProps {
   onClose: () => void;
 }
 
-type ImportState = 'idle' | 'parsing' | 'preview' | 'importing' | 'success' | 'error';
+type ImportState = 'idle' | 'parsing' | 'validating' | 'preview' | 'importing' | 'success' | 'error';
 
 const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose }) => {
   const [state, setState] = useState<ImportState>('idle');
   const [parsedData, setParsedData] = useState<LocationWithStatus[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [invalidReferences, setInvalidReferences] = useState<string[]>([]);
   const [progress, setProgress] = useState(0);
   const [importStats, setImportStats] = useState({ created: 0, updated: 0, skipped: 0 });
   const { toast } = useToast();
   const { profile } = useAuth();
+
+  const validateReferences = async (locations: ParsedLocation[]): Promise<string[]> => {
+    const uniqueRefs = [...new Set(locations.map(l => l.master_reference))];
+    
+    const { data: existingRefs } = await supabase
+      .from('inventory_master')
+      .select('referencia')
+      .in('referencia', uniqueRefs);
+    
+    const existingSet = new Set(existingRefs?.map(r => r.referencia) || []);
+    
+    return uniqueRefs.filter(ref => !existingSet.has(ref));
+  };
 
   const handleFileSelect = useCallback(async (file: File) => {
     if (!file.name.match(/\.(xlsx|xls)$/i)) {
@@ -62,6 +76,7 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
     setState('parsing');
     setErrors([]);
     setWarnings([]);
+    setInvalidReferences([]);
 
     try {
       const result = await parseLocationsExcel(file);
@@ -74,7 +89,16 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
 
       setWarnings(result.warnings);
 
-      // Sin validación de referencias - ir directo al preview
+      // Validar referencias contra inventory_master
+      setState('validating');
+      const notFound = await validateReferences(result.data);
+      
+      if (notFound.length > 0) {
+        setInvalidReferences(notFound);
+        setState('error');
+        return;
+      }
+
       const dataWithStatus: LocationWithStatus[] = result.data.map(loc => ({
         ...loc,
         status: 'valid' as const,
@@ -166,6 +190,7 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
     setParsedData([]);
     setErrors([]);
     setWarnings([]);
+    setInvalidReferences([]);
     setProgress(0);
   };
 
@@ -221,11 +246,13 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
         </>
       )}
 
-      {/* Estado: Parsing */}
-      {state === 'parsing' && (
+      {/* Estado: Parsing / Validating */}
+      {(state === 'parsing' || state === 'validating') && (
         <div className="text-center py-8">
           <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-foreground">Procesando archivo...</p>
+          <p className="text-foreground">
+            {state === 'validating' ? 'Validando referencias...' : 'Procesando archivo...'}
+          </p>
         </div>
       )}
 
@@ -235,13 +262,33 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
           <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4">
             <div className="flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-destructive mb-2">Errores encontrados:</p>
-                <ul className="text-sm text-destructive/80 space-y-1">
-                  {errors.map((error, i) => (
-                    <li key={i}>{error}</li>
-                  ))}
-                </ul>
+              <div className="flex-1">
+                {invalidReferences.length > 0 ? (
+                  <>
+                    <p className="font-medium text-destructive mb-2">
+                      Referencias no encontradas en la maestra ({invalidReferences.length}):
+                    </p>
+                    <div className="max-h-40 overflow-y-auto bg-background/50 rounded p-2 mb-2">
+                      <ul className="text-sm text-destructive/80 space-y-1 font-mono">
+                        {invalidReferences.map((ref, i) => (
+                          <li key={i}>• {ref}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Verifica que estas referencias existan en la maestra de inventario antes de importar.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium text-destructive mb-2">Errores encontrados:</p>
+                    <ul className="text-sm text-destructive/80 space-y-1">
+                      {errors.map((error, i) => (
+                        <li key={i}>{error}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
               </div>
             </div>
           </div>
