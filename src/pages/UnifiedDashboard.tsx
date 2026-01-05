@@ -71,20 +71,16 @@ const UnifiedDashboard: React.FC = () => {
       if (role === 'supervisor') {
         const { data: locations } = await supabase
           .from('locations')
-          .select('id, operario_c1_id, status_c1, status_c2')
+          .select('id, status_c1, status_c2')
           .eq('assigned_supervisor_id', profile!.id);
         
         const pendingC1 = (locations || []).filter(l => l.status_c1 !== 'contado').length;
         const pendingC2 = (locations || []).filter(l => l.status_c2 !== 'contado').length;
-        const withOperario = (locations || []).filter(l => l.operario_c1_id).length;
-        const withoutOperario = (locations || []).length - withOperario;
 
         return {
           total: locations?.length || 0,
           pendingC1,
           pendingC2,
-          withOperario,
-          withoutOperario,
         };
       }
 
@@ -162,7 +158,6 @@ const UnifiedDashboard: React.FC = () => {
         { label: 'Total Asignadas', value: stats?.total || 0, icon: ClipboardList, color: 'bg-primary/10 text-primary' },
         { label: 'Pendientes C1', value: stats?.pendingC1 || 0, icon: AlertCircle, color: 'bg-blue-500/10 text-blue-500' },
         { label: 'Pendientes C2', value: stats?.pendingC2 || 0, icon: AlertCircle, color: 'bg-purple-500/10 text-purple-500' },
-        { label: 'Sin Operario', value: stats?.withoutOperario || 0, icon: Users, color: 'bg-amber-500/10 text-amber-500' },
       ];
     }
 
@@ -211,7 +206,7 @@ const UnifiedDashboard: React.FC = () => {
     gestionOperativa: { 
       label: 'Gestión Operativa', 
       icon: ClipboardList, 
-      description: 'Asignar operarios y transcribir conteos',
+      description: 'Transcribir conteos de inventario',
       onClick: () => navigate('/gestion-operativa'),
       iconColor: 'text-blue-500',
       bgColor: 'bg-blue-500/10',
@@ -350,10 +345,10 @@ const UnifiedDashboard: React.FC = () => {
     }
     
     if (role === 'supervisor') {
-      const pendingTotal = (stats?.withoutOperario || 0) + (stats?.pendingC1 || 0) + (stats?.pendingC2 || 0);
+      const pendingTotal = (stats?.pendingC1 || 0) + (stats?.pendingC2 || 0);
       operacionActions.push({
         ...baseActions.gestionOperativa,
-        description: 'Asigna operarios y transcribe conteos para tus ubicaciones',
+        description: 'Transcribe conteos para tus ubicaciones asignadas',
         badge: pendingTotal,
         badgeLabel: 'pendientes',
       });

@@ -6,7 +6,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Printer } from 'lucide-react';
 
 interface LocationItem {
@@ -24,7 +23,7 @@ interface LocationItem {
 interface PrintableSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  operarioName: string;
+  zoneName: string;
   supervisorName: string;
   locations: LocationItem[];
   roundNumber?: 1 | 2 | 3 | 4 | 5;
@@ -44,7 +43,7 @@ const getRoundLabel = (roundNumber?: number) => {
 const PrintableSheet: React.FC<PrintableSheetProps> = ({
   open,
   onOpenChange,
-  operarioName,
+  zoneName,
   supervisorName,
   locations,
   roundNumber,
@@ -75,7 +74,7 @@ const PrintableSheet: React.FC<PrintableSheetProps> = ({
           {/* Info Row */}
           <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
             <div>
-              <span className="font-medium">Operario:</span> {operarioName}
+              <span className="font-medium">Zona:</span> {zoneName}
             </div>
             <div>
               <span className="font-medium">Fecha:</span> {today}
@@ -99,7 +98,6 @@ const PrintableSheet: React.FC<PrintableSheetProps> = ({
                 <th className="text-left py-2 px-1">Observaciones</th>
                 <th className="text-left py-2 px-1">Ubicación</th>
                 <th className="text-left py-2 px-1">Ubic. Det.</th>
-                <th className="text-left py-2 px-1">Punto Ref.</th>
                 <th className="text-left py-2 px-1">Método</th>
                 <th className="text-center py-2 px-1 w-20">Cantidad</th>
               </tr>
@@ -114,7 +112,6 @@ const PrintableSheet: React.FC<PrintableSheetProps> = ({
                   <td className="py-2 px-1 text-xs max-w-[100px] truncate">{loc.observaciones || '-'}</td>
                   <td className="py-2 px-1">{loc.location_name || '-'}</td>
                   <td className="py-2 px-1">{loc.location_detail || '-'}</td>
-                  <td className="py-2 px-1">{loc.punto_referencia || '-'}</td>
                   <td className="py-2 px-1">{loc.metodo_conteo || '-'}</td>
                   <td className="py-2 px-1">
                     <div className="border-b border-dashed border-foreground h-5 w-full"></div>
@@ -128,7 +125,7 @@ const PrintableSheet: React.FC<PrintableSheetProps> = ({
           <div className="grid grid-cols-2 gap-8 mt-12 pt-8">
             <div className="text-center">
               <div className="border-b border-foreground mb-2 h-8"></div>
-              <p className="text-sm text-muted-foreground">Firma Operario</p>
+              <p className="text-sm text-muted-foreground">Firma Responsable</p>
             </div>
             <div className="text-center">
               <div className="border-b border-foreground mb-2 h-8"></div>

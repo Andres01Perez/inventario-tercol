@@ -50,7 +50,6 @@ export type Database = {
           created_at: string | null
           id: string
           location_id: string | null
-          operario_id: string | null
           quantity_counted: number
           supervisor_id: string | null
           updated_at: string | null
@@ -60,7 +59,6 @@ export type Database = {
           created_at?: string | null
           id?: string
           location_id?: string | null
-          operario_id?: string | null
           quantity_counted: number
           supervisor_id?: string | null
           updated_at?: string | null
@@ -70,7 +68,6 @@ export type Database = {
           created_at?: string | null
           id?: string
           location_id?: string | null
-          operario_id?: string | null
           quantity_counted?: number
           supervisor_id?: string | null
           updated_at?: string | null
@@ -81,13 +78,6 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inventory_counts_operario_id_fkey"
-            columns: ["operario_id"]
-            isOneToOne: false
-            referencedRelation: "operarios"
             referencedColumns: ["id"]
           },
           {
@@ -206,10 +196,6 @@ export type Database = {
           master_reference: string
           metodo_conteo: string | null
           observaciones: string | null
-          operario_c1_id: string | null
-          operario_c2_id: string | null
-          operario_c3_id: string | null
-          operario_c4_id: string | null
           punto_referencia: string | null
           status_c1: string | null
           status_c2: string | null
@@ -231,10 +217,6 @@ export type Database = {
           master_reference: string
           metodo_conteo?: string | null
           observaciones?: string | null
-          operario_c1_id?: string | null
-          operario_c2_id?: string | null
-          operario_c3_id?: string | null
-          operario_c4_id?: string | null
           punto_referencia?: string | null
           status_c1?: string | null
           status_c2?: string | null
@@ -256,10 +238,6 @@ export type Database = {
           master_reference?: string
           metodo_conteo?: string | null
           observaciones?: string | null
-          operario_c1_id?: string | null
-          operario_c2_id?: string | null
-          operario_c3_id?: string | null
-          operario_c4_id?: string | null
           punto_referencia?: string | null
           status_c1?: string | null
           status_c2?: string | null
@@ -284,34 +262,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "inventory_master"
             referencedColumns: ["referencia"]
-          },
-          {
-            foreignKeyName: "locations_operario_c1_id_fkey"
-            columns: ["operario_c1_id"]
-            isOneToOne: false
-            referencedRelation: "operarios"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "locations_operario_c2_id_fkey"
-            columns: ["operario_c2_id"]
-            isOneToOne: false
-            referencedRelation: "operarios"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "locations_operario_c3_id_fkey"
-            columns: ["operario_c3_id"]
-            isOneToOne: false
-            referencedRelation: "operarios"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "locations_operario_c4_id_fkey"
-            columns: ["operario_c4_id"]
-            isOneToOne: false
-            referencedRelation: "operarios"
-            referencedColumns: ["id"]
           },
         ]
       }
