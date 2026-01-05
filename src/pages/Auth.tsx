@@ -44,7 +44,7 @@ const roles: RoleInfo[] = [
     role: "Administradores",
     features: [
       "Asigna ubicaciones específicas a los Supervisores",
-      "Tiene la capacidad de asignar tareas a los operarios",
+      "Gestiona el proceso de conteo físico",
       "Puede exportar o imprimir listado de responsables"
     ]
   },

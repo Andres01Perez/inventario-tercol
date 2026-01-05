@@ -31,8 +31,8 @@ const GestionOperativa: React.FC = () => {
           <h2 className="text-xl font-semibold text-foreground">Selecciona una Ronda de Conteo</h2>
           <p className="text-muted-foreground">
             {role === 'supervisor'
-              ? 'Asigna operarios y transcribe conteos para tus ubicaciones'
-              : 'Gestiona ubicaciones y transcribe conteos'
+              ? 'Transcribe los conteos para tus ubicaciones asignadas'
+              : 'Gestiona y transcribe conteos de inventario'
             }
           </p>
         </div>

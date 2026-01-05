@@ -40,13 +40,11 @@ import { cn } from '@/lib/utils';
 interface AddLocationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  defaultOperarioId?: string | null;
 }
 
 const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
   open,
   onOpenChange,
-  defaultOperarioId,
 }) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();

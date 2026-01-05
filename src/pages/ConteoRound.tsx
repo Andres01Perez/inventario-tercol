@@ -1,15 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import AppLayout from '@/components/layout/AppLayout';
-import RoundAssignmentTab from '@/components/supervisor/RoundAssignmentTab';
-import RoundTranscriptionTab from '@/components/supervisor/RoundTranscriptionTab';
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
-import { Button } from '@/components/ui/button';
+import GroupedTranscriptionTab from '@/components/supervisor/GroupedTranscriptionTab';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PanelLeftClose, PanelRightClose, Columns2, ClipboardList, FileEdit } from 'lucide-react';
-
-type PanelView = 'both' | 'assignment' | 'transcription';
+import { FileEdit } from 'lucide-react';
 
 const roundLabels: Record<number, { title: string; color: string }> = {
   1: { title: 'Conteo 1 - Primer Turno', color: 'text-blue-500' },
@@ -25,11 +20,6 @@ const ConteoRound: React.FC = () => {
   
   const parsedRound = parseInt(round || '1', 10);
   const roundNumber = (parsedRound >= 1 && parsedRound <= 4 ? parsedRound : 1) as 1 | 2 | 3 | 4;
-  
-  // Supervisores no ven asignación en conteos 1 y 2
-  const hideAssignmentForSupervisor = role === 'supervisor' && (roundNumber === 1 || roundNumber === 2);
-  
-  const [panelView, setPanelView] = useState<PanelView>(hideAssignmentForSupervisor ? 'transcription' : 'both');
 
   // Validate round number
   if (parsedRound < 1 || parsedRound > 4) {
@@ -74,110 +64,22 @@ const ConteoRound: React.FC = () => {
       backPath="/gestion-operativa"
       fullWidth={true}
     >
-      <div className="space-y-4 h-full">
-        {/* Panel Toggle Controls - Solo mostrar si puede ver asignación */}
-        {!hideAssignmentForSupervisor && (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Button
-                variant={panelView === 'assignment' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setPanelView('assignment')}
-                className="gap-2"
-              >
-                <ClipboardList className="h-4 w-4" />
-                Solo Asignación
-              </Button>
-              <Button
-                variant={panelView === 'both' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setPanelView('both')}
-                className="gap-2"
-              >
-                <Columns2 className="h-4 w-4" />
-                Ambos
-              </Button>
-              <Button
-                variant={panelView === 'transcription' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setPanelView('transcription')}
-                className="gap-2"
-              >
-                <FileEdit className="h-4 w-4" />
-                Solo Transcripción
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Panels */}
-        <div className="h-[calc(100vh-250px)] min-h-[500px]">
-          {panelView === 'both' ? (
-            <ResizablePanelGroup direction="horizontal" className="rounded-lg border">
-              <ResizablePanel defaultSize={50} minSize={25}>
-                <div className="h-full overflow-auto p-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <ClipboardList className="h-5 w-5 text-primary" />
-                    <h3 className="text-lg font-semibold">Asignación de Operarios</h3>
-                  </div>
-                  <RoundAssignmentTab 
-                    roundNumber={roundNumber} 
-                    isAdminMode={isAdminMode}
-                    controlFilter={controlFilter}
-                  />
-                </div>
-              </ResizablePanel>
-              
-              <ResizableHandle withHandle />
-              
-              <ResizablePanel defaultSize={50} minSize={25}>
-                <div className="h-full overflow-auto p-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <FileEdit className="h-5 w-5 text-primary" />
-                    <h3 className="text-lg font-semibold">Transcripción de Conteos</h3>
-                  </div>
-                  <RoundTranscriptionTab 
-                    roundNumber={roundNumber}
-                    isAdminMode={isAdminMode}
-                    controlFilter={controlFilter}
-                  />
-                </div>
-              </ResizablePanel>
-            </ResizablePanelGroup>
-          ) : panelView === 'assignment' ? (
-            <Card className="h-full">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2">
-                  <ClipboardList className="h-5 w-5 text-primary" />
-                  Asignación de Operarios
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="h-[calc(100%-60px)] overflow-auto">
-                <RoundAssignmentTab 
-                  roundNumber={roundNumber} 
-                  isAdminMode={isAdminMode}
-                  controlFilter={controlFilter}
-                />
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="h-full">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2">
-                  <FileEdit className="h-5 w-5 text-primary" />
-                  Transcripción de Conteos
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="h-[calc(100%-60px)] overflow-auto">
-                <RoundTranscriptionTab 
-                  roundNumber={roundNumber}
-                  isAdminMode={isAdminMode}
-                  controlFilter={controlFilter}
-                />
-              </CardContent>
-            </Card>
-          )}
-        </div>
+      <div className="h-[calc(100vh-200px)] min-h-[500px]">
+        <Card className="h-full">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2">
+              <FileEdit className="h-5 w-5 text-primary" />
+              Transcripción de Conteos
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="h-[calc(100%-60px)] overflow-auto">
+            <GroupedTranscriptionTab 
+              roundNumber={roundNumber}
+              isAdminMode={isAdminMode}
+              controlFilter={controlFilter}
+            />
+          </CardContent>
+        </Card>
       </div>
     </AppLayout>
   );
