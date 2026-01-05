@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import AppLayout from '@/components/layout/AppLayout';
@@ -12,7 +12,8 @@ import {
   Edit3,
   History,
   FileSearch,
-  Info
+  Info,
+  Loader2
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -24,14 +25,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,15 +43,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from '@/components/ui/pagination';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface AuditRow {
   locationId: string;
@@ -111,8 +97,6 @@ const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secon
   cerrado_forzado: { label: 'Cerrado Forzado', variant: 'default' },
 };
 
-const ITEMS_PER_PAGE = 30;
-
 const LocationInfoPopover: React.FC<{ row: AuditRow }> = ({ row }) => (
   <Popover>
     <PopoverTrigger asChild>
@@ -161,7 +145,6 @@ const Auditoria: React.FC = () => {
   const [materialTypeFilter, setMaterialTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [locationFilter, setLocationFilter] = useState<string>('all');
-  const [currentPage, setCurrentPage] = useState(1);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [selectedHistory, setSelectedHistory] = useState<{ referencia: string; history: any[] } | null>(null);
   const [expandedRefs, setExpandedRefs] = useState<Set<string>>(new Set());
@@ -173,11 +156,6 @@ const Auditoria: React.FC = () => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
-
-  // Reset page when filters change
-  React.useEffect(() => {
-    setCurrentPage(1);
-  }, [debouncedSearch, materialTypeFilter, statusFilter, locationFilter]);
 
   // Query for unique location names (for filter dropdown)
   const { data: locationOptions } = useQuery({
@@ -193,13 +171,14 @@ const Auditoria: React.FC = () => {
     staleTime: 10 * 60 * 1000,
   });
 
-  const { data: auditData, isLoading } = useQuery({
-    queryKey: ['audit-full-view', currentPage, debouncedSearch, materialTypeFilter, statusFilter, locationFilter],
+  const { data: auditData, isLoading, isFetching } = useQuery({
+    queryKey: ['audit-full-view', debouncedSearch, materialTypeFilter, statusFilter, locationFilter],
     queryFn: async () => {
-      // 1. Build query with filters and pagination on inventory_master
+      // 1. Build query with filters on inventory_master (no pagination - load all)
       let masterQuery = supabase
         .from('inventory_master')
-        .select('referencia, material_type, cant_total_erp, status_slug, audit_round, count_history', { count: 'exact' });
+        .select('referencia, material_type, cant_total_erp, status_slug, audit_round, count_history')
+        .order('referencia');
       
       // Apply filters
       if (debouncedSearch) {
@@ -212,37 +191,39 @@ const Auditoria: React.FC = () => {
         masterQuery = masterQuery.eq('status_slug', statusFilter);
       }
       
-      // Server-side pagination
-      const from = (currentPage - 1) * ITEMS_PER_PAGE;
-      const to = from + ITEMS_PER_PAGE - 1;
-      masterQuery = masterQuery.range(from, to).order('referencia');
-      
-      const { data: masters, error: masterError, count } = await masterQuery;
+      const { data: masters, error: masterError } = await masterQuery;
       if (masterError) throw masterError;
-      if (!masters || masters.length === 0) return { rows: [], totalCount: count || 0 };
+      if (!masters || masters.length === 0) return { rows: [], totalReferences: 0, totalLocations: 0 };
       
-      // 2. Get locations only for references in this page
+      // 2. Get locations for all references (batch in chunks to avoid limits)
       const refs = masters.map(m => m.referencia);
-      let locationsQuery = supabase
-        .from('locations')
-        .select('id, master_reference, location_name, location_detail, subcategoria, punto_referencia, metodo_conteo, observaciones, validated_at_round, validated_quantity, discovered_at_round')
-        .in('master_reference', refs);
-      
-      // Apply location filter if set
-      if (locationFilter !== 'all') {
-        locationsQuery = locationsQuery.eq('location_name', locationFilter);
+      const refChunks: string[][] = [];
+      for (let i = 0; i < refs.length; i += 500) {
+        refChunks.push(refs.slice(i, i + 500));
       }
       
-      const { data: locations, error: locError } = await locationsQuery;
-      if (locError) throw locError;
+      let allLocations: any[] = [];
+      for (const chunk of refChunks) {
+        let locationsQuery = supabase
+          .from('locations')
+          .select('id, master_reference, location_name, location_detail, subcategoria, punto_referencia, metodo_conteo, observaciones, validated_at_round, validated_quantity, discovered_at_round')
+          .in('master_reference', chunk);
+        
+        if (locationFilter !== 'all') {
+          locationsQuery = locationsQuery.eq('location_name', locationFilter);
+        }
+        
+        const { data: locations, error: locError } = await locationsQuery;
+        if (locError) throw locError;
+        if (locations) allLocations.push(...locations);
+      }
       
-      // 3. Get counts for those locations
-      const locationIds = locations?.map(l => l.id) || [];
-      let counts: { location_id: string; audit_round: number; quantity_counted: number }[] = [];
+      // 3. Get counts for those locations (batch in chunks)
+      const locationIds = allLocations.map(l => l.id);
+      let allCounts: { location_id: string; audit_round: number; quantity_counted: number }[] = [];
       
       if (locationIds.length > 0) {
-        // Batch in chunks of 100 to avoid URL length issues
-        const chunks = [];
+        const chunks: string[][] = [];
         for (let i = 0; i < locationIds.length; i += 100) {
           chunks.push(locationIds.slice(i, i + 100));
         }
@@ -258,16 +239,16 @@ const Auditoria: React.FC = () => {
         
         for (const result of countsResults) {
           if (result.error) throw result.error;
-          if (result.data) counts.push(...result.data);
+          if (result.data) allCounts.push(...result.data);
         }
       }
       
       // 4. Build counts map
       const countsMap = new Map<string, { c1: number | null; c2: number | null; c3: number | null; c4: number | null; c5: number | null }>();
-      locations?.forEach(loc => {
+      allLocations.forEach(loc => {
         countsMap.set(loc.id, { c1: null, c2: null, c3: null, c4: null, c5: null });
       });
-      counts.forEach(count => {
+      allCounts.forEach(count => {
         const existing = countsMap.get(count.location_id);
         if (existing) {
           const key = `c${count.audit_round}` as keyof typeof existing;
@@ -278,9 +259,8 @@ const Auditoria: React.FC = () => {
       });
       
       // 5. Group by reference
-      const masterMap = new Map(masters.map(m => [m.referencia, m]));
-      const locationsMap = new Map<string, typeof locations>();
-      locations?.forEach(loc => {
+      const locationsMap = new Map<string, typeof allLocations>();
+      allLocations.forEach(loc => {
         const existing = locationsMap.get(loc.master_reference) || [];
         existing.push(loc);
         locationsMap.set(loc.master_reference, existing);
@@ -313,7 +293,7 @@ const Auditoria: React.FC = () => {
         });
       });
       
-      return { rows, totalCount: count || 0 };
+      return { rows, totalReferences: masters.length, totalLocations: allLocations.length };
     },
     staleTime: 2 * 60 * 1000,
   });
@@ -351,15 +331,12 @@ const Auditoria: React.FC = () => {
     }));
   }, [auditData?.rows]);
 
-  const totalPages = Math.ceil((auditData?.totalCount || 0) / ITEMS_PER_PAGE);
-  const paginatedGroups = groupedData; // Data is already paginated from server
-
-  const handleViewHistory = (referencia: string, history: any[]) => {
+  const handleViewHistory = useCallback((referencia: string, history: any[]) => {
     setSelectedHistory({ referencia, history });
     setHistoryDialogOpen(true);
-  };
+  }, []);
 
-  const toggleExpand = (referencia: string) => {
+  const toggleExpand = useCallback((referencia: string) => {
     setExpandedRefs(prev => {
       const next = new Set(prev);
       if (next.has(referencia)) {
@@ -369,10 +346,9 @@ const Auditoria: React.FC = () => {
       }
       return next;
     });
-  };
+  }, []);
 
   const renderCountCell = (value: number | null, erp: number, round: number, currentRound: number, discoveredAtRound: number | null = null) => {
-    // Si la ubicación fue descubierta en un round posterior, mostrar "-" para rounds anteriores
     if (discoveredAtRound !== null && round < discoveredAtRound) {
       return <span className="text-muted-foreground/50">-</span>;
     }
@@ -394,183 +370,157 @@ const Auditoria: React.FC = () => {
   const getStatusBadge = (status: string) => {
     const config = STATUS_CONFIG[status] || STATUS_CONFIG.pendiente;
     return (
-      <Badge variant={config.variant} className="whitespace-nowrap">
+      <Badge variant={config.variant} className="whitespace-nowrap text-xs">
         {config.label}
       </Badge>
     );
   };
 
-  const renderGroupRows = (group: GroupedReference) => {
+  const renderMainRow = (group: GroupedReference) => {
     const hasMultipleLocations = group.rows.length > 1;
     const isExpanded = expandedRefs.has(group.referencia);
+    const row = group.rows[0];
 
-    // Single location: render one row with all info
-    if (!hasMultipleLocations) {
-      const row = group.rows[0];
-      return (
-        <TableRow key={group.referencia} className="hover:bg-muted/30">
-          <TableCell className="font-medium">
-            <div className="flex items-center gap-2">
-              <span>{group.referencia}</span>
-            </div>
-          </TableCell>
-          <TableCell>
-            <Badge variant="outline" className={group.materialType === 'MP' ? 'border-orange-500/50 text-orange-600' : 'border-emerald-500/50 text-emerald-600'}>
-              {group.materialType}
-            </Badge>
-          </TableCell>
-          <TableCell>
-            <LocationInfoPopover row={row} />
-          </TableCell>
-          <TableCell className="text-right font-bold">{group.cantTotalErp}</TableCell>
-          <TableCell className="text-right">{renderCountCell(group.totals.c1, group.cantTotalErp, 1, group.auditRound)}</TableCell>
-          <TableCell className="text-right">{renderCountCell(group.totals.c2, group.cantTotalErp, 2, group.auditRound)}</TableCell>
-          <TableCell className="text-right">{renderCountCell(group.totals.c3, group.cantTotalErp, 3, group.auditRound)}</TableCell>
-          <TableCell className="text-right">{renderCountCell(group.totals.c4, group.cantTotalErp, 4, group.auditRound)}</TableCell>
-          <TableCell className="text-right">{renderCountCell(group.totals.c5, group.cantTotalErp, 5, group.auditRound)}</TableCell>
-          <TableCell>{getStatusBadge(group.statusSlug)}</TableCell>
-          <TableCell>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreVertical className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleViewHistory(group.referencia, group.countHistory)}>
-                  <History className="w-4 h-4 mr-2" />
-                  Ver Historial
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem disabled>
-                  <CheckCircle2 className="w-4 h-4 mr-2" />
-                  Validar Manualmente
-                </DropdownMenuItem>
-                <DropdownMenuItem disabled>
-                  <XCircle className="w-4 h-4 mr-2" />
-                  Cerrar Forzado
-                </DropdownMenuItem>
-                <DropdownMenuItem disabled>
-                  <Edit3 className="w-4 h-4 mr-2" />
-                  Editar Conteo
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </TableCell>
-        </TableRow>
-      );
-    }
-
-    // Multiple locations: collapsible accordion
     return (
-      <React.Fragment key={group.referencia}>
-        {/* Main row (always visible) */}
-        <TableRow 
-          className="hover:bg-muted/30 cursor-pointer"
-          onClick={() => toggleExpand(group.referencia)}
-        >
-          <TableCell className="font-medium">
-            <div className="flex items-center gap-2">
-              {isExpanded ? (
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
-              ) : (
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              )}
-              <span>{group.referencia}</span>
-              <Badge variant="secondary" className="text-xs">
-                {group.rows.length} ubic.
-              </Badge>
-            </div>
-          </TableCell>
-          <TableCell>
-            <Badge variant="outline" className={group.materialType === 'MP' ? 'border-orange-500/50 text-orange-600' : 'border-emerald-500/50 text-emerald-600'}>
-              {group.materialType}
+      <div 
+        key={group.referencia}
+        className={`flex items-center h-11 border-b border-border hover:bg-muted/30 ${hasMultipleLocations ? 'cursor-pointer' : ''}`}
+        onClick={() => hasMultipleLocations && toggleExpand(group.referencia)}
+      >
+        {/* Referencia */}
+        <div className="w-[180px] min-w-[180px] px-3 font-medium flex items-center gap-2 truncate">
+          {hasMultipleLocations && (
+            isExpanded ? (
+              <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+            ) : (
+              <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+            )
+          )}
+          <span className="truncate">{group.referencia}</span>
+          {hasMultipleLocations && (
+            <Badge variant="secondary" className="text-xs flex-shrink-0">
+              {group.rows.length}
             </Badge>
-          </TableCell>
-          <TableCell></TableCell>
-          <TableCell className="text-right font-bold">{group.cantTotalErp}</TableCell>
-          <TableCell className="text-right font-bold">{renderCountCell(group.totals.c1, group.cantTotalErp, 1, group.auditRound)}</TableCell>
-          <TableCell className="text-right font-bold">{renderCountCell(group.totals.c2, group.cantTotalErp, 2, group.auditRound)}</TableCell>
-          <TableCell className="text-right font-bold">{renderCountCell(group.totals.c3, group.cantTotalErp, 3, group.auditRound)}</TableCell>
-          <TableCell className="text-right font-bold">{renderCountCell(group.totals.c4, group.cantTotalErp, 4, group.auditRound)}</TableCell>
-          <TableCell className="text-right font-bold">{renderCountCell(group.totals.c5, group.cantTotalErp, 5, group.auditRound)}</TableCell>
-          <TableCell>{getStatusBadge(group.statusSlug)}</TableCell>
-          <TableCell onClick={(e) => e.stopPropagation()}>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreVertical className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleViewHistory(group.referencia, group.countHistory)}>
-                  <History className="w-4 h-4 mr-2" />
-                  Ver Historial
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem disabled>
-                  <CheckCircle2 className="w-4 h-4 mr-2" />
-                  Validar Manualmente
-                </DropdownMenuItem>
-                <DropdownMenuItem disabled>
-                  <XCircle className="w-4 h-4 mr-2" />
-                  Cerrar Forzado
-                </DropdownMenuItem>
-                <DropdownMenuItem disabled>
-                  <Edit3 className="w-4 h-4 mr-2" />
-                  Editar Conteo
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </TableCell>
-        </TableRow>
+          )}
+        </div>
+        
+        {/* Tipo */}
+        <div className="w-[60px] min-w-[60px] px-2">
+          <Badge variant="outline" className={`text-xs ${group.materialType === 'MP' ? 'border-orange-500/50 text-orange-600' : 'border-emerald-500/50 text-emerald-600'}`}>
+            {group.materialType}
+          </Badge>
+        </div>
+        
+        {/* Info */}
+        <div className="w-[50px] min-w-[50px] px-2" onClick={e => e.stopPropagation()}>
+          {!hasMultipleLocations && <LocationInfoPopover row={row} />}
+        </div>
+        
+        {/* ERP */}
+        <div className="w-[80px] min-w-[80px] px-2 text-right font-bold">{group.cantTotalErp}</div>
+        
+        {/* C1-C5 */}
+        <div className="w-[60px] min-w-[60px] px-2 text-right">{renderCountCell(group.totals.c1, group.cantTotalErp, 1, group.auditRound)}</div>
+        <div className="w-[60px] min-w-[60px] px-2 text-right">{renderCountCell(group.totals.c2, group.cantTotalErp, 2, group.auditRound)}</div>
+        <div className="w-[60px] min-w-[60px] px-2 text-right">{renderCountCell(group.totals.c3, group.cantTotalErp, 3, group.auditRound)}</div>
+        <div className="w-[60px] min-w-[60px] px-2 text-right">{renderCountCell(group.totals.c4, group.cantTotalErp, 4, group.auditRound)}</div>
+        <div className="w-[60px] min-w-[60px] px-2 text-right">{renderCountCell(group.totals.c5, group.cantTotalErp, 5, group.auditRound)}</div>
+        
+        {/* Estado */}
+        <div className="w-[110px] min-w-[110px] px-2">{getStatusBadge(group.statusSlug)}</div>
+        
+        {/* Acciones */}
+        <div className="w-[50px] min-w-[50px] px-2" onClick={e => e.stopPropagation()}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7">
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleViewHistory(group.referencia, group.countHistory)}>
+                <History className="w-4 h-4 mr-2" />
+                Ver Historial
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem disabled>
+                <CheckCircle2 className="w-4 h-4 mr-2" />
+                Validar Manualmente
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled>
+                <XCircle className="w-4 h-4 mr-2" />
+                Cerrar Forzado
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled>
+                <Edit3 className="w-4 h-4 mr-2" />
+                Editar Conteo
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    );
+  };
 
-        {/* Expanded location rows */}
-        {isExpanded && group.rows.map((row, idx) => {
-          const isValidated = row.validatedAtRound !== null;
-          const isDiscovered = row.discoveredAtRound !== null;
-          return (
-            <TableRow key={row.locationId} className={`${isValidated ? 'bg-green-500/10' : isDiscovered ? 'bg-amber-500/10' : 'bg-muted/20'} hover:bg-muted/40`}>
-              <TableCell className="pl-10">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-muted-foreground text-sm">
-                    {idx === group.rows.length - 1 ? '└' : '├'} Ubicación {idx + 1}
-                  </span>
-                  {isDiscovered && (
-                    <Badge className="bg-amber-500/20 text-amber-600 border-amber-500/30 text-xs">
-                      Descubierta C{row.discoveredAtRound}
-                    </Badge>
-                  )}
-                  {isValidated && (
-                    <Badge className="bg-green-500/20 text-green-600 border-green-500/30 text-xs gap-1">
-                      <CheckCircle2 className="w-3 h-3" />
-                      Validada C{row.validatedAtRound} ({row.validatedQuantity})
-                    </Badge>
-                  )}
-                </div>
-              </TableCell>
-              <TableCell></TableCell>
-              <TableCell>
-                <LocationInfoPopover row={row} />
-              </TableCell>
-              <TableCell className="text-right text-muted-foreground">-</TableCell>
-              <TableCell className="text-right">{renderCountCell(row.counts.c1, row.cantTotalErp, 1, row.auditRound, row.discoveredAtRound)}</TableCell>
-              <TableCell className="text-right">{renderCountCell(row.counts.c2, row.cantTotalErp, 2, row.auditRound, row.discoveredAtRound)}</TableCell>
-              <TableCell className="text-right">{renderCountCell(row.counts.c3, row.cantTotalErp, 3, row.auditRound, row.discoveredAtRound)}</TableCell>
-              <TableCell className="text-right">{renderCountCell(row.counts.c4, row.cantTotalErp, 4, row.auditRound, row.discoveredAtRound)}</TableCell>
-              <TableCell className="text-right">{renderCountCell(row.counts.c5, row.cantTotalErp, 5, row.auditRound, row.discoveredAtRound)}</TableCell>
-              <TableCell></TableCell>
-              <TableCell></TableCell>
-            </TableRow>
-          );
-        })}
-      </React.Fragment>
+  const renderSubRow = (group: GroupedReference, row: AuditRow, subIndex: number) => {
+    const isValidated = row.validatedAtRound !== null;
+    const isDiscovered = row.discoveredAtRound !== null;
+
+    return (
+      <div 
+        key={row.locationId}
+        className={`flex items-center h-11 border-b border-border ${isValidated ? 'bg-green-500/10' : isDiscovered ? 'bg-amber-500/10' : 'bg-muted/20'} hover:bg-muted/40`}
+      >
+        {/* Referencia - sub row */}
+        <div className="w-[180px] min-w-[180px] px-3 pl-10">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-muted-foreground text-sm">
+              {subIndex === group.rows.length - 1 ? '└' : '├'} Ubic {subIndex + 1}
+            </span>
+            {isDiscovered && (
+              <Badge className="bg-amber-500/20 text-amber-600 border-amber-500/30 text-[10px]">
+                C{row.discoveredAtRound}
+              </Badge>
+            )}
+            {isValidated && (
+              <Badge className="bg-green-500/20 text-green-600 border-green-500/30 text-[10px] gap-1">
+                <CheckCircle2 className="w-3 h-3" />
+                C{row.validatedAtRound}
+              </Badge>
+            )}
+          </div>
+        </div>
+        
+        {/* Tipo - empty */}
+        <div className="w-[60px] min-w-[60px] px-2"></div>
+        
+        {/* Info */}
+        <div className="w-[50px] min-w-[50px] px-2">
+          <LocationInfoPopover row={row} />
+        </div>
+        
+        {/* ERP - empty */}
+        <div className="w-[80px] min-w-[80px] px-2 text-right text-muted-foreground">-</div>
+        
+        {/* C1-C5 */}
+        <div className="w-[60px] min-w-[60px] px-2 text-right">{renderCountCell(row.counts.c1, row.cantTotalErp, 1, row.auditRound, row.discoveredAtRound)}</div>
+        <div className="w-[60px] min-w-[60px] px-2 text-right">{renderCountCell(row.counts.c2, row.cantTotalErp, 2, row.auditRound, row.discoveredAtRound)}</div>
+        <div className="w-[60px] min-w-[60px] px-2 text-right">{renderCountCell(row.counts.c3, row.cantTotalErp, 3, row.auditRound, row.discoveredAtRound)}</div>
+        <div className="w-[60px] min-w-[60px] px-2 text-right">{renderCountCell(row.counts.c4, row.cantTotalErp, 4, row.auditRound, row.discoveredAtRound)}</div>
+        <div className="w-[60px] min-w-[60px] px-2 text-right">{renderCountCell(row.counts.c5, row.cantTotalErp, 5, row.auditRound, row.discoveredAtRound)}</div>
+        
+        {/* Estado - empty */}
+        <div className="w-[110px] min-w-[110px] px-2"></div>
+        
+        {/* Acciones - empty */}
+        <div className="w-[50px] min-w-[50px] px-2"></div>
+      </div>
     );
   };
 
   return (
     <AppLayout title="Auditoría General" showBackButton>
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Filters */}
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="relative flex-1">
@@ -623,117 +573,84 @@ const Auditoria: React.FC = () => {
           </div>
         </div>
 
-        {/* Results count */}
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>
-            Mostrando {paginatedGroups.length} referencias ({auditData?.rows.length || 0} ubicaciones) de {auditData?.totalCount || 0} referencias totales
-          </span>
-          {(debouncedSearch || materialTypeFilter !== 'all' || statusFilter !== 'all' || locationFilter !== 'all') && (
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => {
-                setSearchQuery('');
-                setMaterialTypeFilter('all');
-                setStatusFilter('all');
-                setLocationFilter('all');
-              }}
-            >
-              Limpiar filtros
-            </Button>
+        {/* Stats bar */}
+        <div className="flex items-center justify-between py-2 px-4 bg-muted/30 rounded-lg border border-border">
+          <div className="flex items-center gap-4">
+            <span className="text-sm font-medium">
+              {auditData?.totalReferences || 0} referencias
+            </span>
+            <span className="text-sm text-muted-foreground">
+              ({auditData?.totalLocations || 0} ubicaciones)
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            {isFetching && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Actualizando...
+              </div>
+            )}
+            {(debouncedSearch || materialTypeFilter !== 'all' || statusFilter !== 'all' || locationFilter !== 'all') && (
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => {
+                  setSearchQuery('');
+                  setMaterialTypeFilter('all');
+                  setStatusFilter('all');
+                  setLocationFilter('all');
+                }}
+              >
+                Limpiar filtros
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Excel-like Table */}
+        <div className="rounded-lg border border-border overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center bg-muted/50 border-b border-border font-semibold text-sm sticky top-0 z-10">
+            <div className="w-[180px] min-w-[180px] px-3 py-3">Referencia</div>
+            <div className="w-[60px] min-w-[60px] px-2 py-3">Tipo</div>
+            <div className="w-[50px] min-w-[50px] px-2 py-3">Info</div>
+            <div className="w-[80px] min-w-[80px] px-2 py-3 text-right">ERP</div>
+            <div className="w-[60px] min-w-[60px] px-2 py-3 text-right">C1</div>
+            <div className="w-[60px] min-w-[60px] px-2 py-3 text-right">C2</div>
+            <div className="w-[60px] min-w-[60px] px-2 py-3 text-right">C3</div>
+            <div className="w-[60px] min-w-[60px] px-2 py-3 text-right">C4</div>
+            <div className="w-[60px] min-w-[60px] px-2 py-3 text-right">C5</div>
+            <div className="w-[110px] min-w-[110px] px-2 py-3">Estado</div>
+            <div className="w-[50px] min-w-[50px] px-2 py-3">Acción</div>
+          </div>
+
+          {/* Body with scroll */}
+          {isLoading ? (
+            <div className="p-4 space-y-2">
+              {Array.from({ length: 15 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          ) : groupedData.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <FileSearch className="w-12 h-12 mb-4" />
+              <span className="text-lg">No se encontraron registros</span>
+            </div>
+          ) : (
+            <ScrollArea className="h-[calc(100vh-320px)]">
+              <div className="min-w-fit">
+                {groupedData.map(group => (
+                  <React.Fragment key={group.referencia}>
+                    {renderMainRow(group)}
+                    {expandedRefs.has(group.referencia) && group.rows.length > 1 && 
+                      group.rows.map((row, idx) => renderSubRow(group, row, idx))
+                    }
+                  </React.Fragment>
+                ))}
+              </div>
+            </ScrollArea>
           )}
         </div>
-
-        {/* Table */}
-        <div className="rounded-lg border border-border overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead className="font-semibold">Referencia</TableHead>
-                <TableHead className="font-semibold">Tipo</TableHead>
-                <TableHead className="font-semibold w-[60px]">Info</TableHead>
-                <TableHead className="font-semibold text-right">ERP</TableHead>
-                <TableHead className="font-semibold text-right">C1</TableHead>
-                <TableHead className="font-semibold text-right">C2</TableHead>
-                <TableHead className="font-semibold text-right">C3</TableHead>
-                <TableHead className="font-semibold text-right">C4</TableHead>
-                <TableHead className="font-semibold text-right">C5</TableHead>
-                <TableHead className="font-semibold">Estado</TableHead>
-                <TableHead className="font-semibold w-[60px]">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                Array.from({ length: 10 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array.from({ length: 11 }).map((_, j) => (
-                      <TableCell key={j}>
-                        <Skeleton className="h-5 w-full" />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : paginatedGroups.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={11} className="h-32 text-center">
-                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                      <FileSearch className="w-8 h-8" />
-                      <span>No se encontraron registros</span>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                paginatedGroups.map((group) => renderGroupRows(group))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious 
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                />
-              </PaginationItem>
-              
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum: number;
-                if (totalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (currentPage <= 3) {
-                  pageNum = i + 1;
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i;
-                } else {
-                  pageNum = currentPage - 2 + i;
-                }
-                
-                return (
-                  <PaginationItem key={pageNum}>
-                    <PaginationLink 
-                      onClick={() => setCurrentPage(pageNum)}
-                      isActive={currentPage === pageNum}
-                      className="cursor-pointer"
-                    >
-                      {pageNum}
-                    </PaginationLink>
-                  </PaginationItem>
-                );
-              })}
-              
-              <PaginationItem>
-                <PaginationNext 
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        )}
       </div>
 
       {/* History Dialog */}
