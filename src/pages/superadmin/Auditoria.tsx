@@ -103,12 +103,27 @@ interface GroupedReference {
   };
 }
 
-const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  pendiente: { label: 'Pendiente', variant: 'secondary' },
-  auditado: { label: 'Auditado', variant: 'default' },
-  conflicto: { label: 'Conflicto', variant: 'outline' },
-  critico: { label: 'Crítico', variant: 'destructive' },
-  cerrado_forzado: { label: 'Cerrado Forzado', variant: 'default' },
+const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  pendiente: { 
+    label: 'Pendiente', 
+    className: 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-700' 
+  },
+  auditado: { 
+    label: 'Auditado', 
+    className: 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700' 
+  },
+  conflicto: { 
+    label: 'Conflicto', 
+    className: 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-700' 
+  },
+  critico: { 
+    label: 'Crítico', 
+    className: 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700' 
+  },
+  cerrado_forzado: { 
+    label: 'Cerrado Forzado', 
+    className: 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-700' 
+  },
 };
 
 const LocationInfoPopover: React.FC<{ row: AuditRow }> = ({ row }) => (
@@ -203,7 +218,8 @@ const Auditoria: React.FC = () => {
       let masterQuery = supabase
         .from('inventory_master')
         .select('referencia, material_type, cant_total_erp, status_slug, audit_round, count_history')
-        .order('referencia');
+        .order('referencia')
+        .limit(10000);
       
       // Apply filters
       if (debouncedSearch) {
@@ -573,7 +589,7 @@ const Auditoria: React.FC = () => {
   const getStatusBadge = (status: string) => {
     const config = STATUS_CONFIG[status] || STATUS_CONFIG.pendiente;
     return (
-      <Badge variant={config.variant} className="whitespace-nowrap text-xs">
+      <Badge variant="outline" className={`whitespace-nowrap text-xs ${config.className}`}>
         {config.label}
       </Badge>
     );
