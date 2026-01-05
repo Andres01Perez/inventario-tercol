@@ -277,3 +277,82 @@
     @apply ring-2 ring-primary/50 ring-offset-2 ring-offset-background;
   }
 }
+
+/* ========== PRINT STYLES ========== */
+@media print {
+  /* Hide everything except printable content */
+  body > *:not(#root),
+  header,
+  nav,
+  aside,
+  footer,
+  .print\:hidden,
+  [data-radix-dialog-overlay] {
+    display: none !important;
+  }
+
+  /* Reset body and root */
+  body, html {
+    height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  #root {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Dialog must expand fully for print */
+  [role="dialog"] {
+    position: static !important;
+    transform: none !important;
+    max-width: none !important;
+    max-height: none !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: white !important;
+  }
+
+  /* Printable sheet content */
+  #printable-sheet {
+    display: block !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+  /* Table pagination */
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
+  }
+
+  /* Signatures section - avoid breaking before */
+  .print-signatures {
+    page-break-before: avoid;
+  }
+
+  /* Page configuration */
+  @page {
+    size: letter landscape;
+    margin: 1cm;
+  }
+}
