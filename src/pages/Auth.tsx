@@ -5,10 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
 
-const EMAIL_DOMAIN = '@tercol.com.co';
-const usernameSchema = z.string()
-  .min(3, 'El usuario debe tener al menos 3 caracteres')
-  .regex(/^[a-zA-Z0-9._-]+$/, 'Solo letras, números, puntos y guiones');
+const emailSchema = z.string().email('Correo electrónico inválido');
 const passwordSchema = z.string().min(6, 'La contraseña debe tener al menos 6 caracteres');
 const fullNameSchema = z.string().min(2, 'El nombre debe tener al menos 2 caracteres');
 
@@ -90,12 +87,12 @@ const Auth: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
-    username: '',
+    email: '',
     password: '',
     fullName: '',
   });
   const [errors, setErrors] = useState<{
-    username?: string;
+    email?: string;
     password?: string;
     fullName?: string;
   }>({});
@@ -116,9 +113,9 @@ const Auth: React.FC = () => {
   const validateForm = (): boolean => {
     const newErrors: typeof errors = {};
 
-    const usernameResult = usernameSchema.safeParse(formData.username);
-    if (!usernameResult.success) {
-      newErrors.username = usernameResult.error.errors[0].message;
+    const emailResult = emailSchema.safeParse(formData.email);
+    if (!emailResult.success) {
+      newErrors.email = emailResult.error.errors[0].message;
     }
 
     const passwordResult = passwordSchema.safeParse(formData.password);
@@ -145,10 +142,8 @@ const Auth: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const fullEmail = `${formData.username.toLowerCase().trim()}${EMAIL_DOMAIN}`;
-      
       if (isSignUp) {
-        const { error } = await signUp(fullEmail, formData.password, formData.fullName);
+        const { error } = await signUp(formData.email, formData.password, formData.fullName);
         if (error) {
           if (error.message.includes('already registered')) {
             toast({
@@ -171,7 +166,7 @@ const Auth: React.FC = () => {
           setIsSignUp(false);
         }
       } else {
-        const { error } = await signIn(fullEmail, formData.password);
+        const { error } = await signIn(formData.email, formData.password);
         if (error) {
           if (error.message.includes('Invalid login credentials')) {
             toast({
@@ -259,24 +254,19 @@ const Auth: React.FC = () => {
               )}
 
               <div className="animate-element animate-delay-400">
-                <label className="text-sm font-medium text-muted-foreground">Usuario</label>
-                <GlassInputWrapper error={!!errors.username}>
-                  <div className="flex items-center">
-                    <input
-                      name="username"
-                      type="text"
-                      placeholder="tu.usuario"
-                      value={formData.username}
-                      onChange={handleInputChange}
-                      className="flex-1 bg-transparent text-sm p-4 rounded-l-2xl focus:outline-none text-foreground placeholder:text-muted-foreground"
-                    />
-                    <span className="px-4 py-2 text-sm font-semibold whitespace-nowrap bg-primary/10 text-primary rounded-r-xl border-l border-primary/20">
-                      @tercol.com.co
-                    </span>
-                  </div>
+                <label className="text-sm font-medium text-muted-foreground">Correo Electrónico</label>
+                <GlassInputWrapper error={!!errors.email}>
+                  <input
+                    name="email"
+                    type="email"
+                    placeholder="usuario@tercol.com"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none text-foreground placeholder:text-muted-foreground"
+                  />
                 </GlassInputWrapper>
-                {errors.username && (
-                  <p className="text-xs text-destructive mt-1">{errors.username}</p>
+                {errors.email && (
+                  <p className="text-xs text-destructive mt-1">{errors.email}</p>
                 )}
               </div>
 
