@@ -135,6 +135,72 @@ const GestionResponsables: React.FC = () => {
     enabled: !!role,
   });
 
+  // Query para obtener valores únicos de subcategoria
+  const { data: subcategorias } = useQuery({
+    queryKey: ['subcategorias-options', role, profile?.id, isSuperadmin],
+    queryFn: async () => {
+      let query = supabase
+        .from('locations')
+        .select('subcategoria')
+        .not('subcategoria', 'is', null);
+      
+      if (!isSuperadmin && profile?.id) {
+        query = query.eq('assigned_admin_id', profile.id);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      
+      const uniqueValues = [...new Set(data?.map(d => d.subcategoria).filter(Boolean))];
+      return uniqueValues.sort() as string[];
+    },
+    enabled: !!role,
+  });
+
+  // Query para obtener valores únicos de ubicación
+  const { data: ubicaciones } = useQuery({
+    queryKey: ['ubicaciones-options', role, profile?.id, isSuperadmin],
+    queryFn: async () => {
+      let query = supabase
+        .from('locations')
+        .select('location_name')
+        .not('location_name', 'is', null);
+      
+      if (!isSuperadmin && profile?.id) {
+        query = query.eq('assigned_admin_id', profile.id);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      
+      const uniqueValues = [...new Set(data?.map(d => d.location_name).filter(Boolean))];
+      return uniqueValues.sort() as string[];
+    },
+    enabled: !!role,
+  });
+
+  // Query para obtener valores únicos de observaciones
+  const { data: observacionesOptions } = useQuery({
+    queryKey: ['observaciones-options', role, profile?.id, isSuperadmin],
+    queryFn: async () => {
+      let query = supabase
+        .from('locations')
+        .select('observaciones')
+        .not('observaciones', 'is', null);
+      
+      if (!isSuperadmin && profile?.id) {
+        query = query.eq('assigned_admin_id', profile.id);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      
+      const uniqueValues = [...new Set(data?.map(d => d.observaciones).filter(Boolean))];
+      return uniqueValues.sort() as string[];
+    },
+    enabled: !!role,
+  });
+
   // OPTIMIZED QUERY: Start from locations with JOIN to inventory_master
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['locations-responsables', role, searchTerm, currentPage, pageSize, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, filterPuntoReferencia],
@@ -178,21 +244,23 @@ const GestionResponsables: React.FC = () => {
 
       // Filter by subcategoria
       if (filterSubcategoria) {
-        query = query.ilike('subcategoria', `%${filterSubcategoria}%`);
+        query = query.eq('subcategoria', filterSubcategoria);
       }
 
       // Filter by location name
       if (filterUbicacion) {
-        query = query.ilike('location_name', `%${filterUbicacion}%`);
+        query = query.eq('location_name', filterUbicacion);
       }
 
       // Filter by observaciones
       if (filterObservacion) {
-        query = query.ilike('observaciones', `%${filterObservacion}%`);
+        query = query.eq('observaciones', filterObservacion);
       }
 
       // Filter by supervisor
-      if (filterSupervisor !== 'all') {
+      if (filterSupervisor === 'unassigned') {
+        query = query.is('assigned_supervisor_id', null);
+      } else if (filterSupervisor !== 'all') {
         query = query.eq('assigned_supervisor_id', filterSupervisor);
       }
 
@@ -403,34 +471,49 @@ const GestionResponsables: React.FC = () => {
           {/* Subcategoría filter */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Subcategoría:</span>
-            <Input
-              placeholder="Filtrar..."
-              value={filterSubcategoria}
-              onChange={(e) => { setFilterSubcategoria(e.target.value); setCurrentPage(1); }}
-              className="w-[140px] h-9"
-            />
+            <Select value={filterSubcategoria || 'all'} onValueChange={(value) => { setFilterSubcategoria(value === 'all' ? '' : value); setCurrentPage(1); }}>
+              <SelectTrigger className="w-[160px] h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                {subcategorias?.map((sub) => (
+                  <SelectItem key={sub} value={sub}>{sub}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Ubicación filter */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Ubicación:</span>
-            <Input
-              placeholder="Filtrar..."
-              value={filterUbicacion}
-              onChange={(e) => { setFilterUbicacion(e.target.value); setCurrentPage(1); }}
-              className="w-[140px] h-9"
-            />
+            <Select value={filterUbicacion || 'all'} onValueChange={(value) => { setFilterUbicacion(value === 'all' ? '' : value); setCurrentPage(1); }}>
+              <SelectTrigger className="w-[160px] h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                {ubicaciones?.map((ub) => (
+                  <SelectItem key={ub} value={ub}>{ub}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Observación filter */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Observación:</span>
-            <Input
-              placeholder="Filtrar..."
-              value={filterObservacion}
-              onChange={(e) => { setFilterObservacion(e.target.value); setCurrentPage(1); }}
-              className="w-[140px] h-9"
-            />
+            <Select value={filterObservacion || 'all'} onValueChange={(value) => { setFilterObservacion(value === 'all' ? '' : value); setCurrentPage(1); }}>
+              <SelectTrigger className="w-[160px] h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                {observacionesOptions?.map((obs) => (
+                  <SelectItem key={obs} value={obs}>{obs}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Punto Referencia filter */}
@@ -460,6 +543,7 @@ const GestionResponsables: React.FC = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="unassigned">Sin Asignar</SelectItem>
                 {supervisors?.map((supervisor) => (
                   <SelectItem key={supervisor.id} value={supervisor.id}>
                     {supervisor.full_name || supervisor.email}
