@@ -12,8 +12,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import PrintableSheet from '@/components/supervisor/PrintableSheet';
+import AddLocationDialog from '@/components/supervisor/AddLocationDialog';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, RefreshCw, MapPin, Save, Printer } from 'lucide-react';
+import { Loader2, CheckCircle2, RefreshCw, MapPin, Save, Printer, Plus } from 'lucide-react';
 
 interface Location {
   id: string;
@@ -45,6 +46,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [printZoneData, setPrintZoneData] = useState<{ name: string; locations: Location[] } | null>(null);
+  const [addLocationOpen, setAddLocationOpen] = useState(false);
 
   // Determine which master audit_round to filter by
   const masterAuditRound = roundNumber <= 2 ? 1 : roundNumber;
@@ -347,7 +349,15 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex justify-between items-center">
+        <Button 
+          variant="default" 
+          size="sm" 
+          onClick={() => setAddLocationOpen(true)}
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Agregar Referencia
+        </Button>
         <Button 
           variant="outline" 
           size="sm" 
@@ -483,6 +493,11 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
           roundNumber={roundNumber}
         />
       )}
+
+      <AddLocationDialog 
+        open={addLocationOpen} 
+        onOpenChange={setAddLocationOpen} 
+      />
     </div>
   );
 };
