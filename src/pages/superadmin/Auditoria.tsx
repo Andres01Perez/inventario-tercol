@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import AppLayout from '@/components/layout/AppLayout';
+import { toast } from 'sonner';
 import { 
   Search, 
   ChevronDown,
@@ -18,6 +20,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -35,6 +39,8 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -45,6 +51,14 @@ import {
 } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 interface AuditRow {
   locationId: string;
@@ -141,6 +155,7 @@ const LocationInfoPopover: React.FC<{ row: AuditRow }> = ({ row }) => (
 );
 
 const Auditoria: React.FC = () => {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [materialTypeFilter, setMaterialTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -148,6 +163,16 @@ const Auditoria: React.FC = () => {
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [selectedHistory, setSelectedHistory] = useState<{ referencia: string; history: any[] } | null>(null);
   const [expandedRefs, setExpandedRefs] = useState<Set<string>>(new Set());
+  
+  // Dialog states for actions
+  const [validateDialogOpen, setValidateDialogOpen] = useState(false);
+  const [forceCloseDialogOpen, setForceCloseDialogOpen] = useState(false);
+  const [editCountDialogOpen, setEditCountDialogOpen] = useState(false);
+  const [selectedReference, setSelectedReference] = useState<GroupedReference | null>(null);
+  const [validateQuantity, setValidateQuantity] = useState('');
+  const [forceCloseReason, setForceCloseReason] = useState('');
+  const [editingCounts, setEditingCounts] = useState<Record<string, { c1?: string; c2?: string; c3?: string; c4?: string; c5?: string }>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Debounced search for server-side filtering
   const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
@@ -348,6 +373,184 @@ const Auditoria: React.FC = () => {
     });
   }, []);
 
+  // Open validate dialog
+  const openValidateDialog = useCallback((group: GroupedReference) => {
+    setSelectedReference(group);
+    const sumValidated = group.rows.reduce((acc, r) => acc + (r.validatedQuantity || 0), 0);
+    setValidateQuantity(sumValidated > 0 ? sumValidated.toString() : group.cantTotalErp.toString());
+    setValidateDialogOpen(true);
+  }, []);
+
+  // Open force close dialog
+  const openForceCloseDialog = useCallback((group: GroupedReference) => {
+    setSelectedReference(group);
+    setForceCloseReason('');
+    setForceCloseDialogOpen(true);
+  }, []);
+
+  // Open edit count dialog
+  const openEditCountDialog = useCallback((group: GroupedReference) => {
+    setSelectedReference(group);
+    const initial: typeof editingCounts = {};
+    group.rows.forEach(row => {
+      initial[row.locationId] = {
+        c1: row.counts.c1?.toString() ?? '',
+        c2: row.counts.c2?.toString() ?? '',
+        c3: row.counts.c3?.toString() ?? '',
+        c4: row.counts.c4?.toString() ?? '',
+        c5: row.counts.c5?.toString() ?? '',
+      };
+    });
+    setEditingCounts(initial);
+    setEditCountDialogOpen(true);
+  }, []);
+
+  // Handle validate manually
+  const handleValidateManually = async () => {
+    if (!selectedReference || !user) return;
+    setIsSubmitting(true);
+
+    try {
+      const locationIds = selectedReference.rows.map(r => r.locationId);
+      const qty = parseFloat(validateQuantity);
+      const perLocation = qty / locationIds.length;
+
+      const { error: locError } = await supabase
+        .from('locations')
+        .update({
+          validated_quantity: perLocation,
+          validated_at_round: selectedReference.auditRound,
+        })
+        .in('id', locationIds);
+
+      if (locError) throw locError;
+
+      const { error: masterError } = await supabase
+        .from('inventory_master')
+        .update({ status_slug: 'auditado' })
+        .eq('referencia', selectedReference.referencia);
+
+      if (masterError) throw masterError;
+
+      await supabase.from('audit_logs').insert({
+        action_type: 'validacion_manual',
+        master_reference: selectedReference.referencia,
+        new_data: { validated_quantity: qty },
+        round_number: selectedReference.auditRound,
+        user_id: user.id,
+      });
+
+      toast.success('Referencia validada correctamente');
+      setValidateDialogOpen(false);
+      window.location.reload();
+    } catch (error: any) {
+      toast.error('Error al validar: ' + error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle force close
+  const handleForceClose = async () => {
+    if (!selectedReference || !user) return;
+    if (!forceCloseReason.trim()) {
+      toast.error('Debes ingresar un motivo');
+      return;
+    }
+    setIsSubmitting(true);
+
+    try {
+      const existingHistory = Array.isArray(selectedReference.countHistory) ? selectedReference.countHistory : [];
+      const newHistory = [
+        ...existingHistory,
+        {
+          action: 'cierre_forzado',
+          reason: forceCloseReason,
+          timestamp: new Date().toISOString(),
+          user_id: user.id,
+        },
+      ];
+
+      const { error: masterError } = await supabase
+        .from('inventory_master')
+        .update({
+          status_slug: 'cerrado_forzado',
+          count_history: newHistory,
+        })
+        .eq('referencia', selectedReference.referencia);
+
+      if (masterError) throw masterError;
+
+      await supabase.from('audit_logs').insert({
+        action_type: 'cierre_forzado',
+        master_reference: selectedReference.referencia,
+        new_data: { reason: forceCloseReason },
+        round_number: selectedReference.auditRound,
+        user_id: user.id,
+      });
+
+      toast.success('Referencia cerrada forzadamente');
+      setForceCloseDialogOpen(false);
+      window.location.reload();
+    } catch (error: any) {
+      toast.error('Error al cerrar: ' + error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle save edited counts
+  const handleSaveEditedCounts = async () => {
+    if (!selectedReference || !user) return;
+    setIsSubmitting(true);
+
+    try {
+      const upserts: { location_id: string; audit_round: number; quantity_counted: number; supervisor_id: string }[] = [];
+
+      for (const row of selectedReference.rows) {
+        const edited = editingCounts[row.locationId];
+        if (!edited) continue;
+
+        for (let round = 1; round <= 5; round++) {
+          const key = `c${round}` as 'c1' | 'c2' | 'c3' | 'c4' | 'c5';
+          const value = edited[key];
+
+          if (value !== '' && value !== undefined) {
+            upserts.push({
+              location_id: row.locationId,
+              audit_round: round,
+              quantity_counted: parseFloat(value),
+              supervisor_id: user.id,
+            });
+          }
+        }
+      }
+
+      if (upserts.length > 0) {
+        const { error } = await supabase
+          .from('inventory_counts')
+          .upsert(upserts, { onConflict: 'location_id,audit_round' });
+
+        if (error) throw error;
+      }
+
+      await supabase.from('audit_logs').insert({
+        action_type: 'edicion_conteo',
+        master_reference: selectedReference.referencia,
+        new_data: editingCounts,
+        user_id: user.id,
+      });
+
+      toast.success('Conteos actualizados correctamente');
+      setEditCountDialogOpen(false);
+      window.location.reload();
+    } catch (error: any) {
+      toast.error('Error al guardar: ' + error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const renderCountCell = (value: number | null, erp: number, round: number, currentRound: number, discoveredAtRound: number | null = null) => {
     if (discoveredAtRound !== null && round < discoveredAtRound) {
       return <span className="text-muted-foreground/50">-</span>;
@@ -443,15 +646,16 @@ const Auditoria: React.FC = () => {
                 Ver Historial
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem disabled>
-                <CheckCircle2 className="w-4 h-4 mr-2" />
+              <DropdownMenuItem onClick={() => openValidateDialog(group)}>
+                <CheckCircle2 className="w-4 h-4 mr-2 text-green-600" />
                 Validar Manualmente
               </DropdownMenuItem>
-              <DropdownMenuItem disabled>
-                <XCircle className="w-4 h-4 mr-2" />
+              <DropdownMenuItem onClick={() => openForceCloseDialog(group)}>
+                <XCircle className="w-4 h-4 mr-2 text-red-600" />
                 Cerrar Forzado
               </DropdownMenuItem>
-              <DropdownMenuItem disabled>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => openEditCountDialog(group)}>
                 <Edit3 className="w-4 h-4 mr-2" />
                 Editar Conteo
               </DropdownMenuItem>
@@ -664,11 +868,14 @@ const Auditoria: React.FC = () => {
               selectedHistory.history.map((entry, idx) => (
                 <div key={idx} className="p-4 rounded-lg bg-muted/50 border border-border">
                   <div className="flex items-center justify-between mb-2">
-                    <Badge variant="outline">Ronda {entry.round}</Badge>
+                    <Badge variant="outline">{entry.action || `Ronda ${entry.round}`}</Badge>
                     {entry.closed_by_superadmin && (
                       <Badge variant="destructive">Cerrado por Superadmin</Badge>
                     )}
                   </div>
+                  {entry.reason && (
+                    <p className="text-sm text-muted-foreground mb-2">{entry.reason}</p>
+                  )}
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     {entry.sum_c1 !== undefined && (
                       <div>
@@ -703,6 +910,164 @@ const Auditoria: React.FC = () => {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Validate Dialog */}
+      <Dialog open={validateDialogOpen} onOpenChange={setValidateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Validar Referencia: {selectedReference?.referencia}</DialogTitle>
+            <DialogDescription>
+              Ingresa la cantidad validada para cerrar esta referencia.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-muted-foreground text-xs">Cantidad ERP</Label>
+                <div className="text-2xl font-bold">{selectedReference?.cantTotalErp}</div>
+              </div>
+              <div>
+                <Label className="text-muted-foreground text-xs">Última Suma</Label>
+                <div className="text-2xl font-bold">
+                  {selectedReference?.totals.c5 ?? selectedReference?.totals.c4 ?? selectedReference?.totals.c3 ?? selectedReference?.totals.c2 ?? selectedReference?.totals.c1 ?? '-'}
+                </div>
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="validateQty">Cantidad Validada</Label>
+              <Input
+                id="validateQty"
+                type="number"
+                value={validateQuantity}
+                onChange={(e) => setValidateQuantity(e.target.value)}
+                placeholder="Ingrese cantidad"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setValidateDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleValidateManually} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Validar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Force Close Dialog */}
+      <Dialog open={forceCloseDialogOpen} onOpenChange={setForceCloseDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cerrar Forzado: {selectedReference?.referencia}</DialogTitle>
+            <DialogDescription>
+              Esta acción cerrará la referencia sin completar el proceso de auditoría. No se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <Label className="text-muted-foreground text-xs">ERP</Label>
+                <div className="text-xl font-bold">{selectedReference?.cantTotalErp}</div>
+              </div>
+              <div>
+                <Label className="text-muted-foreground text-xs">Ronda Actual</Label>
+                <div className="text-xl font-bold">{selectedReference?.auditRound}</div>
+              </div>
+              <div>
+                <Label className="text-muted-foreground text-xs">Estado</Label>
+                <div className="pt-1">{selectedReference && getStatusBadge(selectedReference.statusSlug)}</div>
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="reason">Motivo del cierre *</Label>
+              <Textarea
+                id="reason"
+                placeholder="Describe el motivo del cierre forzado..."
+                value={forceCloseReason}
+                onChange={(e) => setForceCloseReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setForceCloseDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleForceClose} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Cerrar Referencia
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Count Dialog */}
+      <Dialog open={editCountDialogOpen} onOpenChange={setEditCountDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>Editar Conteos: {selectedReference?.referencia}</DialogTitle>
+            <DialogDescription>
+              Modifica los valores de conteo para cada ubicación.
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[50vh]">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Ubicación</TableHead>
+                  <TableHead className="w-20 text-center">C1</TableHead>
+                  <TableHead className="w-20 text-center">C2</TableHead>
+                  <TableHead className="w-20 text-center">C3</TableHead>
+                  <TableHead className="w-20 text-center">C4</TableHead>
+                  <TableHead className="w-20 text-center">C5</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {selectedReference?.rows.map((row) => (
+                  <TableRow key={row.locationId}>
+                    <TableCell className="font-medium">
+                      {row.locationName || row.locationDetail || 'Sin nombre'}
+                    </TableCell>
+                    {[1, 2, 3, 4, 5].map((round) => {
+                      const key = `c${round}` as 'c1' | 'c2' | 'c3' | 'c4' | 'c5';
+                      return (
+                        <TableCell key={round}>
+                          <Input
+                            type="number"
+                            className="w-20 text-center"
+                            value={editingCounts[row.locationId]?.[key] ?? ''}
+                            onChange={(e) =>
+                              setEditingCounts((prev) => ({
+                                ...prev,
+                                [row.locationId]: {
+                                  ...prev[row.locationId],
+                                  [key]: e.target.value,
+                                },
+                              }))
+                            }
+                            placeholder="-"
+                          />
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditCountDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEditedCounts} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Guardar Cambios
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </AppLayout>
