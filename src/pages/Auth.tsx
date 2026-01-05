@@ -270,7 +270,7 @@ const Auth: React.FC = () => {
                       onChange={handleInputChange}
                       className="flex-1 bg-transparent text-sm p-4 rounded-l-2xl focus:outline-none text-foreground placeholder:text-muted-foreground"
                     />
-                    <span className="pr-4 text-sm text-muted-foreground font-medium whitespace-nowrap">
+                    <span className="px-4 py-2 text-sm font-semibold whitespace-nowrap bg-primary/10 text-primary rounded-r-xl border-l border-primary/20">
                       @tercol.com.co
                     </span>
                   </div>
