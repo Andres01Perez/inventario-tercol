@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 import {
   Accordion,
   AccordionContent,
@@ -11,10 +12,59 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import PrintableSheet from '@/components/supervisor/PrintableSheet';
 import AddLocationDialog from '@/components/supervisor/AddLocationDialog';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, RefreshCw, MapPin, Save, Printer, Plus } from 'lucide-react';
+import { Loader2, CheckCircle2, RefreshCw, MapPin, Save, Printer, Plus, Info } from 'lucide-react';
+
+// Popover component for location info on mobile
+const LocationInfoPopover: React.FC<{ location: Location }> = ({ location }) => (
+  <Popover>
+    <PopoverTrigger asChild>
+      <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+        <Info className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+      </Button>
+    </PopoverTrigger>
+    <PopoverContent className="w-72" align="start">
+      <div className="space-y-3">
+        <h4 className="font-semibold text-sm">Información de Ubicación</h4>
+        <div className="space-y-2 text-sm">
+          <div>
+            <span className="text-muted-foreground">Tipo:</span>{' '}
+            <span className="font-medium">{location.inventory_master?.material_type || '-'}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Ubicación:</span>{' '}
+            <span className="font-medium">{location.location_name || '-'}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Detalle:</span>{' '}
+            <span className="font-medium">{location.location_detail || '-'}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Subcategoría:</span>{' '}
+            <span className="font-medium">{location.subcategoria || '-'}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Punto de Referencia:</span>{' '}
+            <span className="font-medium">{location.punto_referencia || '-'}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Método de Conteo:</span>{' '}
+            <span className="font-medium">{location.metodo_conteo || '-'}</span>
+          </div>
+          {location.observaciones && (
+            <div>
+              <span className="text-muted-foreground">Observaciones:</span>{' '}
+              <span className="font-medium">{location.observaciones}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </PopoverContent>
+  </Popover>
+);
 
 interface Location {
   id: string;
@@ -41,6 +91,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
 }) => {
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -409,74 +460,122 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
               </AccordionTrigger>
 
               <AccordionContent className="pt-2 pb-4">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm border-collapse">
-                    <thead>
-                      <tr className="border-b text-left text-muted-foreground">
-                        <th className="p-2 font-medium">Tipo</th>
-                        <th className="p-2 font-medium">Referencia</th>
-                        <th className="p-2 font-medium">Subcategoría</th>
-                        <th className="p-2 font-medium">Observaciones</th>
-                        <th className="p-2 font-medium">Ubicación</th>
-                        <th className="p-2 font-medium">Método</th>
-                        <th className="p-2 font-medium text-center">Cantidad</th>
-                        <th className="p-2"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {group.locations.map(loc => {
-                        const isSaving = savingIds.has(loc.id);
+                {isMobile ? (
+                  // Vista Mobile - Lista simplificada
+                  <div className="space-y-3">
+                    {group.locations.map(loc => {
+                      const isSaving = savingIds.has(loc.id);
+                      
+                      return (
+                        <div key={loc.id} className="flex items-center gap-2 p-3 border rounded-lg bg-background">
+                          <LocationInfoPopover location={loc} />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{loc.master_reference}</p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {loc.location_name || loc.punto_referencia || '-'}
+                            </p>
+                          </div>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="0"
+                            className="w-20 text-center font-bold h-9"
+                            value={quantities[loc.id] || ''}
+                            onChange={(e) => setQuantities(prev => ({
+                              ...prev,
+                              [loc.id]: e.target.value
+                            }))}
+                            onKeyDown={(e) => handleKeyDown(e, loc.id)}
+                            disabled={isSaving}
+                          />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleSaveCount(loc.id)}
+                            disabled={isSaving || !quantities[loc.id]}
+                          >
+                            {isSaving ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Save className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  // Vista Desktop - Tabla completa
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm border-collapse">
+                      <thead>
+                        <tr className="border-b text-left text-muted-foreground">
+                          <th className="p-2 font-medium">Tipo</th>
+                          <th className="p-2 font-medium">Referencia</th>
+                          <th className="p-2 font-medium">Subcategoría</th>
+                          <th className="p-2 font-medium">Observaciones</th>
+                          <th className="p-2 font-medium">Ubicación</th>
+                          <th className="p-2 font-medium">Método</th>
+                          <th className="p-2 font-medium text-center">Cantidad</th>
+                          <th className="p-2"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.locations.map(loc => {
+                          const isSaving = savingIds.has(loc.id);
 
-                        return (
-                          <tr key={loc.id} className="border-b hover:bg-muted/50">
-                            <td className="p-2">
-                              <Badge variant="outline" className="text-xs">
-                                {loc.inventory_master?.material_type || '-'}
-                              </Badge>
-                            </td>
-                            <td className="p-2 font-medium">{loc.master_reference}</td>
-                            <td className="p-2 text-muted-foreground">{loc.subcategoria || '-'}</td>
-                            <td className="p-2 text-muted-foreground max-w-[120px] truncate" title={loc.observaciones || ''}>
-                              {loc.observaciones || '-'}
-                            </td>
-                            <td className="p-2">{loc.location_name || '-'}</td>
-                            <td className="p-2">{loc.metodo_conteo || '-'}</td>
-                            <td className="p-2">
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                placeholder="0"
-                                className="w-24 text-center font-bold h-8"
-                                value={quantities[loc.id] || ''}
-                                onChange={(e) => setQuantities(prev => ({
-                                  ...prev,
-                                  [loc.id]: e.target.value
-                                }))}
-                                onKeyDown={(e) => handleKeyDown(e, loc.id)}
-                                disabled={isSaving}
-                              />
-                            </td>
-                            <td className="p-2">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleSaveCount(loc.id)}
-                                disabled={isSaving || !quantities[loc.id]}
-                              >
-                                {isSaving ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <Save className="w-4 h-4" />
-                                )}
-                              </Button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                          return (
+                            <tr key={loc.id} className="border-b hover:bg-muted/50">
+                              <td className="p-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {loc.inventory_master?.material_type || '-'}
+                                </Badge>
+                              </td>
+                              <td className="p-2 font-medium">{loc.master_reference}</td>
+                              <td className="p-2 text-muted-foreground">{loc.subcategoria || '-'}</td>
+                              <td className="p-2 text-muted-foreground max-w-[120px] truncate" title={loc.observaciones || ''}>
+                                {loc.observaciones || '-'}
+                              </td>
+                              <td className="p-2">{loc.location_name || '-'}</td>
+                              <td className="p-2">{loc.metodo_conteo || '-'}</td>
+                              <td className="p-2">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  placeholder="0"
+                                  className="w-24 text-center font-bold h-8"
+                                  value={quantities[loc.id] || ''}
+                                  onChange={(e) => setQuantities(prev => ({
+                                    ...prev,
+                                    [loc.id]: e.target.value
+                                  }))}
+                                  onKeyDown={(e) => handleKeyDown(e, loc.id)}
+                                  disabled={isSaving}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleSaveCount(loc.id)}
+                                  disabled={isSaving || !quantities[loc.id]}
+                                >
+                                  {isSaving ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Save className="w-4 h-4" />
+                                  )}
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </AccordionContent>
             </AccordionItem>
           );
