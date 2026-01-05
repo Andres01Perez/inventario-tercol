@@ -280,13 +280,29 @@
 
 /* ========== PRINT STYLES ========== */
 @media print {
-  /* Hide everything except printable content */
-  body > *:not(#root),
-  header,
-  nav,
-  aside,
-  footer,
-  .print\:hidden,
+  /* Hide everything by visibility - works with Portals */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* Show only the printable sheet and its contents */
+  #printable-sheet,
+  #printable-sheet * {
+    visibility: visible !important;
+  }
+
+  /* Position printable sheet at top of page */
+  #printable-sheet {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    overflow: visible !important;
+    background: white !important;
+    padding: 1cm !important;
+  }
+
+  /* Hide dialog overlay completely */
   [data-radix-dialog-overlay] {
     display: none !important;
   }
@@ -300,13 +316,7 @@
     print-color-adjust: exact !important;
   }
 
-  #root {
-    max-width: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-  }
-
-  /* Dialog must expand fully for print */
+  /* Dialog must not interfere */
   [role="dialog"] {
     position: static !important;
     transform: none !important;
@@ -317,14 +327,7 @@
     overflow: visible !important;
     border: none !important;
     box-shadow: none !important;
-    background: white !important;
-  }
-
-  /* Printable sheet content */
-  #printable-sheet {
-    display: block !important;
-    width: 100% !important;
-    overflow: visible !important;
+    background: transparent !important;
   }
 
   /* Table pagination */
