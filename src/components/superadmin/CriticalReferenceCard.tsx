@@ -112,7 +112,6 @@ const CriticalReferenceCard: React.FC<CriticalReferenceCardProps> = ({ reference
         supervisor_id: user!.id,
         audit_round: 5,
         quantity_counted: parseFloat(quantities[loc.id]),
-        operario_id: null,
       }));
 
       const { error: insertError } = await supabase
