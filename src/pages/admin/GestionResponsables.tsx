@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { useDebounce } from '@/hooks/useDebounce';
 import SupervisorSelect from '@/components/shared/SupervisorSelect';
 import { useSupervisors } from '@/hooks/useSupervisors';
 import {
@@ -93,10 +94,13 @@ const GestionResponsables: React.FC = () => {
   const adminBgClass = isSuperadmin ? 'bg-primary/10' : isAdminMP ? 'bg-orange-500/10' : 'bg-emerald-500/10';
   const adminRoleLabel = isSuperadmin ? 'Superadmin' : isAdminMP ? 'Admin MP' : 'Admin PP';
 
+  // Debounce search term for better performance
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+
   // Clear selection when filters change
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [searchTerm, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, filterPuntoReferencia, currentPage, pageSize]);
+  }, [debouncedSearchTerm, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, filterPuntoReferencia, currentPage, pageSize]);
 
   // Use cached supervisors hook
   const { data: supervisors } = useSupervisors();
@@ -113,14 +117,13 @@ const GestionResponsables: React.FC = () => {
     setCurrentPage(1);
   };
 
-  // Query para obtener valores únicos de punto_referencia
-  const { data: puntosReferencia } = useQuery({
-    queryKey: ['puntos-referencia-options', role, profile?.id, isSuperadmin],
+  // OPTIMIZED: Single query for all filter options with aggressive caching
+  const { data: filterOptions } = useQuery({
+    queryKey: ['filter-options', role, profile?.id, isSuperadmin],
     queryFn: async () => {
       let query = supabase
         .from('locations')
-        .select('punto_referencia')
-        .not('punto_referencia', 'is', null);
+        .select('subcategoria, location_name, observaciones, punto_referencia');
       
       if (!isSuperadmin && profile?.id) {
         query = query.eq('assigned_admin_id', profile.id);
@@ -129,81 +132,34 @@ const GestionResponsables: React.FC = () => {
       const { data, error } = await query;
       if (error) throw error;
       
-      const uniqueValues = [...new Set(data?.map(d => d.punto_referencia).filter(Boolean))];
-      return uniqueValues.sort() as string[];
+      // Extract unique values in a single pass
+      const subcategorias = new Set<string>();
+      const ubicaciones = new Set<string>();
+      const observaciones = new Set<string>();
+      const puntosReferencia = new Set<string>();
+      
+      data?.forEach(row => {
+        if (row.subcategoria) subcategorias.add(row.subcategoria);
+        if (row.location_name) ubicaciones.add(row.location_name);
+        if (row.observaciones) observaciones.add(row.observaciones);
+        if (row.punto_referencia) puntosReferencia.add(row.punto_referencia);
+      });
+      
+      return {
+        subcategorias: [...subcategorias].sort(),
+        ubicaciones: [...ubicaciones].sort(),
+        observaciones: [...observaciones].sort(),
+        puntosReferencia: [...puntosReferencia].sort(),
+      };
     },
-    enabled: !!role,
-  });
-
-  // Query para obtener valores únicos de subcategoria
-  const { data: subcategorias } = useQuery({
-    queryKey: ['subcategorias-options', role, profile?.id, isSuperadmin],
-    queryFn: async () => {
-      let query = supabase
-        .from('locations')
-        .select('subcategoria')
-        .not('subcategoria', 'is', null);
-      
-      if (!isSuperadmin && profile?.id) {
-        query = query.eq('assigned_admin_id', profile.id);
-      }
-      
-      const { data, error } = await query;
-      if (error) throw error;
-      
-      const uniqueValues = [...new Set(data?.map(d => d.subcategoria).filter(Boolean))];
-      return uniqueValues.sort() as string[];
-    },
-    enabled: !!role,
-  });
-
-  // Query para obtener valores únicos de ubicación
-  const { data: ubicaciones } = useQuery({
-    queryKey: ['ubicaciones-options', role, profile?.id, isSuperadmin],
-    queryFn: async () => {
-      let query = supabase
-        .from('locations')
-        .select('location_name')
-        .not('location_name', 'is', null);
-      
-      if (!isSuperadmin && profile?.id) {
-        query = query.eq('assigned_admin_id', profile.id);
-      }
-      
-      const { data, error } = await query;
-      if (error) throw error;
-      
-      const uniqueValues = [...new Set(data?.map(d => d.location_name).filter(Boolean))];
-      return uniqueValues.sort() as string[];
-    },
-    enabled: !!role,
-  });
-
-  // Query para obtener valores únicos de observaciones
-  const { data: observacionesOptions } = useQuery({
-    queryKey: ['observaciones-options', role, profile?.id, isSuperadmin],
-    queryFn: async () => {
-      let query = supabase
-        .from('locations')
-        .select('observaciones')
-        .not('observaciones', 'is', null);
-      
-      if (!isSuperadmin && profile?.id) {
-        query = query.eq('assigned_admin_id', profile.id);
-      }
-      
-      const { data, error } = await query;
-      if (error) throw error;
-      
-      const uniqueValues = [...new Set(data?.map(d => d.observaciones).filter(Boolean))];
-      return uniqueValues.sort() as string[];
-    },
+    staleTime: 10 * 60 * 1000, // 10 minutes - filter options don't change often
+    gcTime: 30 * 60 * 1000,    // Keep in cache for 30 minutes
     enabled: !!role,
   });
 
   // OPTIMIZED QUERY: Start from locations with JOIN to inventory_master
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['locations-responsables', role, searchTerm, currentPage, pageSize, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, filterPuntoReferencia],
+    queryKey: ['locations-responsables', role, debouncedSearchTerm, currentPage, pageSize, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, filterPuntoReferencia],
     queryFn: async () => {
       // Single query starting from locations with inner join to inventory_master
       let query = supabase
@@ -237,9 +193,9 @@ const GestionResponsables: React.FC = () => {
         query = query.eq('inventory_master.material_type', filterTipo);
       }
 
-      // Search by reference
-      if (searchTerm) {
-        query = query.ilike('master_reference', `%${searchTerm}%`);
+      // Search by reference (use debounced value)
+      if (debouncedSearchTerm) {
+        query = query.ilike('master_reference', `%${debouncedSearchTerm}%`);
       }
 
       // Filter by subcategoria
@@ -295,11 +251,20 @@ const GestionResponsables: React.FC = () => {
 
       return { locations, total: count || 0 };
     },
+    staleTime: 2 * 60 * 1000, // 2 minutes - data is relatively fresh
     enabled: !!role,
   });
 
-  // Selection functions
-  const toggleSelection = (id: string) => {
+  // OPTIMIZED: Memoized selection calculations
+  const { isAllSelected, isIndeterminate, allIds } = useMemo(() => {
+    const ids = data?.locations.map(l => l.id) || [];
+    const allSelected = ids.length > 0 && ids.every(id => selectedIds.has(id));
+    const indeterminate = selectedIds.size > 0 && !allSelected;
+    return { isAllSelected: allSelected, isIndeterminate: indeterminate, allIds: ids };
+  }, [data?.locations, selectedIds]);
+
+  // OPTIMIZED: Memoized selection functions
+  const toggleSelection = useCallback((id: string) => {
     setSelectedIds(prev => {
       const newSet = new Set(prev);
       if (newSet.has(id)) {
@@ -309,23 +274,16 @@ const GestionResponsables: React.FC = () => {
       }
       return newSet;
     });
-  };
+  }, []);
 
-  const toggleSelectAll = () => {
-    const allIds = data?.locations.map(l => l.id) || [];
-    const allSelected = allIds.length > 0 && allIds.every(id => selectedIds.has(id));
-    setSelectedIds(allSelected ? new Set() : new Set(allIds));
-  };
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds(isAllSelected ? new Set() : new Set(allIds));
+  }, [isAllSelected, allIds]);
 
-  const isAllSelected = () => {
-    const allIds = data?.locations.map(l => l.id) || [];
-    return allIds.length > 0 && allIds.every(id => selectedIds.has(id));
-  };
-
-  const isIndeterminate = () => {
-    const allIds = data?.locations.map(l => l.id) || [];
-    return selectedIds.size > 0 && !allIds.every(id => selectedIds.has(id));
-  };
+  // Memoized handler for supervisor changes
+  const handleSupervisorChange = useCallback((locationId: string, supervisorId: string | null) => {
+    updateAssignmentMutation.mutate({ locationId, supervisorId });
+  }, []);
 
   // Bulk assignment mutation
   const bulkAssignMutation = useMutation({
@@ -477,7 +435,7 @@ const GestionResponsables: React.FC = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
-                {subcategorias?.map((sub) => (
+                {filterOptions?.subcategorias?.map((sub) => (
                   <SelectItem key={sub} value={sub}>{sub}</SelectItem>
                 ))}
               </SelectContent>
@@ -493,7 +451,7 @@ const GestionResponsables: React.FC = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
-                {ubicaciones?.map((ub) => (
+                {filterOptions?.ubicaciones?.map((ub) => (
                   <SelectItem key={ub} value={ub}>{ub}</SelectItem>
                 ))}
               </SelectContent>
@@ -509,7 +467,7 @@ const GestionResponsables: React.FC = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
-                {observacionesOptions?.map((obs) => (
+                {filterOptions?.observaciones?.map((obs) => (
                   <SelectItem key={obs} value={obs}>{obs}</SelectItem>
                 ))}
               </SelectContent>
@@ -525,7 +483,7 @@ const GestionResponsables: React.FC = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
-                {puntosReferencia?.map((punto) => (
+                {filterOptions?.puntosReferencia?.map((punto) => (
                   <SelectItem key={punto} value={punto}>
                     {punto}
                   </SelectItem>
@@ -633,10 +591,10 @@ const GestionResponsables: React.FC = () => {
                   <TableRow>
                     <TableHead className="w-[50px]">
                       <Checkbox
-                        checked={isAllSelected()}
+                        checked={isAllSelected}
                         onCheckedChange={toggleSelectAll}
                         aria-label="Seleccionar todos"
-                        className={isIndeterminate() ? 'data-[state=checked]:bg-primary/50' : ''}
+                        className={isIndeterminate ? 'data-[state=checked]:bg-primary/50' : ''}
                       />
                     </TableHead>
                     <TableHead className="w-[80px]">Tipo</TableHead>
