@@ -166,54 +166,108 @@ const Auditoria: React.FC = () => {
   const [selectedHistory, setSelectedHistory] = useState<{ referencia: string; history: any[] } | null>(null);
   const [expandedRefs, setExpandedRefs] = useState<Set<string>>(new Set());
 
-  const { data: auditData, isLoading } = useQuery({
-    queryKey: ['audit-full-view'],
+  // Debounced search for server-side filtering
+  const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
+  
+  React.useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Reset page when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, materialTypeFilter, statusFilter, locationFilter]);
+
+  // Query for unique location names (for filter dropdown)
+  const { data: locationOptions } = useQuery({
+    queryKey: ['audit-location-options'],
     queryFn: async () => {
-      const { data: locations, error: locError } = await supabase
+      const { data, error } = await supabase
         .from('locations')
-        .select(`
-          id,
-          master_reference,
-          location_name,
-          location_detail,
-          subcategoria,
-          punto_referencia,
-          metodo_conteo,
-          observaciones,
-          validated_at_round,
-          validated_quantity,
-          discovered_at_round
-        `)
-        .order('master_reference');
-
-      if (locError) throw locError;
-      if (!locations || locations.length === 0) return { rows: [], uniqueLocations: [] };
-
-      const uniqueRefs = [...new Set(locations.map(l => l.master_reference))];
-      const { data: masters, error: masterError } = await supabase
-        .from('inventory_master')
-        .select('referencia, material_type, cant_total_erp, status_slug, audit_round, count_history')
-        .in('referencia', uniqueRefs);
-
-      if (masterError) throw masterError;
-
-      const masterMap = new Map(masters?.map(m => [m.referencia, m]) || []);
-
-      const locationIds = locations.map(l => l.id);
-      const { data: counts, error: countsError } = await supabase
-        .from('inventory_counts')
-        .select('location_id, audit_round, quantity_counted')
-        .in('location_id', locationIds);
-
-      if (countsError) throw countsError;
-
-      const countsMap = new Map<string, { c1: number | null; c2: number | null; c3: number | null; c4: number | null; c5: number | null }>();
+        .select('location_name');
       
-      locations.forEach(loc => {
+      if (error) throw error;
+      return [...new Set(data?.map(d => d.location_name).filter(Boolean))] as string[];
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const { data: auditData, isLoading } = useQuery({
+    queryKey: ['audit-full-view', currentPage, debouncedSearch, materialTypeFilter, statusFilter, locationFilter],
+    queryFn: async () => {
+      // 1. Build query with filters and pagination on inventory_master
+      let masterQuery = supabase
+        .from('inventory_master')
+        .select('referencia, material_type, cant_total_erp, status_slug, audit_round, count_history', { count: 'exact' });
+      
+      // Apply filters
+      if (debouncedSearch) {
+        masterQuery = masterQuery.ilike('referencia', `%${debouncedSearch}%`);
+      }
+      if (materialTypeFilter !== 'all') {
+        masterQuery = masterQuery.eq('material_type', materialTypeFilter as 'MP' | 'PP');
+      }
+      if (statusFilter !== 'all') {
+        masterQuery = masterQuery.eq('status_slug', statusFilter);
+      }
+      
+      // Server-side pagination
+      const from = (currentPage - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+      masterQuery = masterQuery.range(from, to).order('referencia');
+      
+      const { data: masters, error: masterError, count } = await masterQuery;
+      if (masterError) throw masterError;
+      if (!masters || masters.length === 0) return { rows: [], totalCount: count || 0 };
+      
+      // 2. Get locations only for references in this page
+      const refs = masters.map(m => m.referencia);
+      let locationsQuery = supabase
+        .from('locations')
+        .select('id, master_reference, location_name, location_detail, subcategoria, punto_referencia, metodo_conteo, observaciones, validated_at_round, validated_quantity, discovered_at_round')
+        .in('master_reference', refs);
+      
+      // Apply location filter if set
+      if (locationFilter !== 'all') {
+        locationsQuery = locationsQuery.eq('location_name', locationFilter);
+      }
+      
+      const { data: locations, error: locError } = await locationsQuery;
+      if (locError) throw locError;
+      
+      // 3. Get counts for those locations
+      const locationIds = locations?.map(l => l.id) || [];
+      let counts: { location_id: string; audit_round: number; quantity_counted: number }[] = [];
+      
+      if (locationIds.length > 0) {
+        // Batch in chunks of 100 to avoid URL length issues
+        const chunks = [];
+        for (let i = 0; i < locationIds.length; i += 100) {
+          chunks.push(locationIds.slice(i, i + 100));
+        }
+        
+        const countsResults = await Promise.all(
+          chunks.map(chunk => 
+            supabase
+              .from('inventory_counts')
+              .select('location_id, audit_round, quantity_counted')
+              .in('location_id', chunk)
+          )
+        );
+        
+        for (const result of countsResults) {
+          if (result.error) throw result.error;
+          if (result.data) counts.push(...result.data);
+        }
+      }
+      
+      // 4. Build counts map
+      const countsMap = new Map<string, { c1: number | null; c2: number | null; c3: number | null; c4: number | null; c5: number | null }>();
+      locations?.forEach(loc => {
         countsMap.set(loc.id, { c1: null, c2: null, c3: null, c4: null, c5: null });
       });
-
-      counts?.forEach(count => {
+      counts.forEach(count => {
         const existing = countsMap.get(count.location_id);
         if (existing) {
           const key = `c${count.audit_round}` as keyof typeof existing;
@@ -222,60 +276,53 @@ const Auditoria: React.FC = () => {
           }
         }
       });
-
-      const rows: AuditRow[] = locations.map(loc => {
-        const master = masterMap.get(loc.master_reference);
-        return {
-          locationId: loc.id,
-          referencia: loc.master_reference,
-          materialType: master?.material_type || 'MP',
-          locationName: loc.location_name,
-          locationDetail: loc.location_detail,
-          subcategoria: loc.subcategoria,
-          puntoReferencia: loc.punto_referencia,
-          metodoConteo: loc.metodo_conteo,
-          observaciones: loc.observaciones,
-          cantTotalErp: master?.cant_total_erp || 0,
-          statusSlug: master?.status_slug || 'pendiente',
-          auditRound: master?.audit_round || 1,
-          countHistory: master?.count_history || [],
-          validatedAtRound: loc.validated_at_round,
-          validatedQuantity: loc.validated_quantity,
-          discoveredAtRound: loc.discovered_at_round,
-          counts: countsMap.get(loc.id) || { c1: null, c2: null, c3: null, c4: null, c5: null },
-        };
+      
+      // 5. Group by reference
+      const masterMap = new Map(masters.map(m => [m.referencia, m]));
+      const locationsMap = new Map<string, typeof locations>();
+      locations?.forEach(loc => {
+        const existing = locationsMap.get(loc.master_reference) || [];
+        existing.push(loc);
+        locationsMap.set(loc.master_reference, existing);
       });
-
-      const uniqueLocations = [...new Set(locations.map(l => l.location_name).filter(Boolean))] as string[];
-
-      return { rows, uniqueLocations };
+      
+      // 6. Build grouped rows maintaining master order
+      const rows: AuditRow[] = [];
+      masters.forEach(master => {
+        const locs = locationsMap.get(master.referencia) || [];
+        locs.forEach(loc => {
+          rows.push({
+            locationId: loc.id,
+            referencia: master.referencia,
+            materialType: master.material_type || 'MP',
+            locationName: loc.location_name,
+            locationDetail: loc.location_detail,
+            subcategoria: loc.subcategoria,
+            puntoReferencia: loc.punto_referencia,
+            metodoConteo: loc.metodo_conteo,
+            observaciones: loc.observaciones,
+            cantTotalErp: master.cant_total_erp || 0,
+            statusSlug: master.status_slug || 'pendiente',
+            auditRound: master.audit_round || 1,
+            countHistory: master.count_history || [],
+            validatedAtRound: loc.validated_at_round,
+            validatedQuantity: loc.validated_quantity,
+            discoveredAtRound: loc.discovered_at_round,
+            counts: countsMap.get(loc.id) || { c1: null, c2: null, c3: null, c4: null, c5: null },
+          });
+        });
+      });
+      
+      return { rows, totalCount: count || 0 };
     },
+    staleTime: 2 * 60 * 1000,
   });
 
-  const filteredData = useMemo(() => {
-    if (!auditData?.rows) return [];
-
-    return auditData.rows.filter(row => {
-      if (searchQuery && !row.referencia.toLowerCase().includes(searchQuery.toLowerCase())) {
-        return false;
-      }
-      if (materialTypeFilter !== 'all' && row.materialType !== materialTypeFilter) {
-        return false;
-      }
-      if (statusFilter !== 'all' && row.statusSlug !== statusFilter) {
-        return false;
-      }
-      if (locationFilter !== 'all' && row.locationName !== locationFilter) {
-        return false;
-      }
-      return true;
-    });
-  }, [auditData?.rows, searchQuery, materialTypeFilter, statusFilter, locationFilter]);
-
   const groupedData = useMemo(() => {
-    const groups = new Map<string, AuditRow[]>();
+    if (!auditData?.rows) return [];
     
-    filteredData.forEach(row => {
+    const groups = new Map<string, AuditRow[]>();
+    auditData.rows.forEach(row => {
       const existing = groups.get(row.referencia) || [];
       existing.push(row);
       groups.set(row.referencia, existing);
@@ -302,17 +349,10 @@ const Auditoria: React.FC = () => {
         c5: calculateSum(rows, 'c5'),
       },
     }));
-  }, [filteredData]);
+  }, [auditData?.rows]);
 
-  const totalPages = Math.ceil(groupedData.length / ITEMS_PER_PAGE);
-  const paginatedGroups = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return groupedData.slice(start, start + ITEMS_PER_PAGE);
-  }, [groupedData, currentPage]);
-
-  React.useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, materialTypeFilter, statusFilter, locationFilter]);
+  const totalPages = Math.ceil((auditData?.totalCount || 0) / ITEMS_PER_PAGE);
+  const paginatedGroups = groupedData; // Data is already paginated from server
 
   const handleViewHistory = (referencia: string, history: any[]) => {
     setSelectedHistory({ referencia, history });
@@ -575,7 +615,7 @@ const Auditoria: React.FC = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas las ubicaciones</SelectItem>
-                {auditData?.uniqueLocations.map(loc => (
+                {locationOptions?.map(loc => (
                   <SelectItem key={loc} value={loc}>{loc}</SelectItem>
                 ))}
               </SelectContent>
@@ -586,9 +626,9 @@ const Auditoria: React.FC = () => {
         {/* Results count */}
         <div className="flex items-center justify-between text-sm text-muted-foreground">
           <span>
-            Mostrando {paginatedGroups.length} referencias ({filteredData.length} ubicaciones) de {groupedData.length} referencias
+            Mostrando {paginatedGroups.length} referencias ({auditData?.rows.length || 0} ubicaciones) de {auditData?.totalCount || 0} referencias totales
           </span>
-          {filteredData.length !== (auditData?.rows.length || 0) && (
+          {(debouncedSearch || materialTypeFilter !== 'all' || statusFilter !== 'all' || locationFilter !== 'all') && (
             <Button 
               variant="ghost" 
               size="sm"
