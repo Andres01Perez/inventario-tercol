@@ -64,33 +64,26 @@ const PrintableSheet: React.FC<PrintableSheetProps> = ({
 
         {/* Printable Content */}
         <div className="print:p-4 print:block" id="printable-sheet">
-          {/* Header */}
-          <div className="text-center mb-6 border-b pb-4">
-            <h1 className="text-2xl font-bold mb-1">PLANILLA DE CONTEO FÍSICO</h1>
-            <p className="text-lg font-medium text-primary">{roundLabel}</p>
-            <p className="text-muted-foreground">Inventario Físico</p>
-          </div>
-
-          {/* Info Row */}
-          <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
-            <div>
-              <span className="font-medium">Zona:</span> {zoneName}
-            </div>
-            <div>
-              <span className="font-medium">Fecha:</span> {today}
-            </div>
-            <div>
-              <span className="font-medium">Supervisor:</span> {supervisorName}
-            </div>
-            <div>
-              <span className="font-medium">Total Items:</span> {locations.length}
-            </div>
-          </div>
-
-          {/* Table */}
+          {/* Table with header info in thead and signatures in tfoot */}
           <table className="w-full border-collapse text-xs print:text-[10px]">
             <thead className="print:table-header-group">
-              <tr className="border-b-2 border-foreground">
+              {/* Header info row - repeats on each page */}
+              <tr>
+                <th colSpan={9} className="pb-4 border-b-0 text-left font-normal">
+                  <div className="text-center mb-4">
+                    <h1 className="text-xl font-bold">PLANILLA DE CONTEO FÍSICO</h1>
+                    <p className="text-base font-medium text-primary">{roundLabel}</p>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span><strong>Zona:</strong> {zoneName}</span>
+                    <span><strong>Fecha:</strong> {today}</span>
+                    <span><strong>Supervisor:</strong> {supervisorName}</span>
+                    <span><strong>Total:</strong> {locations.length} items</span>
+                  </div>
+                </th>
+              </tr>
+              {/* Column headers row */}
+              <tr className="border-b-2 border-t border-foreground">
                 <th className="text-left py-2 px-1 w-8">#</th>
                 <th className="text-left py-2 px-1">Tipo</th>
                 <th className="text-left py-2 px-1">Referencia</th>
@@ -102,6 +95,25 @@ const PrintableSheet: React.FC<PrintableSheetProps> = ({
                 <th className="text-center py-2 px-1 w-20">Cantidad</th>
               </tr>
             </thead>
+            
+            {/* Signatures footer - repeats on each page */}
+            <tfoot className="print:table-footer-group">
+              <tr>
+                <td colSpan={9} className="pt-8">
+                  <div className="grid grid-cols-2 gap-8">
+                    <div className="text-center">
+                      <div className="border-b border-foreground mb-2 h-6"></div>
+                      <p className="text-xs text-muted-foreground">Firma Responsable</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="border-b border-foreground mb-2 h-6"></div>
+                      <p className="text-xs text-muted-foreground">Firma Supervisor</p>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </tfoot>
+            
             <tbody>
               {locations.map((loc, index) => (
                 <tr key={loc.id} className="border-b border-muted print:break-inside-avoid">
@@ -120,18 +132,6 @@ const PrintableSheet: React.FC<PrintableSheetProps> = ({
               ))}
             </tbody>
           </table>
-
-          {/* Signatures */}
-          <div className="grid grid-cols-2 gap-8 mt-12 pt-8 print-signatures">
-            <div className="text-center">
-              <div className="border-b border-foreground mb-2 h-8"></div>
-              <p className="text-sm text-muted-foreground">Firma Responsable</p>
-            </div>
-            <div className="text-center">
-              <div className="border-b border-foreground mb-2 h-8"></div>
-              <p className="text-sm text-muted-foreground">Firma Supervisor</p>
-            </div>
-          </div>
         </div>
 
         {/* Print Button */}

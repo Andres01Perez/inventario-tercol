@@ -348,6 +348,10 @@
     display: table-footer-group;
   }
 
+  tfoot {
+    display: table-footer-group;
+  }
+
   /* Signatures section - avoid breaking before */
   .print-signatures {
     page-break-before: avoid;
