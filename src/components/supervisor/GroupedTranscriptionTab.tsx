@@ -467,40 +467,45 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
                       const isSaving = savingIds.has(loc.id);
                       
                       return (
-                        <div key={loc.id} className="flex items-center gap-2 p-3 border rounded-lg bg-background">
-                          <LocationInfoPopover location={loc} />
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">{loc.master_reference}</p>
-                            <p className="text-xs text-muted-foreground truncate">
+                        <div key={loc.id} className="p-3 border rounded-lg bg-background space-y-2">
+                          {/* Línea 1: Referencia + Info */}
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-semibold text-sm break-all">{loc.master_reference}</p>
+                            <LocationInfoPopover location={loc} />
+                          </div>
+                          
+                          {/* Línea 2: Ubicación + Input + Guardar */}
+                          <div className="flex items-center gap-2">
+                            <p className="flex-1 text-xs text-muted-foreground truncate">
                               {loc.location_name || loc.punto_referencia || '-'}
                             </p>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="0"
+                              className="w-24 text-center font-bold h-9"
+                              value={quantities[loc.id] || ''}
+                              onChange={(e) => setQuantities(prev => ({
+                                ...prev,
+                                [loc.id]: e.target.value
+                              }))}
+                              onKeyDown={(e) => handleKeyDown(e, loc.id)}
+                              disabled={isSaving}
+                            />
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleSaveCount(loc.id)}
+                              disabled={isSaving || !quantities[loc.id]}
+                            >
+                              {isSaving ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Save className="w-4 h-4" />
+                              )}
+                            </Button>
                           </div>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            placeholder="0"
-                            className="w-20 text-center font-bold h-9"
-                            value={quantities[loc.id] || ''}
-                            onChange={(e) => setQuantities(prev => ({
-                              ...prev,
-                              [loc.id]: e.target.value
-                            }))}
-                            onKeyDown={(e) => handleKeyDown(e, loc.id)}
-                            disabled={isSaving}
-                          />
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleSaveCount(loc.id)}
-                            disabled={isSaving || !quantities[loc.id]}
-                          >
-                            {isSaving ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Save className="w-4 h-4" />
-                            )}
-                          </Button>
                         </div>
                       );
                     })}
