@@ -219,8 +219,11 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
           table: 'inventory_counts',
         },
         (payload) => {
-          if (payload.new && payload.new.audit_round === roundNumber) {
-            queryClient.invalidateQueries({ queryKey: ['grouped-transcription-locations', roundNumber] });
+          const payloadRound = Number(payload.new?.audit_round);
+          console.log(`[REALTIME] INSERT detected for round ${payloadRound}, current view is round ${roundNumber}`);
+          if (payload.new && payloadRound === roundNumber) {
+            console.log(`[REALTIME] Invalidating queries for round ${roundNumber}`);
+            queryClient.invalidateQueries({ queryKey: ['grouped-transcription-locations'] });
           }
         }
       )
@@ -273,6 +276,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
       }
 
       queryClient.invalidateQueries({ queryKey: ['validation-references'] });
+      queryClient.invalidateQueries({ queryKey: ['grouped-transcription-locations'] });
     }
   };
 
@@ -355,7 +359,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
     onSuccess: async (result, variables) => {
       toast.success(`Conteo ${roundNumber} guardado`);
       
-      queryClient.invalidateQueries({ queryKey: ['grouped-transcription-locations', roundNumber] });
+      queryClient.invalidateQueries({ queryKey: ['grouped-transcription-locations'] });
       queryClient.invalidateQueries({ queryKey: ['supervisor-stats'] });
       
       setSavingIds(prev => {
