@@ -3,12 +3,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useDebounce } from '@/hooks/useDebounce';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +22,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import PrintableSheet from '@/components/supervisor/PrintableSheet';
 import AddLocationDialog from '@/components/supervisor/AddLocationDialog';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, RefreshCw, MapPin, Save, Printer, Plus, Info } from 'lucide-react';
+import { Loader2, CheckCircle2, RefreshCw, MapPin, Save, Printer, Plus, Info, Search, Bug, AlertTriangle } from 'lucide-react';
 
 // Popover component for location info on mobile
 const LocationInfoPopover: React.FC<{ location: Location }> = ({ location }) => (
@@ -89,7 +95,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
   isAdminMode = false,
   controlFilter = 'all',
 }) => {
-  const { user, profile } = useAuth();
+  const { user, profile, role } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const [quantities, setQuantities] = useState<Record<string, string>>({});
@@ -98,9 +104,24 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [printZoneData, setPrintZoneData] = useState<{ name: string; locations: Location[] } | null>(null);
   const [addLocationOpen, setAddLocationOpen] = useState(false);
+  
+  // Diagnostic panel state
+  const [showDiagnostic, setShowDiagnostic] = useState(false);
+  const [diagnosticRef, setDiagnosticRef] = useState('');
+  const [diagnosticResult, setDiagnosticResult] = useState<any>(null);
+  const [isDiagnosing, setIsDiagnosing] = useState(false);
+  const [localSearchTerm, setLocalSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(localSearchTerm, 300);
 
   // Determine which master audit_round to filter by
   const masterAuditRound = roundNumber <= 2 ? 1 : roundNumber;
+
+  // Debug: Track raw data before filtering
+  const [debugInfo, setDebugInfo] = useState<{
+    rawCount: number;
+    filteredCount: number;
+    countedIds: string[];
+  }>({ rawCount: 0, filteredCount: 0, countedIds: [] });
 
   const { data: locations = [], isLoading, refetch } = useQuery({
     queryKey: ['grouped-transcription-locations', roundNumber, user?.id, isAdminMode, controlFilter, masterAuditRound],
@@ -110,6 +131,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
         .select(`
           id, master_reference, location_name, location_detail,
           subcategoria, observaciones, punto_referencia, metodo_conteo,
+          assigned_supervisor_id,
           inventory_master!inner(referencia, material_type, control, audit_round)
         `)
         .eq('inventory_master.audit_round', masterAuditRound);
@@ -129,10 +151,16 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
       const { data, error } = await query.limit(10000);
       if (error) throw error;
 
-      // Filter out locations that already have a count for this specific round
-      if (!data || data.length === 0) return [];
+      const rawData = data || [];
+      console.log(`[DEBUG] Query returned ${rawData.length} rows for round ${roundNumber}, masterAuditRound=${masterAuditRound}`);
 
-      const locationIds = data.map(l => l.id);
+      // Filter out locations that already have a count for this specific round
+      if (rawData.length === 0) {
+        setDebugInfo({ rawCount: 0, filteredCount: 0, countedIds: [] });
+        return [];
+      }
+
+      const locationIds = rawData.map(l => l.id);
       
       const { data: existingCounts } = await supabase
         .from('inventory_counts')
@@ -141,9 +169,16 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
         .eq('audit_round', roundNumber);
 
       const countedLocationIds = new Set(existingCounts?.map(c => c.location_id) || []);
+      
+      // Debug info
+      setDebugInfo({
+        rawCount: rawData.length,
+        filteredCount: rawData.length - countedLocationIds.size,
+        countedIds: Array.from(countedLocationIds) as string[]
+      });
 
       // Return only locations that DON'T have a count for this round
-      return (data as unknown as Location[]).filter(loc => !countedLocationIds.has(loc.id));
+      return (rawData as unknown as Location[]).filter(loc => !countedLocationIds.has(loc.id));
     },
     enabled: !!user?.id,
   });
@@ -352,11 +387,145 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
     }
   };
 
-  // Group locations by punto_referencia
-  const groupedByZone = useMemo(() => {
+  // Diagnostic function to investigate why a reference might be missing
+  const runDiagnostic = async (reference: string) => {
+    setIsDiagnosing(true);
+    try {
+      const refUpper = reference.toUpperCase().trim();
+      
+      // 1. Check inventory_master
+      const { data: masterData } = await supabase
+        .from('inventory_master')
+        .select('referencia, material_type, control, audit_round, status_slug')
+        .ilike('referencia', `%${refUpper}%`)
+        .limit(10);
+      
+      // 2. Check locations for this reference
+      const { data: locData } = await supabase
+        .from('locations')
+        .select('id, master_reference, punto_referencia, location_name, assigned_supervisor_id, status_c1, status_c2, status_c3, status_c4')
+        .ilike('master_reference', `%${refUpper}%`)
+        .limit(20);
+      
+      // 3. Check inventory_counts for these locations
+      const locationIds = locData?.map(l => l.id) || [];
+      let countsData: any[] = [];
+      if (locationIds.length > 0) {
+        const { data: counts } = await supabase
+          .from('inventory_counts')
+          .select('id, location_id, audit_round, quantity_counted, supervisor_id, created_at')
+          .in('location_id', locationIds);
+        countsData = counts || [];
+      }
+
+      // 4. Check if reference appears in current filtered data
+      const inCurrentView = locations.filter(l => 
+        l.master_reference.toUpperCase().includes(refUpper)
+      );
+
+      setDiagnosticResult({
+        searchTerm: refUpper,
+        masterRecords: masterData || [],
+        locations: locData || [],
+        counts: countsData,
+        inCurrentView: inCurrentView.length,
+        currentUserId: user?.id,
+        currentRound: roundNumber,
+        masterAuditRound,
+        isAdminMode,
+        controlFilter,
+        reasons: generateReasons(masterData, locData, countsData, inCurrentView.length, user?.id, roundNumber, masterAuditRound, isAdminMode, controlFilter)
+      });
+    } catch (err) {
+      console.error('Diagnostic error:', err);
+      toast.error('Error al diagnosticar');
+    } finally {
+      setIsDiagnosing(false);
+    }
+  };
+
+  // Generate human-readable reasons why a reference might be missing
+  const generateReasons = (
+    masterData: any[] | null,
+    locData: any[] | null,
+    countsData: any[],
+    inViewCount: number,
+    userId: string | undefined,
+    round: number,
+    masterRound: number,
+    adminMode: boolean,
+    ctrlFilter: string
+  ): string[] => {
+    const reasons: string[] = [];
+    
+    if (!masterData || masterData.length === 0) {
+      reasons.push('❌ NO existe en inventory_master');
+      return reasons;
+    }
+    
+    const masterRecord = masterData[0];
+    if (masterRecord.audit_round !== masterRound) {
+      reasons.push(`❌ audit_round en maestra (${masterRecord.audit_round}) ≠ esperado (${masterRound})`);
+    } else {
+      reasons.push(`✅ audit_round en maestra = ${masterRound}`);
+    }
+
+    if (ctrlFilter === 'not_null' && !masterRecord.control) {
+      reasons.push('❌ Filtro control="not_null" pero control es NULL');
+    } else if (ctrlFilter === 'null' && masterRecord.control) {
+      reasons.push(`❌ Filtro control="null" pero control = "${masterRecord.control}"`);
+    } else {
+      reasons.push(`✅ Filtro control="${ctrlFilter}" pasa (control=${masterRecord.control || 'null'})`);
+    }
+    
+    if (!locData || locData.length === 0) {
+      reasons.push('❌ NO hay locations para esta referencia');
+      return reasons;
+    }
+    
+    reasons.push(`✅ ${locData.length} location(s) encontrada(s)`);
+    
+    if (!adminMode) {
+      const assignedToUser = locData.filter(l => l.assigned_supervisor_id === userId);
+      if (assignedToUser.length === 0) {
+        reasons.push(`❌ Ninguna location asignada al supervisor actual (${userId?.slice(0,8)}...)`);
+      } else {
+        reasons.push(`✅ ${assignedToUser.length} location(s) asignada(s) al supervisor`);
+      }
+    }
+    
+    const countsForRound = countsData.filter(c => c.audit_round === round);
+    if (countsForRound.length > 0) {
+      reasons.push(`⚠️ ${countsForRound.length} conteo(s) ya existen para ronda ${round} - se filtran`);
+    } else {
+      reasons.push(`✅ Sin conteos para ronda ${round}`);
+    }
+    
+    if (inViewCount > 0) {
+      reasons.push(`✅ VISIBLE en la vista actual (${inViewCount} items)`);
+    } else {
+      reasons.push('❌ NO aparece en la vista actual filtrada');
+    }
+    
+    return reasons;
+  };
+
+  // Filter locations by local search term
+  const filteredGroupedByZone = useMemo(() => {
+    let filteredLocations = locations;
+    
+    if (debouncedSearchTerm.trim()) {
+      const term = debouncedSearchTerm.toUpperCase();
+      filteredLocations = locations.filter(loc =>
+        loc.master_reference.toUpperCase().includes(term) ||
+        (loc.punto_referencia && loc.punto_referencia.toUpperCase().includes(term)) ||
+        (loc.location_name && loc.location_name.toUpperCase().includes(term))
+      );
+    }
+
     const groups: Record<string, { zoneName: string; locations: Location[] }> = {};
 
-    locations.forEach(loc => {
+    filteredLocations.forEach(loc => {
       const key = loc.punto_referencia || 'sin_zona';
       const name = loc.punto_referencia || 'Sin Zona Asignada';
 
@@ -375,7 +544,10 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
     });
 
     return entries;
-  }, [locations]);
+  }, [locations, debouncedSearchTerm]);
+
+  // Keep groupedByZone for backwards compatibility
+  const groupedByZone = filteredGroupedByZone;
 
   const handlePrintClick = (zoneName: string, zoneLocations: Location[]) => {
     setPrintZoneData({ name: zoneName, locations: zoneLocations });
@@ -390,7 +562,10 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
     );
   }
 
-  if (groupedByZone.length === 0) {
+  // Show diagnostic panel even when no locations (for debugging)
+  const canShowDiagnostic = role === 'superadmin' || role === 'admin_mp' || role === 'admin_pp';
+
+  if (groupedByZone.length === 0 && !canShowDiagnostic) {
     return (
       <div className="text-center py-12 text-muted-foreground">
         No hay ubicaciones pendientes para transcribir en este conteo
@@ -400,6 +575,133 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
 
   return (
     <div className="space-y-4">
+      {/* Diagnostic Panel - Only for admins */}
+      {canShowDiagnostic && (
+        <Collapsible open={showDiagnostic} onOpenChange={setShowDiagnostic}>
+          <CollapsibleTrigger asChild>
+            <Button variant="outline" size="sm" className="w-full justify-between">
+              <span className="flex items-center gap-2">
+                <Bug className="w-4 h-4" />
+                Panel de Diagnóstico
+              </span>
+              <Badge variant="secondary" className="ml-2">
+                {debugInfo.rawCount} raw → {locations.length} visible
+              </Badge>
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-3 p-4 border rounded-lg bg-muted/30 space-y-4">
+            {/* Debug Info */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+              <div className="p-2 bg-background rounded">
+                <span className="text-muted-foreground">Round:</span> {roundNumber}
+              </div>
+              <div className="p-2 bg-background rounded">
+                <span className="text-muted-foreground">Master Round:</span> {masterAuditRound}
+              </div>
+              <div className="p-2 bg-background rounded">
+                <span className="text-muted-foreground">Admin Mode:</span> {isAdminMode ? 'Sí' : 'No'}
+              </div>
+              <div className="p-2 bg-background rounded">
+                <span className="text-muted-foreground">Control:</span> {controlFilter}
+              </div>
+            </div>
+
+            {/* Reference Search */}
+            <div className="flex gap-2">
+              <Input
+                placeholder="Buscar referencia para diagnosticar (ej: NEUTRO6ALET)"
+                value={diagnosticRef}
+                onChange={(e) => setDiagnosticRef(e.target.value)}
+                className="flex-1"
+              />
+              <Button 
+                onClick={() => runDiagnostic(diagnosticRef)}
+                disabled={isDiagnosing || !diagnosticRef.trim()}
+              >
+                {isDiagnosing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                Diagnosticar
+              </Button>
+            </div>
+
+            {/* Diagnostic Results */}
+            {diagnosticResult && (
+              <div className="space-y-3 text-sm">
+                <h4 className="font-semibold flex items-center gap-2">
+                  Resultado para: {diagnosticResult.searchTerm}
+                </h4>
+                
+                {/* Reasons */}
+                <div className="space-y-1 p-3 bg-background rounded-lg">
+                  <h5 className="font-medium text-muted-foreground mb-2">Análisis:</h5>
+                  {diagnosticResult.reasons.map((reason: string, idx: number) => (
+                    <div key={idx} className="flex items-start gap-2">
+                      {reason}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Master Records */}
+                {diagnosticResult.masterRecords.length > 0 && (
+                  <details className="p-3 bg-background rounded-lg">
+                    <summary className="cursor-pointer font-medium">
+                      inventory_master ({diagnosticResult.masterRecords.length})
+                    </summary>
+                    <pre className="mt-2 text-xs overflow-auto max-h-32">
+                      {JSON.stringify(diagnosticResult.masterRecords, null, 2)}
+                    </pre>
+                  </details>
+                )}
+
+                {/* Locations */}
+                {diagnosticResult.locations.length > 0 && (
+                  <details className="p-3 bg-background rounded-lg">
+                    <summary className="cursor-pointer font-medium">
+                      locations ({diagnosticResult.locations.length})
+                    </summary>
+                    <pre className="mt-2 text-xs overflow-auto max-h-32">
+                      {JSON.stringify(diagnosticResult.locations, null, 2)}
+                    </pre>
+                  </details>
+                )}
+
+                {/* Counts */}
+                {diagnosticResult.counts.length > 0 && (
+                  <details className="p-3 bg-background rounded-lg">
+                    <summary className="cursor-pointer font-medium flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-500" />
+                      inventory_counts ({diagnosticResult.counts.length}) - posible causa
+                    </summary>
+                    <pre className="mt-2 text-xs overflow-auto max-h-32">
+                      {JSON.stringify(diagnosticResult.counts, null, 2)}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+
+      {/* Local Search */}
+      <div className="flex gap-2 items-center">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar referencia..."
+            value={localSearchTerm}
+            onChange={(e) => setLocalSearchTerm(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        {localSearchTerm && (
+          <Badge variant="secondary">
+            {locations.filter(l => 
+              l.master_reference.toUpperCase().includes(localSearchTerm.toUpperCase())
+            ).length} resultados
+          </Badge>
+        )}
+      </div>
+
       <div className="flex justify-between items-center">
         <Button 
           variant="default" 
@@ -420,9 +722,17 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
         </Button>
       </div>
 
-      <Accordion type="multiple" className="space-y-3">
-        {groupedByZone.map(([zoneKey, group]) => {
-          const isNoZone = zoneKey === 'sin_zona';
+      {groupedByZone.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          {localSearchTerm 
+            ? `No se encontraron resultados para "${localSearchTerm}"`
+            : 'No hay ubicaciones pendientes para transcribir en este conteo'
+          }
+        </div>
+      ) : (
+        <Accordion type="multiple" className="space-y-3">
+          {groupedByZone.map(([zoneKey, group]) => {
+            const isNoZone = zoneKey === 'sin_zona';
 
           return (
             <AccordionItem
@@ -585,7 +895,8 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
             </AccordionItem>
           );
         })}
-      </Accordion>
+        </Accordion>
+      )}
 
       {printZoneData && (
         <PrintableSheet
