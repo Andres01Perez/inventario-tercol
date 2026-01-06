@@ -210,10 +210,10 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
     enabled: !!user?.id,
   });
 
-  // Realtime subscription for inventory_counts
+  // Realtime subscription for inventory_counts - optimizado
   useEffect(() => {
     const channel = supabase
-      .channel(`inventory-counts-grouped-${roundNumber}`)
+      .channel(`inventory-counts-round-${roundNumber}`)
       .on(
         'postgres_changes',
         {
@@ -225,8 +225,9 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
           const payloadRound = Number(payload.new?.audit_round);
           console.log(`[REALTIME] INSERT detected for round ${payloadRound}, current view is round ${roundNumber}`);
           if (payload.new && payloadRound === roundNumber) {
-          console.log(`[REALTIME] Refetching queries for round ${roundNumber}`);
-            queryClient.refetchQueries({ queryKey: ['grouped-transcription-locations'], type: 'active' });
+            console.log(`[REALTIME] Invalidating queries for round ${roundNumber}`);
+            // Solo invalidar, no refetch agresivo - dejará que el staleTime controle
+            queryClient.invalidateQueries({ queryKey: ['grouped-transcription-locations', roundNumber] });
           }
         }
       )
@@ -397,12 +398,10 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
 
       return { locationId, masterReference: location?.master_reference };
     },
-    onSuccess: async (result, variables) => {
+    onSuccess: (result, variables) => {
       toast.success(`Conteo ${roundNumber} guardado`);
       
-      await queryClient.refetchQueries({ queryKey: ['grouped-transcription-locations'], type: 'active' });
-      queryClient.invalidateQueries({ queryKey: ['supervisor-stats'] });
-      
+      // Limpiar estado inmediatamente para feedback visual rápido
       setSavingIds(prev => {
         const next = new Set(prev);
         next.delete(variables.locationId);
@@ -415,11 +414,21 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
         return next;
       });
 
+      // Invalidar queries para actualizar UI
+      queryClient.invalidateQueries({ queryKey: ['grouped-transcription-locations'] });
+      queryClient.invalidateQueries({ queryKey: ['supervisor-stats'] });
+
+      // Ejecutar validación de forma asíncrona sin bloquear la UI
       if (result.masterReference) {
-        if (roundNumber <= 2) {
-          await checkAndAutoValidate(result.masterReference);
-        } else if (roundNumber === 3 || roundNumber === 4) {
-          await checkAndAutoValidateHigherRounds(result.masterReference, roundNumber);
+        const validationFn = roundNumber <= 2 
+          ? checkAndAutoValidate 
+          : (roundNumber === 3 || roundNumber === 4) 
+            ? (ref: string) => checkAndAutoValidateHigherRounds(ref, roundNumber as 3 | 4)
+            : null;
+        
+        if (validationFn) {
+          validationFn(result.masterReference)
+            .catch(err => console.error('Error en validación background:', err));
         }
       }
     },
