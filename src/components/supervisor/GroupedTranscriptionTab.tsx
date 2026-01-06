@@ -105,6 +105,9 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
   const [printZoneData, setPrintZoneData] = useState<{ name: string; locations: Location[] } | null>(null);
   const [addLocationOpen, setAddLocationOpen] = useState(false);
   
+  // Lock para evitar llamadas duplicadas a validación
+  const [validatingRefs, setValidatingRefs] = useState<Set<string>>(new Set());
+  
   // Diagnostic panel state
   const [showDiagnostic, setShowDiagnostic] = useState(false);
   const [diagnosticRef, setDiagnosticRef] = useState('');
@@ -243,44 +246,68 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
 
   // Auto-validation functions
   const checkAndAutoValidate = async (masterReference: string) => {
-    const { data: refLocations } = await supabase
-      .from('locations')
-      .select('id')
-      .eq('master_reference', masterReference);
+    // Evitar llamadas duplicadas
+    if (validatingRefs.has(masterReference)) {
+      console.log(`[VALIDATION] Ya se está validando ${masterReference}, omitiendo`);
+      return;
+    }
+    
+    setValidatingRefs(prev => new Set(prev).add(masterReference));
+    
+    try {
+      const { data: refLocations } = await supabase
+        .from('locations')
+        .select('id')
+        .eq('master_reference', masterReference);
 
-    if (!refLocations || refLocations.length === 0) return;
+      if (!refLocations || refLocations.length === 0) return;
 
-    const locationIds = refLocations.map(l => l.id);
+      const locationIds = refLocations.map(l => l.id);
 
-    const { data: counts } = await supabase
-      .from('inventory_counts')
-      .select('audit_round')
-      .in('location_id', locationIds)
-      .in('audit_round', [1, 2]);
+      const { data: counts } = await supabase
+        .from('inventory_counts')
+        .select('audit_round')
+        .in('location_id', locationIds)
+        .in('audit_round', [1, 2]);
 
-    const c1Count = counts?.filter(c => c.audit_round === 1).length || 0;
-    const c2Count = counts?.filter(c => c.audit_round === 2).length || 0;
+      const c1Count = counts?.filter(c => c.audit_round === 1).length || 0;
+      const c2Count = counts?.filter(c => c.audit_round === 2).length || 0;
 
-    if (c1Count === refLocations.length && c2Count === refLocations.length) {
-      const { data: result } = await supabase.rpc('validate_and_close_round', {
-        _reference: masterReference,
-        _admin_id: user!.id,
-      });
+      if (c1Count === refLocations.length && c2Count === refLocations.length) {
+        const { data: result } = await supabase.rpc('validate_and_close_round', {
+          _reference: masterReference,
+          _admin_id: user!.id,
+        });
 
-      const validationResult = result as { success?: boolean; action?: string; new_round?: number } | null;
+        const validationResult = result as { success?: boolean; action?: string; new_round?: number } | null;
 
-      if (validationResult?.action === 'closed') {
-        toast.success(`✅ ${masterReference} - AUDITADO automáticamente`);
-      } else if (validationResult?.action === 'next_round') {
-        toast.warning(`⚠️ ${masterReference} - Pasó a Conteo ${validationResult.new_round}`);
+        if (validationResult?.action === 'closed') {
+          toast.success(`✅ ${masterReference} - AUDITADO automáticamente`);
+        } else if (validationResult?.action === 'next_round') {
+          toast.warning(`⚠️ ${masterReference} - Pasó a Conteo ${validationResult.new_round}`);
+        }
+
+        queryClient.invalidateQueries({ queryKey: ['validation-references'] });
+        queryClient.refetchQueries({ queryKey: ['grouped-transcription-locations'], type: 'active' });
       }
-
-      queryClient.invalidateQueries({ queryKey: ['validation-references'] });
-      queryClient.refetchQueries({ queryKey: ['grouped-transcription-locations'], type: 'active' });
+    } finally {
+      setValidatingRefs(prev => {
+        const next = new Set(prev);
+        next.delete(masterReference);
+        return next;
+      });
     }
   };
 
   const checkAndAutoValidateHigherRounds = async (masterReference: string, currentRound: 3 | 4) => {
+    // Evitar llamadas duplicadas
+    if (validatingRefs.has(masterReference)) {
+      console.log(`[VALIDATION] Ya se está validando ${masterReference} para ronda ${currentRound}, omitiendo`);
+      return;
+    }
+    
+    setValidatingRefs(prev => new Set(prev).add(masterReference));
+    
     try {
       const { data: refLocations } = await supabase
         .from('locations')
@@ -312,6 +339,12 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
 
       const countedLocationIds = new Set(counts?.map(c => c.location_id) || []);
 
+      // NUEVO: Si no hay ningún conteo de la ronda actual, no llamar a validación
+      if (countedLocationIds.size === 0) {
+        console.log(`[VALIDATION] No hay conteos de ronda ${currentRound} aún para ${masterReference}, omitiendo validación`);
+        return;
+      }
+
       if (countedLocationIds.size < refLocations.length) return;
 
       const { data: result } = await supabase.rpc('validate_and_close_round', {
@@ -327,12 +360,20 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
         toast.warning(`⚠️ ${masterReference} - Pasó a Conteo ${validationResult.new_round}`);
       } else if (validationResult?.action === 'escalate_to_superadmin') {
         toast.error(`🚨 ${masterReference} - Escalado a SUPERADMIN (Crítico C5)`);
+      } else if (validationResult?.action === 'waiting_for_counts') {
+        console.log(`[VALIDATION] ${masterReference} esperando conteos de ronda ${currentRound}`);
       }
 
       queryClient.invalidateQueries({ queryKey: ['validation-references'] });
       queryClient.refetchQueries({ queryKey: ['grouped-transcription-locations'], type: 'active' });
     } catch (err) {
       console.error('Error en validación:', err);
+    } finally {
+      setValidatingRefs(prev => {
+        const next = new Set(prev);
+        next.delete(masterReference);
+        return next;
+      });
     }
   };
 
