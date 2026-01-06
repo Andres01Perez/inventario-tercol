@@ -41,11 +41,11 @@ interface CriticalReference {
 }
 
 const Criticos: React.FC = () => {
-  // Fetch critical references (audit_round = 5)
+  // OPTIMIZED: Fetch critical references with batch queries (eliminates N+1)
   const { data: criticalReferences = [], isLoading, refetch } = useQuery({
     queryKey: ['critical-references'],
     queryFn: async () => {
-      // Get all inventory_master with audit_round = 5
+      // 1. Get all inventory_master with audit_round = 5
       const { data: masters, error: mastersError } = await supabase
         .from('inventory_master')
         .select('referencia, material_type, control, cant_total_erp, count_history')
@@ -54,75 +54,90 @@ const Criticos: React.FC = () => {
       if (mastersError) throw mastersError;
       if (!masters || masters.length === 0) return [];
 
-      // For each master, get its locations and count history from inventory_counts
-      const referencesWithLocations: CriticalReference[] = await Promise.all(
-        masters.map(async (master) => {
-          const { data: locations } = await supabase
-            .from('locations')
-            .select(`
-              id, master_reference, location_name, location_detail,
-              subcategoria, observaciones, punto_referencia, metodo_conteo
-            `)
-            .eq('master_reference', master.referencia);
+      const references = masters.map(m => m.referencia);
 
-          // Filter out locations that already have C5 count
-          const locationIds = locations?.map(l => l.id) || [];
-          
-          let filteredLocations = locations || [];
-          
-          if (locationIds.length > 0) {
-            const { data: existingCounts } = await supabase
-              .from('inventory_counts')
-              .select('location_id')
-              .in('location_id', locationIds)
-              .eq('audit_round', 5);
+      // 2. Batch fetch ALL locations for all critical references
+      const { data: allLocations } = await supabase
+        .from('locations')
+        .select(`
+          id, master_reference, location_name, location_detail,
+          subcategoria, observaciones, punto_referencia, metodo_conteo
+        `)
+        .in('master_reference', references);
 
-            const countedLocationIds = new Set(existingCounts?.map(c => c.location_id) || []);
-            filteredLocations = (locations || []).filter(loc => !countedLocationIds.has(loc.id));
+      if (!allLocations || allLocations.length === 0) return [];
+
+      const allLocationIds = allLocations.map(l => l.id);
+
+      // 3. Batch fetch ALL counts for C1-C5 in one query
+      const { data: allCounts } = await supabase
+        .from('inventory_counts')
+        .select('location_id, audit_round, quantity_counted')
+        .in('location_id', allLocationIds)
+        .in('audit_round', [1, 2, 3, 4, 5]);
+
+      // 4. Build lookup maps for efficient grouping
+      const locationsByRef = new Map<string, Location[]>();
+      allLocations.forEach(loc => {
+        const list = locationsByRef.get(loc.master_reference) || [];
+        list.push(loc);
+        locationsByRef.set(loc.master_reference, list);
+      });
+
+      const countsByLocationId = new Map<string, { round: number; qty: number }[]>();
+      allCounts?.forEach(count => {
+        const list = countsByLocationId.get(count.location_id) || [];
+        list.push({ round: count.audit_round, qty: Number(count.quantity_counted) });
+        countsByLocationId.set(count.location_id, list);
+      });
+
+      // 5. Build result using in-memory grouping (no more N+1 queries)
+      const referencesWithLocations: CriticalReference[] = masters.map(master => {
+        const locations = locationsByRef.get(master.referencia) || [];
+        
+        // Filter out locations that already have C5 count
+        const c5CountedLocationIds = new Set<string>();
+        locations.forEach(loc => {
+          const counts = countsByLocationId.get(loc.id) || [];
+          if (counts.some(c => c.round === 5)) {
+            c5CountedLocationIds.add(loc.id);
           }
+        });
+        const filteredLocations = locations.filter(loc => !c5CountedLocationIds.has(loc.id));
 
-          // Get actual count sums from inventory_counts for C1-C4
-          const allLocationIds = locations?.map(l => l.id) || [];
-          let countSummary = { c1: 0, c2: 0, c3: 0, c4: 0 };
-          
-          if (allLocationIds.length > 0) {
-            const { data: allCounts } = await supabase
-              .from('inventory_counts')
-              .select('audit_round, quantity_counted')
-              .in('location_id', allLocationIds)
-              .in('audit_round', [1, 2, 3, 4]);
+        // Calculate count summary from in-memory data
+        const countSummary = { c1: 0, c2: 0, c3: 0, c4: 0 };
+        locations.forEach(loc => {
+          const counts = countsByLocationId.get(loc.id) || [];
+          counts.forEach(c => {
+            if (c.round === 1) countSummary.c1 += c.qty;
+            else if (c.round === 2) countSummary.c2 += c.qty;
+            else if (c.round === 3) countSummary.c3 += c.qty;
+            else if (c.round === 4) countSummary.c4 += c.qty;
+          });
+        });
 
-            if (allCounts) {
-              countSummary.c1 = allCounts.filter(c => c.audit_round === 1).reduce((sum, c) => sum + Number(c.quantity_counted), 0);
-              countSummary.c2 = allCounts.filter(c => c.audit_round === 2).reduce((sum, c) => sum + Number(c.quantity_counted), 0);
-              countSummary.c3 = allCounts.filter(c => c.audit_round === 3).reduce((sum, c) => sum + Number(c.quantity_counted), 0);
-              countSummary.c4 = allCounts.filter(c => c.audit_round === 4).reduce((sum, c) => sum + Number(c.quantity_counted), 0);
-            }
-          }
+        // Parse count_history safely
+        let parsedHistory: CountHistoryEntry[] | null = null;
+        if (master.count_history && Array.isArray(master.count_history)) {
+          parsedHistory = master.count_history as unknown as CountHistoryEntry[];
+        }
 
-          // Parse count_history safely
-          let parsedHistory: CountHistoryEntry[] | null = null;
-          if (master.count_history) {
-            if (Array.isArray(master.count_history)) {
-              parsedHistory = master.count_history as unknown as CountHistoryEntry[];
-            }
-          }
-
-          return {
-            referencia: master.referencia,
-            material_type: master.material_type,
-            control: master.control,
-            cant_total_erp: master.cant_total_erp,
-            count_history: parsedHistory,
-            locations: filteredLocations,
-            count_summary: countSummary,
-          };
-        })
-      );
+        return {
+          referencia: master.referencia,
+          material_type: master.material_type,
+          control: master.control,
+          cant_total_erp: master.cant_total_erp,
+          count_history: parsedHistory,
+          locations: filteredLocations,
+          count_summary: countSummary,
+        };
+      });
 
       // Only return references that still have pending locations
       return referencesWithLocations.filter(ref => ref.locations.length > 0);
     },
+    staleTime: 30 * 1000, // 30 seconds - counts change frequently
   });
 
   const handleReferenceClosed = () => {

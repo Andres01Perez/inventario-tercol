@@ -117,39 +117,56 @@ const GestionResponsables: React.FC = () => {
     setCurrentPage(1);
   };
 
-  // OPTIMIZED: Single query for all filter options with aggressive caching
+  // OPTIMIZED: Use RPC function for filter options (single efficient query)
   const { data: filterOptions } = useQuery({
-    queryKey: ['filter-options', role, profile?.id, isSuperadmin],
+    queryKey: ['filter-options-rpc', role],
     queryFn: async () => {
-      let query = supabase
-        .from('locations')
-        .select('subcategoria, location_name, observaciones, punto_referencia');
-      
-      if (!isSuperadmin && profile?.id) {
-        query = query.eq('assigned_admin_id', profile.id);
-      }
-      
-      const { data, error } = await query;
-      if (error) throw error;
-      
-      // Extract unique values in a single pass
-      const subcategorias = new Set<string>();
-      const ubicaciones = new Set<string>();
-      const observaciones = new Set<string>();
-      const puntosReferencia = new Set<string>();
-      
-      data?.forEach(row => {
-        if (row.subcategoria) subcategorias.add(row.subcategoria);
-        if (row.location_name) ubicaciones.add(row.location_name);
-        if (row.observaciones) observaciones.add(row.observaciones);
-        if (row.punto_referencia) puntosReferencia.add(row.punto_referencia);
+      // Use optimized SQL function that returns only distinct values
+      const materialType = isAdminMP ? 'MP' : isAdminPP ? 'PP' : null;
+      const { data, error } = await supabase.rpc('get_filter_options', {
+        _material_type: materialType
       });
       
+      if (error) {
+        console.error('Error fetching filter options:', error);
+        // Fallback to direct query if RPC fails
+        const { data: fallbackData } = await supabase
+          .from('locations')
+          .select('subcategoria, location_name, observaciones, punto_referencia');
+        
+        const subcategorias = new Set<string>();
+        const ubicaciones = new Set<string>();
+        const observaciones = new Set<string>();
+        const puntosReferencia = new Set<string>();
+        
+        fallbackData?.forEach(row => {
+          if (row.subcategoria) subcategorias.add(row.subcategoria);
+          if (row.location_name) ubicaciones.add(row.location_name);
+          if (row.observaciones) observaciones.add(row.observaciones);
+          if (row.punto_referencia) puntosReferencia.add(row.punto_referencia);
+        });
+        
+        return {
+          subcategorias: [...subcategorias].sort(),
+          ubicaciones: [...ubicaciones].sort(),
+          observaciones: [...observaciones].sort(),
+          puntosReferencia: [...puntosReferencia].sort(),
+        };
+      }
+      
+      // Cast data to expected shape
+      const typedData = data as {
+        subcategorias: string[] | null;
+        ubicaciones: string[] | null;
+        observaciones: string[] | null;
+        puntos_referencia: string[] | null;
+      };
+      
       return {
-        subcategorias: [...subcategorias].sort(),
-        ubicaciones: [...ubicaciones].sort(),
-        observaciones: [...observaciones].sort(),
-        puntosReferencia: [...puntosReferencia].sort(),
+        subcategorias: (typedData?.subcategorias || []).filter(Boolean),
+        ubicaciones: (typedData?.ubicaciones || []).filter(Boolean),
+        observaciones: (typedData?.observaciones || []).filter(Boolean),
+        puntosReferencia: (typedData?.puntos_referencia || []).filter(Boolean),
       };
     },
     staleTime: 10 * 60 * 1000, // 10 minutes - filter options don't change often
