@@ -53,14 +53,40 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
   const validateReferences = async (locations: ParsedLocation[]): Promise<string[]> => {
     const uniqueRefs = [...new Set(locations.map(l => l.master_reference))];
     
-    const { data: existingRefs } = await supabase
-      .from('inventory_master')
-      .select('referencia')
-      .in('referencia', uniqueRefs);
+    // Dividir en lotes para evitar problemas con .in() en consultas grandes
+    const batchSize = 500;
+    const allExistingRefs: string[] = [];
     
-    const existingSet = new Set(existingRefs?.map(r => r.referencia) || []);
+    console.log(`[LOCATIONS-IMPORT] Validando ${uniqueRefs.length} referencias únicas en lotes de ${batchSize}`);
     
-    return uniqueRefs.filter(ref => !existingSet.has(ref));
+    try {
+      for (let i = 0; i < uniqueRefs.length; i += batchSize) {
+        const batch = uniqueRefs.slice(i, i + batchSize);
+        console.log(`[LOCATIONS-IMPORT] Procesando lote ${Math.floor(i / batchSize) + 1}/${Math.ceil(uniqueRefs.length / batchSize)}`);
+        
+        const { data: existingRefs, error } = await supabase
+          .from('inventory_master')
+          .select('referencia')
+          .in('referencia', batch);
+        
+        if (error) {
+          console.error('[LOCATIONS-IMPORT] Error validando referencias:', error);
+          throw new Error(`Error al validar referencias: ${error.message}`);
+        }
+        
+        if (existingRefs) {
+          allExistingRefs.push(...existingRefs.map(r => r.referencia));
+        }
+      }
+      
+      const existingSet = new Set(allExistingRefs);
+      const notFound = uniqueRefs.filter(ref => !existingSet.has(ref));
+      console.log(`[LOCATIONS-IMPORT] Validación completada. ${notFound.length} referencias no encontradas.`);
+      return notFound;
+    } catch (error) {
+      console.error('[LOCATIONS-IMPORT] Error en validateReferences:', error);
+      throw error;
+    }
   };
 
   const handleFileSelect = useCallback(async (file: File) => {
@@ -91,10 +117,17 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
 
       // Validar referencias contra inventory_master
       setState('validating');
-      const notFound = await validateReferences(result.data);
-      
-      if (notFound.length > 0) {
-        setInvalidReferences(notFound);
+      try {
+        const notFound = await validateReferences(result.data);
+        
+        if (notFound.length > 0) {
+          setInvalidReferences(notFound);
+          setState('error');
+          return;
+        }
+      } catch (validationError) {
+        console.error('[LOCATIONS-IMPORT] Error en validación:', validationError);
+        setErrors([`Error al validar referencias: ${validationError instanceof Error ? validationError.message : 'Error desconocido'}`]);
         setState('error');
         return;
       }
