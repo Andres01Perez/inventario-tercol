@@ -54,7 +54,7 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
     const uniqueRefs = [...new Set(locations.map(l => l.master_reference))];
     
     // Dividir en lotes para evitar problemas con .in() en consultas grandes
-    const batchSize = 500;
+    const batchSize = 100;
     const allExistingRefs: string[] = [];
     
     console.log(`[LOCATIONS-IMPORT] Validando ${uniqueRefs.length} referencias únicas en lotes de ${batchSize}`);
