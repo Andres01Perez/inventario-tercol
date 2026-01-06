@@ -358,6 +358,7 @@ export type Database = {
         Args: { _reference: string; _user_id: string }
         Returns: boolean
       }
+      get_filter_options: { Args: { _material_type?: string }; Returns: Json }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]

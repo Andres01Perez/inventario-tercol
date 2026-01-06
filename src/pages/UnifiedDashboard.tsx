@@ -64,9 +64,10 @@ const UnifiedDashboard: React.FC = () => {
 
   const IconComponent = roleConfig.icon;
 
-  // Fetch statistics
+  // Fetch statistics with optimized staleTime for concurrent users
   const { data: stats } = useQuery({
     queryKey: ['unified-stats', profile?.id, role],
+    staleTime: 30 * 1000, // 30 seconds - reduce unnecessary refetches
     queryFn: async () => {
       if (role === 'supervisor') {
         const { data: locations } = await supabase
