@@ -214,12 +214,12 @@ const Auditoria: React.FC = () => {
   const { data: auditData, isLoading, isFetching } = useQuery({
     queryKey: ['audit-full-view', debouncedSearch, materialTypeFilter, statusFilter, locationFilter],
     queryFn: async () => {
-      // 1. Build query with filters on inventory_master (no pagination - load all)
+      // 1. Build query with filters on inventory_master - limit to 500 for performance
       let masterQuery = supabase
         .from('inventory_master')
         .select('referencia, material_type, cant_total_erp, status_slug, audit_round, count_history')
         .order('referencia')
-        .limit(10000);
+        .limit(500);
       
       // Apply filters
       if (debouncedSearch) {
@@ -236,60 +236,37 @@ const Auditoria: React.FC = () => {
       if (masterError) throw masterError;
       if (!masters || masters.length === 0) return { rows: [], totalReferences: 0, totalLocations: 0 };
       
-      // 2. Get locations for all references (batch in chunks to avoid limits)
+      // 2. Get locations for all references in a single batch
       const refs = masters.map(m => m.referencia);
-      const refChunks: string[][] = [];
-      for (let i = 0; i < refs.length; i += 500) {
-        refChunks.push(refs.slice(i, i + 500));
+      
+      let locationsQuery = supabase
+        .from('locations')
+        .select('id, master_reference, location_name, location_detail, subcategoria, punto_referencia, metodo_conteo, observaciones, validated_at_round, validated_quantity, discovered_at_round')
+        .in('master_reference', refs);
+      
+      if (locationFilter !== 'all') {
+        locationsQuery = locationsQuery.eq('location_name', locationFilter);
       }
       
-      let allLocations: any[] = [];
-      for (const chunk of refChunks) {
-        let locationsQuery = supabase
-          .from('locations')
-          .select('id, master_reference, location_name, location_detail, subcategoria, punto_referencia, metodo_conteo, observaciones, validated_at_round, validated_quantity, discovered_at_round')
-          .in('master_reference', chunk);
-        
-        if (locationFilter !== 'all') {
-          locationsQuery = locationsQuery.eq('location_name', locationFilter);
-        }
-        
-        const { data: locations, error: locError } = await locationsQuery;
-        if (locError) throw locError;
-        if (locations) allLocations.push(...locations);
-      }
+      const { data: allLocations, error: locError } = await locationsQuery;
+      if (locError) throw locError;
+      if (!allLocations || allLocations.length === 0) return { rows: [], totalReferences: masters.length, totalLocations: 0 };
       
-      // 3. Get counts for those locations (batch in chunks)
+      // 3. Get counts for all locations in a single query
       const locationIds = allLocations.map(l => l.id);
-      let allCounts: { location_id: string; audit_round: number; quantity_counted: number }[] = [];
+      const { data: allCounts, error: countsError } = await supabase
+        .from('inventory_counts')
+        .select('location_id, audit_round, quantity_counted')
+        .in('location_id', locationIds);
       
-      if (locationIds.length > 0) {
-        const chunks: string[][] = [];
-        for (let i = 0; i < locationIds.length; i += 100) {
-          chunks.push(locationIds.slice(i, i + 100));
-        }
-        
-        const countsResults = await Promise.all(
-          chunks.map(chunk => 
-            supabase
-              .from('inventory_counts')
-              .select('location_id, audit_round, quantity_counted')
-              .in('location_id', chunk)
-          )
-        );
-        
-        for (const result of countsResults) {
-          if (result.error) throw result.error;
-          if (result.data) allCounts.push(...result.data);
-        }
-      }
+      if (countsError) throw countsError;
       
       // 4. Build counts map
       const countsMap = new Map<string, { c1: number | null; c2: number | null; c3: number | null; c4: number | null; c5: number | null }>();
       allLocations.forEach(loc => {
         countsMap.set(loc.id, { c1: null, c2: null, c3: null, c4: null, c5: null });
       });
-      allCounts.forEach(count => {
+      (allCounts || []).forEach(count => {
         const existing = countsMap.get(count.location_id);
         if (existing) {
           const key = `c${count.audit_round}` as keyof typeof existing;
@@ -336,7 +313,7 @@ const Auditoria: React.FC = () => {
       
       return { rows, totalReferences: masters.length, totalLocations: allLocations.length };
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: 60 * 1000, // 1 minuto
   });
 
   const groupedData = useMemo(() => {
