@@ -222,8 +222,8 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
           const payloadRound = Number(payload.new?.audit_round);
           console.log(`[REALTIME] INSERT detected for round ${payloadRound}, current view is round ${roundNumber}`);
           if (payload.new && payloadRound === roundNumber) {
-            console.log(`[REALTIME] Invalidating queries for round ${roundNumber}`);
-            queryClient.invalidateQueries({ queryKey: ['grouped-transcription-locations'] });
+          console.log(`[REALTIME] Refetching queries for round ${roundNumber}`);
+            queryClient.refetchQueries({ queryKey: ['grouped-transcription-locations'], type: 'active' });
           }
         }
       )
@@ -276,7 +276,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
       }
 
       queryClient.invalidateQueries({ queryKey: ['validation-references'] });
-      queryClient.invalidateQueries({ queryKey: ['grouped-transcription-locations'] });
+      queryClient.refetchQueries({ queryKey: ['grouped-transcription-locations'], type: 'active' });
     }
   };
 
@@ -330,7 +330,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
       }
 
       queryClient.invalidateQueries({ queryKey: ['validation-references'] });
-      queryClient.invalidateQueries({ queryKey: ['grouped-transcription-locations'] });
+      queryClient.refetchQueries({ queryKey: ['grouped-transcription-locations'], type: 'active' });
     } catch (err) {
       console.error('Error en validación:', err);
     }
@@ -359,7 +359,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
     onSuccess: async (result, variables) => {
       toast.success(`Conteo ${roundNumber} guardado`);
       
-      queryClient.invalidateQueries({ queryKey: ['grouped-transcription-locations'] });
+      await queryClient.refetchQueries({ queryKey: ['grouped-transcription-locations'], type: 'active' });
       queryClient.invalidateQueries({ queryKey: ['supervisor-stats'] });
       
       setSavingIds(prev => {
