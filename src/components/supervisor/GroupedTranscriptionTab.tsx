@@ -123,9 +123,15 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
     countedIds: string[];
   }>({ rawCount: 0, filteredCount: 0, countedIds: [] });
 
-  const { data: locations = [], isLoading, refetch } = useQuery({
-    queryKey: ['grouped-transcription-locations', roundNumber, user?.id, isAdminMode, controlFilter, masterAuditRound],
-    queryFn: async () => {
+  // Paginated fetch function to overcome Supabase 1000 row limit
+  const fetchAllLocations = async (): Promise<any[]> => {
+    const PAGE_SIZE = 1000;
+    let allData: any[] = [];
+    let from = 0;
+    let hasMore = true;
+    let pageCount = 0;
+
+    while (hasMore) {
       let query = supabase
         .from('locations')
         .select(`
@@ -134,7 +140,8 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
           assigned_supervisor_id,
           inventory_master!inner(referencia, material_type, control, audit_round)
         `)
-        .eq('inventory_master.audit_round', masterAuditRound);
+        .eq('inventory_master.audit_round', masterAuditRound)
+        .range(from, from + PAGE_SIZE - 1);
 
       // If not admin mode, filter by supervisor
       if (!isAdminMode) {
@@ -148,10 +155,27 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
         query = query.is('inventory_master.control', null);
       }
 
-      const { data, error } = await query.limit(10000);
+      const { data, error } = await query;
       if (error) throw error;
 
-      const rawData = data || [];
+      if (data && data.length > 0) {
+        allData = [...allData, ...data];
+        from += PAGE_SIZE;
+        pageCount++;
+        hasMore = data.length === PAGE_SIZE; // Continue if we got full page
+      } else {
+        hasMore = false;
+      }
+    }
+
+    console.log(`[DEBUG] Fetched ${allData.length} total rows in ${pageCount} pages for round ${roundNumber}`);
+    return allData;
+  };
+
+  const { data: locations = [], isLoading, refetch } = useQuery({
+    queryKey: ['grouped-transcription-locations', roundNumber, user?.id, isAdminMode, controlFilter, masterAuditRound],
+    queryFn: async () => {
+      const rawData = await fetchAllLocations();
       console.log(`[DEBUG] Query returned ${rawData.length} rows for round ${roundNumber}, masterAuditRound=${masterAuditRound}`);
 
       // Filter out locations that already have a count for this specific round
