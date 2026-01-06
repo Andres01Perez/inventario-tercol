@@ -126,7 +126,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
         query = query.is('inventory_master.control', null);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await query.limit(10000);
       if (error) throw error;
 
       // Filter out locations that already have a count for this specific round
