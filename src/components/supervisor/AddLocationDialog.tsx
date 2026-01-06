@@ -50,7 +50,7 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
   const queryClient = useQueryClient();
   
   // Form state
-  const [tipo, setTipo] = useState<'MP' | 'PP' | ''>('');
+  // Removed tipo state - all references are now shown
   const [referencia, setReferencia] = useState('');
   const [subcategoria, setSubcategoria] = useState('');
   const [observaciones, setObservaciones] = useState('');
@@ -63,26 +63,23 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
   // Combobox state
   const [comboboxOpen, setComboboxOpen] = useState(false);
 
-  // Fetch references filtered by type
+  // Fetch ALL references (no filter by type)
   const { data: references = [], isLoading: loadingRefs } = useQuery({
-    queryKey: ['inventory-references', tipo],
+    queryKey: ['all-inventory-references'],
     queryFn: async () => {
-      if (!tipo) return [];
       const { data, error } = await supabase
         .from('inventory_master')
         .select('referencia, material_type')
-        .eq('material_type', tipo)
         .order('referencia')
-        .limit(500);
+        .limit(10000);
       
       if (error) throw error;
       return data;
     },
-    enabled: !!tipo,
+    enabled: open,
   });
 
   const resetForm = () => {
-    setTipo('');
     setReferencia('');
     setSubcategoria('');
     setObservaciones('');
@@ -95,8 +92,8 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
 
   const addLocationMutation = useMutation({
     mutationFn: async () => {
-      if (!referencia || !ubicacion) {
-        throw new Error('Referencia y ubicación son requeridos');
+      if (!referencia || !ubicacion || !puntoReferencia) {
+        throw new Error('Referencia, ubicación y punto de referencia son requeridos');
       }
 
       // 1. Get current audit_round from inventory_master
@@ -174,20 +171,6 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Tipo */}
-          <div className="space-y-2">
-            <Label htmlFor="tipo">Tipo *</Label>
-            <Select value={tipo} onValueChange={(v) => { setTipo(v as 'MP' | 'PP'); setReferencia(''); }}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar tipo..." />
-              </SelectTrigger>
-              <SelectContent className="bg-popover">
-                <SelectItem value="MP">MP - Materia Prima</SelectItem>
-                <SelectItem value="PP">PP - Producto en Proceso</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
           {/* Referencia - Combobox with search */}
           <div className="space-y-2">
             <Label>Referencia *</Label>
@@ -198,9 +181,8 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
                   role="combobox"
                   aria-expanded={comboboxOpen}
                   className="w-full justify-between"
-                  disabled={!tipo}
                 >
-                  {referencia || (tipo ? "Buscar referencia..." : "Seleccione tipo primero")}
+                  {referencia || "Buscar referencia..."}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
@@ -266,10 +248,13 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
             <Input
               id="ubicacion"
               value={ubicacion}
-              onChange={(e) => setUbicacion(e.target.value)}
-              placeholder="Nombre de ubicación"
+              onChange={(e) => setUbicacion(e.target.value.toUpperCase())}
+              placeholder="Ej: BODEGA1, BODEGA2..."
               required
             />
+            <p className="text-xs text-muted-foreground">
+              Ingrese la bodega en mayúsculas seguida del número. Ejemplos: BODEGA1, BODEGA2, BODEGA3
+            </p>
           </div>
 
           {/* Ubicación Detallada */}
@@ -285,13 +270,17 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
 
           {/* Punto de Referencia */}
           <div className="space-y-2">
-            <Label htmlFor="puntoReferencia">Punto de Referencia</Label>
+            <Label htmlFor="puntoReferencia">Punto de Referencia *</Label>
             <Input
               id="puntoReferencia"
               value={puntoReferencia}
-              onChange={(e) => setPuntoReferencia(e.target.value)}
-              placeholder="Punto de referencia"
+              onChange={(e) => setPuntoReferencia(e.target.value.toUpperCase())}
+              placeholder="Ej: AA, V, S..."
+              required
             />
+            <p className="text-xs text-muted-foreground">
+              Ubicación exacta o punto exacto donde se encuentra el material. Ejemplos: AA, V, S
+            </p>
           </div>
 
           {/* Método de Conteo */}
@@ -328,7 +317,7 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={isSubmitting || !tipo || !referencia || !ubicacion}>
+            <Button type="submit" disabled={isSubmitting || !referencia || !ubicacion || !puntoReferencia}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Guardar
             </Button>
