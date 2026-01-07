@@ -54,6 +54,7 @@ import {
 } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -179,6 +180,7 @@ const Auditoria: React.FC = () => {
   const [materialTypeFilter, setMaterialTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [locationFilter, setLocationFilter] = useState<string>('all');
+  const [sharedLocationsOnly, setSharedLocationsOnly] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [selectedHistory, setSelectedHistory] = useState<{ referencia: string; history: any[] } | null>(null);
   const [expandedRefs, setExpandedRefs] = useState<Set<string>>(new Set());
@@ -208,7 +210,7 @@ const Auditoria: React.FC = () => {
   // Reset page when filters change
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch, materialTypeFilter, statusFilter, locationFilter]);
+  }, [debouncedSearch, materialTypeFilter, statusFilter, locationFilter, sharedLocationsOnly]);
 
   // Query for unique location names (for filter dropdown) - fetch in batches to avoid 1000 row limit
   const { data: locationOptions } = useQuery({
@@ -394,7 +396,7 @@ const Auditoria: React.FC = () => {
       return validCounts.length > 0 ? validCounts.reduce((a, b) => a + b, 0) : null;
     };
 
-    return Array.from(groups.entries()).map(([referencia, rows]): GroupedReference => ({
+    let result = Array.from(groups.entries()).map(([referencia, rows]): GroupedReference => ({
       referencia,
       materialType: rows[0].materialType,
       cantTotalErp: rows[0].cantTotalErp,
@@ -410,7 +412,14 @@ const Auditoria: React.FC = () => {
         c5: calculateSum(rows, 'c5'),
       },
     }));
-  }, [auditData?.rows]);
+
+    // Filter for shared locations only (references with 2+ locations)
+    if (sharedLocationsOnly) {
+      result = result.filter(group => group.rows.length > 1);
+    }
+
+    return result;
+  }, [auditData?.rows, sharedLocationsOnly]);
 
   const handleViewHistory = useCallback((referencia: string, history: any[]) => {
     setSelectedHistory({ referencia, history });
@@ -868,6 +877,17 @@ const Auditoria: React.FC = () => {
                 ))}
               </SelectContent>
             </Select>
+
+            <div className="flex items-center gap-2 px-3 py-2 border rounded-lg bg-background">
+              <Switch
+                id="shared-locations"
+                checked={sharedLocationsOnly}
+                onCheckedChange={setSharedLocationsOnly}
+              />
+              <Label htmlFor="shared-locations" className="text-sm cursor-pointer whitespace-nowrap">
+                Solo compartidas
+              </Label>
+            </div>
           </div>
         </div>
 
@@ -902,7 +922,7 @@ const Auditoria: React.FC = () => {
                 Actualizando...
               </div>
             )}
-            {(debouncedSearch || materialTypeFilter !== 'all' || statusFilter !== 'all' || locationFilter !== 'all') && (
+            {(debouncedSearch || materialTypeFilter !== 'all' || statusFilter !== 'all' || locationFilter !== 'all' || sharedLocationsOnly) && (
               <Button 
                 variant="ghost" 
                 size="sm"
@@ -911,6 +931,7 @@ const Auditoria: React.FC = () => {
                   setMaterialTypeFilter('all');
                   setStatusFilter('all');
                   setLocationFilter('all');
+                  setSharedLocationsOnly(false);
                 }}
               >
                 Limpiar filtros
