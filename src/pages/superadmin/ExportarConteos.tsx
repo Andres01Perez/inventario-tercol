@@ -29,111 +29,120 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { ArrowLeft, Download, Search, RefreshCw, Clock, Calendar } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { ArrowLeft, Download, Search, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
 const ITEMS_PER_PAGE = 20;
 
+interface AuditedReference {
+  material_type: string;
+  referencia: string;
+  conteo: number;
+  cantidad_validada: number;
+}
+
 const ExportarConteos: React.FC = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const [selectedRound, setSelectedRound] = useState('1');
-  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [timeFrom, setTimeFrom] = useState('00:00');
-  const [timeTo, setTimeTo] = useState('23:59');
   const [searchTerm, setSearchTerm] = useState('');
+  const [materialTypeFilter, setMaterialTypeFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
 
-  // Build the status column based on round
-  const statusColumn = `status_c${selectedRound}` as 'status_c1' | 'status_c2' | 'status_c3' | 'status_c4';
-
-  // Fetch locations with status = 'contado' for selected round and time range
-  const { data: locations, isLoading, refetch } = useQuery({
-    queryKey: ['export-conteos', selectedRound, selectedDate, timeFrom, timeTo, searchTerm],
+  // Fetch audited references with their total validated quantities
+  const { data: auditedReferences, isLoading, refetch } = useQuery({
+    queryKey: ['export-auditados', searchTerm, materialTypeFilter],
     queryFn: async () => {
-      const startDateTime = `${selectedDate}T${timeFrom}:00`;
-      const endDateTime = `${selectedDate}T${timeTo}:59`;
+      // 1. Get all audited references from inventory_master
+      let masterQuery = supabase
+        .from('inventory_master')
+        .select('referencia, material_type')
+        .eq('status_slug', 'auditado');
 
-      let query = supabase
-        .from('locations')
-        .select(`
-          *,
-          inventory_counts!inner(quantity_counted, audit_round)
-        `)
-        .eq(statusColumn, 'contado')
-        .eq('inventory_counts.audit_round', parseInt(selectedRound))
-        .gte('updated_at', startDateTime)
-        .lte('updated_at', endDateTime)
-        .order('updated_at', { ascending: false });
-
-      if (searchTerm) {
-        query = query.ilike('master_reference', `%${searchTerm}%`);
+      if (materialTypeFilter !== 'all') {
+        masterQuery = masterQuery.eq('material_type', materialTypeFilter as 'MP' | 'PP');
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data || [];
+      if (searchTerm) {
+        masterQuery = masterQuery.ilike('referencia', `%${searchTerm}%`);
+      }
+
+      const { data: masters, error: masterError } = await masterQuery;
+      if (masterError) throw masterError;
+      if (!masters || masters.length === 0) return [];
+
+      // 2. Get locations with validated_quantity for these references
+      const { data: locations, error: locError } = await supabase
+        .from('locations')
+        .select('master_reference, validated_quantity, validated_at_round')
+        .in('master_reference', masters.map(m => m.referencia))
+        .not('validated_quantity', 'is', null);
+
+      if (locError) throw locError;
+
+      // 3. Group and sum by reference
+      const grouped: AuditedReference[] = masters.map(master => {
+        const locs = locations?.filter(l => l.master_reference === master.referencia) || [];
+        const totalValidado = locs.reduce((sum, l) => sum + (Number(l.validated_quantity) || 0), 0);
+        const round = locs[0]?.validated_at_round || 1;
+
+        return {
+          material_type: master.material_type,
+          referencia: master.referencia,
+          conteo: round,
+          cantidad_validada: totalValidado,
+        };
+      });
+
+      return grouped;
     },
     staleTime: 30 * 1000,
   });
 
   // Pagination
-  const totalPages = Math.ceil((locations?.length || 0) / ITEMS_PER_PAGE);
-  const paginatedLocations = useMemo(() => {
+  const totalPages = Math.ceil((auditedReferences?.length || 0) / ITEMS_PER_PAGE);
+  const paginatedReferences = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return locations?.slice(start, start + ITEMS_PER_PAGE) || [];
-  }, [locations, currentPage]);
+    return auditedReferences?.slice(start, start + ITEMS_PER_PAGE) || [];
+  }, [auditedReferences, currentPage]);
 
   // Reset page when filters change
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [selectedRound, selectedDate, timeFrom, timeTo, searchTerm]);
+  }, [searchTerm, materialTypeFilter]);
 
   // Export function
   const handleExport = async () => {
-    if (!locations || locations.length === 0) {
+    if (!auditedReferences || auditedReferences.length === 0) {
       toast.error('No hay datos para exportar');
       return;
     }
 
     setIsExporting(true);
     try {
-      const exportData = locations.map((loc: any) => ({
-        'Conteo': `Conteo ${selectedRound}`,
-        'Referencia': loc.master_reference,
-        'Ubicación': loc.location_name || '',
-        'Detalle': loc.location_detail || '',
-        'Cantidad Contada': loc.inventory_counts?.[0]?.quantity_counted ?? 0,
-        'Subcategoría': loc.subcategoria || '',
-        'Punto Ref.': loc.punto_referencia || '',
-        'Método': loc.metodo_conteo || '',
-        'Observaciones': loc.observaciones || '',
-        'Fecha Actualización': loc.updated_at ? format(new Date(loc.updated_at), 'dd/MM/yyyy HH:mm:ss', { locale: es }) : '',
+      const exportData = auditedReferences.map((ref) => ({
+        'Tipo Material': ref.material_type,
+        'Referencia': ref.referencia,
+        'Conteo': ref.conteo,
+        'Cantidad Validada': ref.cantidad_validada,
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(exportData);
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, `Conteo ${selectedRound}`);
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Referencias Auditadas');
 
-      const filename = `conteos_c${selectedRound}_${selectedDate}_${timeFrom.replace(':', '')}-${timeTo.replace(':', '')}.xlsx`;
+      const today = new Date().toISOString().split('T')[0];
+      const filename = `referencias_auditadas_${today}.xlsx`;
       XLSX.writeFile(workbook, filename);
 
-      toast.success(`Exportados ${locations.length} registros`);
+      toast.success(`Exportadas ${auditedReferences.length} referencias auditadas`);
     } catch (error) {
       console.error('Export error:', error);
       toast.error('Error al exportar');
     } finally {
       setIsExporting(false);
     }
-  };
-
-  const formatTime = (dateString: string | null) => {
-    if (!dateString) return '-';
-    return format(new Date(dateString), 'HH:mm:ss', { locale: es });
   };
 
   return (
@@ -147,8 +156,8 @@ const ExportarConteos: React.FC = () => {
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
-                <h1 className="text-lg font-bold text-foreground">Exportar Conteos</h1>
-                <p className="text-xs text-muted-foreground">Exportar ubicaciones contadas por corte horario</p>
+                <h1 className="text-lg font-bold text-foreground">Exportar Referencias Auditadas</h1>
+                <p className="text-xs text-muted-foreground">Exportar referencias que coincidieron (auditadas)</p>
               </div>
             </div>
             <div className="text-right hidden sm:block">
@@ -163,69 +172,28 @@ const ExportarConteos: React.FC = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Card>
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg">Filtros de Exportación</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-green-600" />
+              Filtros
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Filters Row 1 */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Round Selector */}
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-muted-foreground">Conteo</label>
-                <Select value={selectedRound} onValueChange={setSelectedRound}>
+            <div className="flex flex-col sm:flex-row gap-4 items-end">
+              {/* Material Type Filter */}
+              <div className="w-full sm:w-48 space-y-1">
+                <label className="text-sm font-medium text-muted-foreground">Tipo Material</label>
+                <Select value={materialTypeFilter} onValueChange={setMaterialTypeFilter}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar conteo" />
+                    <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1">Conteo 1 (C1)</SelectItem>
-                    <SelectItem value="2">Conteo 2 (C2)</SelectItem>
-                    <SelectItem value="3">Conteo 3 (C3)</SelectItem>
-                    <SelectItem value="4">Conteo 4 (C4)</SelectItem>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="MP">MP</SelectItem>
+                    <SelectItem value="PP">PP</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Date Picker */}
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                  <Calendar className="w-4 h-4" />
-                  Fecha
-                </label>
-                <Input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                />
-              </div>
-
-              {/* Time From */}
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                  <Clock className="w-4 h-4" />
-                  Desde
-                </label>
-                <Input
-                  type="time"
-                  value={timeFrom}
-                  onChange={(e) => setTimeFrom(e.target.value)}
-                />
-              </div>
-
-              {/* Time To */}
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                  <Clock className="w-4 h-4" />
-                  Hasta
-                </label>
-                <Input
-                  type="time"
-                  value={timeTo}
-                  onChange={(e) => setTimeTo(e.target.value)}
-                />
-              </div>
-            </div>
-
-            {/* Filters Row 2 */}
-            <div className="flex flex-col sm:flex-row gap-4 items-end">
               {/* Search */}
               <div className="flex-1 space-y-1">
                 <label className="text-sm font-medium text-muted-foreground">Buscar referencia</label>
@@ -246,9 +214,9 @@ const ExportarConteos: React.FC = () => {
                   <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
                   Actualizar
                 </Button>
-                <Button onClick={handleExport} disabled={isExporting || !locations?.length}>
+                <Button onClick={handleExport} disabled={isExporting || !auditedReferences?.length}>
                   <Download className="w-4 h-4 mr-2" />
-                  Exportar ({locations?.length || 0})
+                  Exportar ({auditedReferences?.length || 0})
                 </Button>
               </div>
             </div>
@@ -260,10 +228,10 @@ const ExportarConteos: React.FC = () => {
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg">
-                Ubicaciones Contadas (C{selectedRound})
+                Referencias Auditadas
               </CardTitle>
               <span className="text-sm text-muted-foreground">
-                {locations?.length || 0} registros encontrados
+                {auditedReferences?.length || 0} referencias encontradas
               </span>
             </div>
           </CardHeader>
@@ -272,9 +240,9 @@ const ExportarConteos: React.FC = () => {
               <div className="flex items-center justify-center py-12">
                 <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
               </div>
-            ) : paginatedLocations.length === 0 ? (
+            ) : paginatedReferences.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
-                No se encontraron ubicaciones contadas con los filtros seleccionados
+                No se encontraron referencias auditadas
               </div>
             ) : (
               <>
@@ -282,25 +250,29 @@ const ExportarConteos: React.FC = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>Tipo Material</TableHead>
                         <TableHead>Referencia</TableHead>
-                        <TableHead>Ubicación</TableHead>
-                        <TableHead>Detalle</TableHead>
-                        <TableHead className="text-right">Cantidad</TableHead>
-                        <TableHead>Subcategoría</TableHead>
-                        <TableHead>Método</TableHead>
-                        <TableHead>Hora Actualización</TableHead>
+                        <TableHead className="text-center">Conteo</TableHead>
+                        <TableHead className="text-right">Cantidad Validada</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {paginatedLocations.map((loc: any) => (
-                        <TableRow key={loc.id}>
-                          <TableCell className="font-medium">{loc.master_reference}</TableCell>
-                          <TableCell>{loc.location_name || '-'}</TableCell>
-                          <TableCell>{loc.location_detail || '-'}</TableCell>
-                          <TableCell className="text-right font-mono">{loc.inventory_counts?.[0]?.quantity_counted ?? '-'}</TableCell>
-                          <TableCell>{loc.subcategoria || '-'}</TableCell>
-                          <TableCell>{loc.metodo_conteo || '-'}</TableCell>
-                          <TableCell className="font-mono text-sm">{formatTime(loc.updated_at)}</TableCell>
+                      {paginatedReferences.map((ref) => (
+                        <TableRow key={ref.referencia}>
+                          <TableCell>
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              ref.material_type === 'MP' 
+                                ? 'bg-blue-100 text-blue-800' 
+                                : 'bg-purple-100 text-purple-800'
+                            }`}>
+                              {ref.material_type}
+                            </span>
+                          </TableCell>
+                          <TableCell className="font-medium">{ref.referencia}</TableCell>
+                          <TableCell className="text-center">C{ref.conteo}</TableCell>
+                          <TableCell className="text-right font-mono font-semibold">
+                            {ref.cantidad_validada.toLocaleString('es-CO')}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
