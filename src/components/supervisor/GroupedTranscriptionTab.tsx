@@ -245,6 +245,34 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
     toast.success('Datos actualizados');
   };
 
+  // Filter out locations with status_cX = 'contado' manually (fallback for realtime issues)
+  const handleValidateContados = async () => {
+    setIsRefreshing(true);
+    const statusColumn = `status_c${roundNumber}` as 'status_c1' | 'status_c2' | 'status_c3' | 'status_c4';
+    
+    // Query locations with status = 'contado' for this round
+    const { data: contadoLocations } = await supabase
+      .from('locations')
+      .select('id')
+      .eq(statusColumn, 'contado');
+    
+    const contadoIds = new Set(contadoLocations?.map(l => l.id) || []);
+    
+    // Manually filter the cache by removing contado locations
+    queryClient.setQueryData(
+      ['grouped-transcription-locations', roundNumber, user?.id, isAdminMode, controlFilter, masterAuditRound],
+      (old: Location[] | undefined) => {
+        if (!old) return [];
+        const filtered = old.filter(loc => !contadoIds.has(loc.id));
+        console.log(`[VALIDATE] Removed ${old.length - filtered.length} contado locations`);
+        return filtered;
+      }
+    );
+    
+    setIsRefreshing(false);
+    toast.success(`${contadoIds.size} referencias contadas filtradas`);
+  };
+
   // Auto-validation functions
   const checkAndAutoValidate = async (masterReference: string) => {
     // Evitar llamadas duplicadas
@@ -789,15 +817,26 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
           <Plus className="w-4 h-4 mr-2" />
           Agregar Referencia
         </Button>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-          Actualizar
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleValidateContados}
+            disabled={isRefreshing}
+          >
+            <CheckCircle2 className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Validar Contados
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Actualizar
+          </Button>
+        </div>
       </div>
 
       {groupedByZone.length === 0 ? (
