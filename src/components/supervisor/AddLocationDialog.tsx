@@ -63,18 +63,30 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
   // Combobox state
   const [comboboxOpen, setComboboxOpen] = useState(false);
 
-  // Fetch ALL references (no filter by type)
+  // Fetch ALL references (no filter by type) - fetch in batches to avoid 1000 row limit
   const { data: references = [], isLoading: loadingRefs } = useQuery({
     queryKey: ['all-inventory-references'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('inventory_master')
-        .select('referencia, material_type')
-        .order('referencia')
-        .limit(10000);
+      let allData: { referencia: string; material_type: string }[] = [];
+      let from = 0;
+      const batchSize = 1000;
       
-      if (error) throw error;
-      return data;
+      while (true) {
+        const { data, error } = await supabase
+          .from('inventory_master')
+          .select('referencia, material_type')
+          .order('referencia')
+          .range(from, from + batchSize - 1);
+        
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        
+        allData.push(...data);
+        if (data.length < batchSize) break;
+        from += batchSize;
+      }
+      
+      return allData;
     },
     enabled: open,
   });
