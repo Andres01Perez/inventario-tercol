@@ -8,8 +8,10 @@ import {
   ArrowLeft, 
   Search, 
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Download
 } from 'lucide-react';
+import { useExportToExcel } from '@/hooks/useExportToExcel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -38,6 +40,7 @@ const InventarioMP: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isExporting, exportInventoryMP } = useExportToExcel();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -156,6 +159,15 @@ const InventarioMP: React.FC = () => {
           </div>
           <Button variant="outline" size="icon" onClick={() => refetch()}>
             <RefreshCw className="w-4 h-4" />
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => exportInventoryMP(searchTerm)}
+            disabled={isExporting}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            {isExporting ? 'Exportando...' : 'Exportar'}
           </Button>
           <span className="text-sm text-muted-foreground">
             {data?.total || 0} referencias
