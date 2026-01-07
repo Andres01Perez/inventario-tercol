@@ -133,6 +133,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
     let from = 0;
     let hasMore = true;
     let pageCount = 0;
+    const statusColumn = `status_c${roundNumber}` as 'status_c1' | 'status_c2' | 'status_c3' | 'status_c4';
 
     while (hasMore) {
       let query = supabase
@@ -144,6 +145,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
           inventory_master!inner(referencia, material_type, control, audit_round)
         `)
         .eq('inventory_master.audit_round', masterAuditRound)
+        .eq(statusColumn, 'pendiente')
         .range(from, from + PAGE_SIZE - 1);
 
       // If not admin mode, filter by supervisor
