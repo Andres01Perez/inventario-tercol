@@ -103,6 +103,7 @@ const ExportarConteos: React.FC = () => {
     setIsExporting(true);
     try {
       const exportData = locations.map((loc: any) => ({
+        'Conteo': `Conteo ${selectedRound}`,
         'Referencia': loc.master_reference,
         'Ubicación': loc.location_name || '',
         'Detalle': loc.location_detail || '',
