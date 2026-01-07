@@ -16,8 +16,10 @@ import {
   History,
   FileSearch,
   Info,
-  Loader2
+  Loader2,
+  Download
 } from 'lucide-react';
+import { useExportToExcel } from '@/hooks/useExportToExcel';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -172,6 +174,7 @@ const LocationInfoPopover: React.FC<{ row: AuditRow }> = ({ row }) => (
 
 const Auditoria: React.FC = () => {
   const { user } = useAuth();
+  const { isExporting, exportAuditoria } = useExportToExcel();
   const [searchQuery, setSearchQuery] = useState('');
   const [materialTypeFilter, setMaterialTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -841,6 +844,20 @@ const Auditoria: React.FC = () => {
             </span>
           </div>
           <div className="flex items-center gap-3">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => exportAuditoria({
+                searchTerm: debouncedSearch,
+                materialType: materialTypeFilter,
+                status: statusFilter,
+                location: locationFilter,
+              })}
+              disabled={isExporting}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              {isExporting ? 'Exportando...' : 'Exportar'}
+            </Button>
             {isFetching && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="w-4 h-4 animate-spin" />
