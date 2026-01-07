@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import AppLayout from '@/components/layout/AppLayout';
@@ -175,6 +175,7 @@ const LocationInfoPopover: React.FC<{ row: AuditRow }> = ({ row }) => (
 
 const Auditoria: React.FC = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { isExporting, exportAuditoria } = useExportToExcel();
   const [searchQuery, setSearchQuery] = useState('');
   const [materialTypeFilter, setMaterialTypeFilter] = useState<string>('all');
@@ -507,7 +508,7 @@ const Auditoria: React.FC = () => {
 
       toast.success('Referencia validada correctamente');
       setValidateDialogOpen(false);
-      window.location.reload();
+      await queryClient.invalidateQueries({ queryKey: ['audit-full-view'] });
     } catch (error: any) {
       toast.error('Error al validar: ' + error.message);
     } finally {
@@ -556,7 +557,7 @@ const Auditoria: React.FC = () => {
 
       toast.success('Referencia cerrada forzadamente');
       setForceCloseDialogOpen(false);
-      window.location.reload();
+      await queryClient.invalidateQueries({ queryKey: ['audit-full-view'] });
     } catch (error: any) {
       toast.error('Error al cerrar: ' + error.message);
     } finally {
@@ -646,7 +647,7 @@ const Auditoria: React.FC = () => {
 
       toast.success('Conteos actualizados correctamente');
       setEditCountDialogOpen(false);
-      window.location.reload();
+      await queryClient.invalidateQueries({ queryKey: ['audit-full-view'] });
     } catch (error: any) {
       toast.error('Error al guardar: ' + error.message);
     } finally {
