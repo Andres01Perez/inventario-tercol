@@ -8,6 +8,7 @@ import {
   Search, 
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   MoreVertical,
   CheckCircle2,
   XCircle,
@@ -189,6 +190,10 @@ const Auditoria: React.FC = () => {
   const [editingCounts, setEditingCounts] = useState<Record<string, { c1?: string; c2?: string; c3?: string; c4?: string; c5?: string }>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 1000;
+
   // Debounced search for server-side filtering
   const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
   
@@ -196,6 +201,11 @@ const Auditoria: React.FC = () => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  // Reset page when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, materialTypeFilter, statusFilter, locationFilter]);
 
   // Query for unique location names (for filter dropdown)
   const { data: locationOptions } = useQuery({
@@ -212,14 +222,35 @@ const Auditoria: React.FC = () => {
   });
 
   const { data: auditData, isLoading, isFetching } = useQuery({
-    queryKey: ['audit-full-view', debouncedSearch, materialTypeFilter, statusFilter, locationFilter],
+    queryKey: ['audit-full-view', debouncedSearch, materialTypeFilter, statusFilter, locationFilter, currentPage],
     queryFn: async () => {
-      // 1. Build query with filters on inventory_master - limit to 500 for performance
+      // First get total count for pagination
+      let countQuery = supabase
+        .from('inventory_master')
+        .select('referencia', { count: 'exact', head: true });
+      
+      if (debouncedSearch) {
+        countQuery = countQuery.ilike('referencia', `%${debouncedSearch}%`);
+      }
+      if (materialTypeFilter !== 'all') {
+        countQuery = countQuery.eq('material_type', materialTypeFilter as 'MP' | 'PP');
+      }
+      if (statusFilter !== 'all') {
+        countQuery = countQuery.eq('status_slug', statusFilter);
+      }
+      
+      const { count: totalCount } = await countQuery;
+
+      // Calculate pagination range
+      const from = (currentPage - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      // Build query with filters on inventory_master with pagination
       let masterQuery = supabase
         .from('inventory_master')
         .select('referencia, material_type, cant_total_erp, status_slug, audit_round, count_history')
         .order('referencia')
-        .limit(500);
+        .range(from, to);
       
       // Apply filters
       if (debouncedSearch) {
@@ -234,7 +265,7 @@ const Auditoria: React.FC = () => {
       
       const { data: masters, error: masterError } = await masterQuery;
       if (masterError) throw masterError;
-      if (!masters || masters.length === 0) return { rows: [], totalReferences: 0, totalLocations: 0 };
+      if (!masters || masters.length === 0) return { rows: [], totalReferences: 0, totalLocations: 0, totalCount: totalCount || 0 };
       
       // 2. Get locations for all references in a single batch
       const refs = masters.map(m => m.referencia);
@@ -311,10 +342,12 @@ const Auditoria: React.FC = () => {
         });
       });
       
-      return { rows, totalReferences: masters.length, totalLocations: allLocations.length };
+      return { rows, totalReferences: masters.length, totalLocations: allLocations.length, totalCount: totalCount || 0 };
     },
     staleTime: 60 * 1000, // 1 minuto
   });
+
+  const totalPages = Math.ceil((auditData?.totalCount || 0) / pageSize);
 
   const groupedData = useMemo(() => {
     if (!auditData?.rows) return [];
@@ -848,6 +881,38 @@ const Auditoria: React.FC = () => {
             </ScrollArea>
           )}
         </div>
+
+        {/* Pagination Controls */}
+        {!isLoading && auditData && auditData.totalCount > pageSize && (
+          <div className="flex items-center justify-between py-4 px-4 border border-border rounded-lg bg-muted/20 mt-4">
+            <div className="text-sm text-muted-foreground">
+              Mostrando {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, auditData.totalCount)} de {auditData.totalCount} referencias
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1 || isFetching}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Anterior
+              </Button>
+              <span className="px-3 py-1 text-sm font-medium">
+                Página {currentPage} de {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => p + 1)}
+                disabled={currentPage >= totalPages || isFetching}
+              >
+                Siguiente
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* History Dialog */}
