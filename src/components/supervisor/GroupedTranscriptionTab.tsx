@@ -250,27 +250,45 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
     setIsRefreshing(true);
     const statusColumn = `status_c${roundNumber}` as 'status_c1' | 'status_c2' | 'status_c3' | 'status_c4';
     
-    // Query locations with status = 'contado' for this round
-    const { data: contadoLocations } = await supabase
+    // Get current locations from cache
+    const currentLocations = queryClient.getQueryData<Location[]>(
+      ['grouped-transcription-locations', roundNumber, user?.id, isAdminMode, controlFilter, masterAuditRound]
+    ) || [];
+    
+    const locationIds = currentLocations.map(l => l.id);
+    
+    if (locationIds.length === 0) {
+      setIsRefreshing(false);
+      toast.info('No hay referencias para filtrar');
+      return;
+    }
+    
+    // Query current status of these specific locations
+    const { data: locationsStatus } = await supabase
       .from('locations')
-      .select('id')
-      .eq(statusColumn, 'contado');
+      .select('id, status_c1, status_c2, status_c3, status_c4')
+      .in('id', locationIds);
     
-    const contadoIds = new Set(contadoLocations?.map(l => l.id) || []);
+    // Find IDs where status_cX = 'contado'
+    const contadoIds = new Set(
+      locationsStatus
+        ?.filter(loc => loc[statusColumn] === 'contado')
+        .map(loc => loc.id) || []
+    );
     
-    // Manually filter the cache by removing contado locations
+    // Keep ONLY locations with status = 'pendiente' (remove contado)
     queryClient.setQueryData(
       ['grouped-transcription-locations', roundNumber, user?.id, isAdminMode, controlFilter, masterAuditRound],
       (old: Location[] | undefined) => {
         if (!old) return [];
         const filtered = old.filter(loc => !contadoIds.has(loc.id));
-        console.log(`[VALIDATE] Removed ${old.length - filtered.length} contado locations`);
+        console.log(`[VALIDATE] Removed ${contadoIds.size} contado locations, ${filtered.length} remaining`);
         return filtered;
       }
     );
     
     setIsRefreshing(false);
-    toast.success(`${contadoIds.size} referencias contadas filtradas`);
+    toast.success(`${contadoIds.size} referencias contadas removidas, quedan ${currentLocations.length - contadoIds.size} pendientes`);
   };
 
   // Auto-validation functions
