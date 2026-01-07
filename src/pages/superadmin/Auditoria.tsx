@@ -207,16 +207,30 @@ const Auditoria: React.FC = () => {
     setCurrentPage(1);
   }, [debouncedSearch, materialTypeFilter, statusFilter, locationFilter]);
 
-  // Query for unique location names (for filter dropdown)
+  // Query for unique location names (for filter dropdown) - fetch in batches to avoid 1000 row limit
   const { data: locationOptions } = useQuery({
     queryKey: ['audit-location-options'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('locations')
-        .select('location_name');
+      let allData: { location_name: string | null }[] = [];
+      let from = 0;
+      const batchSize = 1000;
       
-      if (error) throw error;
-      return [...new Set(data?.map(d => d.location_name).filter(Boolean))] as string[];
+      while (true) {
+        const { data, error } = await supabase
+          .from('locations')
+          .select('location_name')
+          .range(from, from + batchSize - 1);
+        
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        
+        allData.push(...data);
+        if (data.length < batchSize) break;
+        from += batchSize;
+      }
+      
+      const uniqueLocations = [...new Set(allData.map(d => d.location_name).filter(Boolean))] as string[];
+      return uniqueLocations.sort();
     },
     staleTime: 10 * 60 * 1000,
   });
