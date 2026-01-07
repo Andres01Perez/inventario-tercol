@@ -561,7 +561,25 @@ const Auditoria: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      const upserts: { location_id: string; audit_round: number; quantity_counted: number; supervisor_id: string }[] = [];
+      // Collect all location_ids to fetch existing counts
+      const locationIds = selectedReference.rows.map(r => r.locationId);
+      
+      // Fetch existing counts for these locations
+      const { data: existingCounts, error: fetchError } = await supabase
+        .from('inventory_counts')
+        .select('id, location_id, audit_round')
+        .in('location_id', locationIds);
+      
+      if (fetchError) throw fetchError;
+      
+      // Build a map of existing counts: "location_id-round" -> id
+      const existingMap = new Map<string, string>();
+      existingCounts?.forEach(c => {
+        existingMap.set(`${c.location_id}-${c.audit_round}`, c.id);
+      });
+
+      const updates: { id: string; quantity_counted: number; supervisor_id: string }[] = [];
+      const inserts: { location_id: string; audit_round: number; quantity_counted: number; supervisor_id: string }[] = [];
 
       for (const row of selectedReference.rows) {
         const edited = editingCounts[row.locationId];
@@ -572,21 +590,41 @@ const Auditoria: React.FC = () => {
           const value = edited[key];
 
           if (value !== '' && value !== undefined) {
-            upserts.push({
-              location_id: row.locationId,
-              audit_round: round,
-              quantity_counted: parseFloat(value),
-              supervisor_id: user.id,
-            });
+            const mapKey = `${row.locationId}-${round}`;
+            const existingId = existingMap.get(mapKey);
+            
+            if (existingId) {
+              updates.push({
+                id: existingId,
+                quantity_counted: parseFloat(value),
+                supervisor_id: user.id,
+              });
+            } else {
+              inserts.push({
+                location_id: row.locationId,
+                audit_round: round,
+                quantity_counted: parseFloat(value),
+                supervisor_id: user.id,
+              });
+            }
           }
         }
       }
 
-      if (upserts.length > 0) {
+      // Perform updates one by one (or batch if needed)
+      for (const upd of updates) {
         const { error } = await supabase
           .from('inventory_counts')
-          .upsert(upserts, { onConflict: 'location_id,audit_round' });
+          .update({ quantity_counted: upd.quantity_counted, supervisor_id: upd.supervisor_id })
+          .eq('id', upd.id);
+        if (error) throw error;
+      }
 
+      // Perform inserts
+      if (inserts.length > 0) {
+        const { error } = await supabase
+          .from('inventory_counts')
+          .insert(inserts);
         if (error) throw error;
       }
 
