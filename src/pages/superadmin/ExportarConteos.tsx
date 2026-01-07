@@ -60,8 +60,12 @@ const ExportarConteos: React.FC = () => {
 
       let query = supabase
         .from('locations')
-        .select('*')
+        .select(`
+          *,
+          inventory_counts!inner(quantity_counted, audit_round)
+        `)
         .eq(statusColumn, 'contado')
+        .eq('inventory_counts.audit_round', parseInt(selectedRound))
         .gte('updated_at', startDateTime)
         .lte('updated_at', endDateTime)
         .order('updated_at', { ascending: false });
@@ -98,10 +102,11 @@ const ExportarConteos: React.FC = () => {
 
     setIsExporting(true);
     try {
-      const exportData = locations.map(loc => ({
+      const exportData = locations.map((loc: any) => ({
         'Referencia': loc.master_reference,
         'Ubicación': loc.location_name || '',
         'Detalle': loc.location_detail || '',
+        'Cantidad Contada': loc.inventory_counts?.[0]?.quantity_counted ?? 0,
         'Subcategoría': loc.subcategoria || '',
         'Punto Ref.': loc.punto_referencia || '',
         'Método': loc.metodo_conteo || '',
@@ -279,17 +284,19 @@ const ExportarConteos: React.FC = () => {
                         <TableHead>Referencia</TableHead>
                         <TableHead>Ubicación</TableHead>
                         <TableHead>Detalle</TableHead>
+                        <TableHead className="text-right">Cantidad</TableHead>
                         <TableHead>Subcategoría</TableHead>
                         <TableHead>Método</TableHead>
                         <TableHead>Hora Actualización</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {paginatedLocations.map((loc) => (
+                      {paginatedLocations.map((loc: any) => (
                         <TableRow key={loc.id}>
                           <TableCell className="font-medium">{loc.master_reference}</TableCell>
                           <TableCell>{loc.location_name || '-'}</TableCell>
                           <TableCell>{loc.location_detail || '-'}</TableCell>
+                          <TableCell className="text-right font-mono">{loc.inventory_counts?.[0]?.quantity_counted ?? '-'}</TableCell>
                           <TableCell>{loc.subcategoria || '-'}</TableCell>
                           <TableCell>{loc.metodo_conteo || '-'}</TableCell>
                           <TableCell className="font-mono text-sm">{formatTime(loc.updated_at)}</TableCell>
