@@ -18,7 +18,8 @@ import {
   ArrowRight,
   FileSpreadsheet,
   AlertCircle,
-  FileSearch
+  FileSearch,
+  Download
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -294,6 +295,15 @@ const UnifiedDashboard: React.FC = () => {
       bgColor: 'bg-violet-500/10',
       hoverBg: 'group-hover:bg-violet-500',
     },
+    exportarConteos: { 
+      label: 'Exportar Conteos', 
+      icon: Download, 
+      description: 'Exportar ubicaciones contadas por corte horario',
+      onClick: () => navigate('/superadmin/exportar-conteos'),
+      iconColor: 'text-sky-500',
+      bgColor: 'bg-sky-500/10',
+      hoverBg: 'group-hover:bg-sky-500',
+    },
   }), [navigate]);
 
   // Action categories based on role
@@ -322,6 +332,7 @@ const UnifiedDashboard: React.FC = () => {
           baseActions.inventarioMP,
           baseActions.inventarioPP,
           baseActions.auditoria,
+          baseActions.exportarConteos,
         ]
       });
     }
