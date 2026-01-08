@@ -55,6 +55,36 @@ interface CountByLocation {
   conteo_4: number | null;
 }
 
+// Helper to fetch all records in batches (Supabase limits to 1000 per query)
+async function fetchAllInBatches<T>(
+  table: 'locations' | 'inventory_counts' | 'inventory_master',
+  selectQuery: string,
+  batchSize = 1000
+): Promise<T[]> {
+  let allData: T[] = [];
+  let from = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from(table)
+      .select(selectQuery)
+      .range(from, from + batchSize - 1);
+
+    if (error) throw error;
+
+    if (data && data.length > 0) {
+      allData = [...allData, ...(data as T[])];
+      from += batchSize;
+      hasMore = data.length === batchSize;
+    } else {
+      hasMore = false;
+    }
+  }
+
+  return allData;
+}
+
 const ExportarConteos: React.FC = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
@@ -122,43 +152,48 @@ const ExportarConteos: React.FC = () => {
   const { data: countsByLocation, isLoading: isLoadingLoc, refetch: refetchLoc } = useQuery({
     queryKey: ['export-counts-by-location', searchTermLoc, materialTypeFilterLoc],
     queryFn: async () => {
-      // 1. Get locations
-      const { data: locations, error: locError } = await supabase
-        .from('locations')
-        .select('id, master_reference, location_name, location_detail, punto_referencia');
+      // Fetch ALL records using batch pagination to avoid Supabase 1000 row limit
+      const [locations, counts, masters] = await Promise.all([
+        fetchAllInBatches<{ id: string; master_reference: string; location_name: string | null; location_detail: string | null; punto_referencia: string | null }>(
+          'locations',
+          'id, master_reference, location_name, location_detail, punto_referencia'
+        ),
+        fetchAllInBatches<{ location_id: string; audit_round: number; quantity_counted: number }>(
+          'inventory_counts',
+          'location_id, audit_round, quantity_counted'
+        ),
+        fetchAllInBatches<{ referencia: string; material_type: string }>(
+          'inventory_master',
+          'referencia, material_type'
+        ),
+      ]);
 
-      if (locError) throw locError;
-      if (!locations || locations.length === 0) return [];
+      if (locations.length === 0) return [];
 
-      // 2. Get inventory_counts
-      const { data: counts, error: countsError } = await supabase
-        .from('inventory_counts')
-        .select('location_id, audit_round, quantity_counted');
+      // Create lookup maps for performance
+      const masterMap = new Map(masters.map(m => [m.referencia, m.material_type]));
+      const countsMap = new Map<string, Map<number, number>>();
+      for (const c of counts) {
+        if (!countsMap.has(c.location_id)) {
+          countsMap.set(c.location_id, new Map());
+        }
+        countsMap.get(c.location_id)!.set(c.audit_round, c.quantity_counted);
+      }
 
-      if (countsError) throw countsError;
-
-      // 3. Get inventory_master for material_type
-      const { data: masters, error: masterError } = await supabase
-        .from('inventory_master')
-        .select('referencia, material_type');
-
-      if (masterError) throw masterError;
-
-      // 4. Pivot data: one row per location with conteo_1, conteo_2, conteo_3, conteo_4
+      // Pivot data: one row per location with conteo_1, conteo_2, conteo_3, conteo_4
       const pivotedData: CountByLocation[] = locations.map(location => {
-        const master = masters?.find(m => m.referencia === location.master_reference);
-        const locationCounts = counts?.filter(c => c.location_id === location.id) || [];
+        const locationCounts = countsMap.get(location.id);
 
         return {
-          material_type: master?.material_type || '',
+          material_type: masterMap.get(location.master_reference) || '',
           referencia: location.master_reference,
           ubicacion: location.location_name || '',
           ubicacion_detallada: location.location_detail || '',
           punto_referencia: location.punto_referencia || '',
-          conteo_1: locationCounts.find(c => c.audit_round === 1)?.quantity_counted ?? null,
-          conteo_2: locationCounts.find(c => c.audit_round === 2)?.quantity_counted ?? null,
-          conteo_3: locationCounts.find(c => c.audit_round === 3)?.quantity_counted ?? null,
-          conteo_4: locationCounts.find(c => c.audit_round === 4)?.quantity_counted ?? null,
+          conteo_1: locationCounts?.get(1) ?? null,
+          conteo_2: locationCounts?.get(2) ?? null,
+          conteo_3: locationCounts?.get(3) ?? null,
+          conteo_4: locationCounts?.get(4) ?? null,
         };
       });
 
