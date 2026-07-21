@@ -217,9 +217,11 @@ const MasterDataImport: React.FC = () => {
   
   const [mpFile, setMpFile] = useState<File | null>(null);
   const [ppFile, setPpFile] = useState<File | null>(null);
+  const [ptFile, setPtFile] = useState<File | null>(null);
   
   const [mpResult, setMpResult] = useState<ParseResult | null>(null);
   const [ppResult, setPpResult] = useState<ParseResult | null>(null);
+  const [ptResult, setPtResult] = useState<ParseResult | null>(null);
   
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [combinedData, setCombinedData] = useState<ParsedRow[]>([]);
