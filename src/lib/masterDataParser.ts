@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 
-export type MaterialType = 'MP' | 'PP';
+export type MaterialType = 'MP' | 'PP' | 'PT';
 
 export interface ParsedRow {
   referencia: string;
