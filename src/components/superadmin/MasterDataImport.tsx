@@ -643,9 +643,10 @@ const MasterDataImport: React.FC = () => {
                       <TableCell>
                         <Badge 
                           variant="outline" 
-                          className={row.material_type === 'MP' 
-                            ? 'border-blue-500/50 text-blue-600' 
-                            : 'border-emerald-500/50 text-emerald-600'
+                          className={
+                            row.material_type === 'MP' ? 'border-blue-500/50 text-blue-600'
+                            : row.material_type === 'PP' ? 'border-emerald-500/50 text-emerald-600'
+                            : 'border-amber-500/50 text-amber-600'
                           }
                         >
                           {row.material_type}
