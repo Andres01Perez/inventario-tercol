@@ -362,23 +362,42 @@ const MasterDataImport: React.FC = () => {
       // Remove cant_total_erp since it's a generated column in the database
       const dataToInsert = combinedData.map(({ cant_total_erp, ...rest }) => rest);
 
-      // Step 1: Delete all existing locations (cascade cleanup)
-      setProgress(5);
-      const { error: locDeleteError } = await supabase
-        .from('locations')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+      // Determinar qué familias se están importando
+      const typesInImport = Array.from(new Set(dataToInsert.map((r) => r.material_type))) as MaterialType[];
 
-      if (locDeleteError) {
-        throw new Error(`Error al eliminar ubicaciones: ${locDeleteError.message}`);
+      // Step 1: Fetch existing references of these types so we can delete their locations first
+      setProgress(3);
+      const { data: existingRefs, error: refsError } = await supabase
+        .from('inventory_master')
+        .select('referencia')
+        .in('material_type', typesInImport);
+
+      if (refsError) {
+        throw new Error(`Error al consultar referencias existentes: ${refsError.message}`);
       }
 
-      // Step 2: Delete all existing inventory records
+      const refsToDelete = (existingRefs || []).map((r) => r.referencia);
+
+      // Step 2: Delete locations tied to those references (in batches to avoid huge URLs)
+      setProgress(6);
+      const LOC_BATCH = 200;
+      for (let i = 0; i < refsToDelete.length; i += LOC_BATCH) {
+        const chunk = refsToDelete.slice(i, i + LOC_BATCH);
+        const { error: locDeleteError } = await supabase
+          .from('locations')
+          .delete()
+          .in('master_reference', chunk);
+        if (locDeleteError) {
+          throw new Error(`Error al eliminar ubicaciones: ${locDeleteError.message}`);
+        }
+      }
+
+      // Step 3: Delete inventory_master rows only for the affected material types
       setProgress(10);
       const { error: deleteError } = await supabase
         .from('inventory_master')
         .delete()
-        .neq('referencia', '');
+        .in('material_type', typesInImport);
 
       if (deleteError) {
         throw new Error(`Error al eliminar datos existentes: ${deleteError.message}`);
