@@ -145,12 +145,12 @@ const FileUploadZone: React.FC<FileUploadZoneProps> = ({
       />
 
       <div className="flex flex-col items-center text-center">
-        <div className={`p-4 rounded-full ${isMP ? 'bg-blue-500/10' : 'bg-emerald-500/10'} mb-4`}>
+        <div className={`p-4 rounded-full ${cfg.iconBg} mb-4`}>
           <Icon className={`w-8 h-8 ${iconColor}`} />
         </div>
 
         <h3 className="text-lg font-semibold text-foreground mb-1">
-          {isMP ? 'Materia Prima (MP)' : 'Producto Proceso (PP)'}
+          {cfg.title}
         </h3>
 
         {file ? (
