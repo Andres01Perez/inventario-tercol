@@ -391,7 +391,7 @@ export type Database = {
         | "admin_pp"
         | "supervisor"
         | "operario"
-      material_type: "MP" | "PP"
+      material_type: "MP" | "PP" | "PT"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -527,7 +527,7 @@ export const Constants = {
         "supervisor",
         "operario",
       ],
-      material_type: ["MP", "PP"],
+      material_type: ["MP", "PP", "PT"],
     },
   },
 } as const
