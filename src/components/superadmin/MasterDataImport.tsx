@@ -437,8 +437,10 @@ const MasterDataImport: React.FC = () => {
       setTimeout(() => {
         setMpFile(null);
         setPpFile(null);
+        setPtFile(null);
         setMpResult(null);
         setPpResult(null);
+        setPtResult(null);
         setValidation(null);
         setCombinedData([]);
         setState('idle');
@@ -458,8 +460,10 @@ const MasterDataImport: React.FC = () => {
   const handleClear = () => {
     setMpFile(null);
     setPpFile(null);
+    setPtFile(null);
     setMpResult(null);
     setPpResult(null);
+    setPtResult(null);
     setValidation(null);
     setCombinedData([]);
     setState('idle');
@@ -468,7 +472,13 @@ const MasterDataImport: React.FC = () => {
 
   const mpCount = mpResult?.data.length || 0;
   const ppCount = ppResult?.data.length || 0;
-  const totalCount = mpCount + ppCount;
+  const ptCount = ptResult?.data.length || 0;
+  const totalCount = mpCount + ppCount + ptCount;
+  const typesInImport: MaterialType[] = [
+    ...(mpCount > 0 ? (['MP'] as const) : []),
+    ...(ppCount > 0 ? (['PP'] as const) : []),
+    ...(ptCount > 0 ? (['PT'] as const) : []),
+  ];
 
   const allWarnings = [
     ...(mpResult?.warnings || []),
