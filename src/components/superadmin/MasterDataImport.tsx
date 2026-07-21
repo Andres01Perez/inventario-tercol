@@ -110,13 +110,16 @@ const FileUploadZone: React.FC<FileUploadZoneProps> = ({
     );
   };
 
-  const isMP = type === 'MP';
-  const bgColor = isMP ? 'bg-blue-500/5' : 'bg-emerald-500/5';
-  const borderColor = isMP 
-    ? isDragging ? 'border-blue-500' : 'border-blue-500/30' 
-    : isDragging ? 'border-emerald-500' : 'border-emerald-500/30';
-  const iconColor = isMP ? 'text-blue-500' : 'text-emerald-500';
-  const Icon = isMP ? Package : Factory;
+  const typeConfig = {
+    MP: { bg: 'bg-blue-500/5', border: 'border-blue-500/30', borderActive: 'border-blue-500', iconBg: 'bg-blue-500/10', icon: 'text-blue-500', Icon: Package, title: 'Materia Prima (MP)' },
+    PP: { bg: 'bg-emerald-500/5', border: 'border-emerald-500/30', borderActive: 'border-emerald-500', iconBg: 'bg-emerald-500/10', icon: 'text-emerald-500', Icon: Factory, title: 'Producto Proceso (PP)' },
+    PT: { bg: 'bg-amber-500/5', border: 'border-amber-500/30', borderActive: 'border-amber-500', iconBg: 'bg-amber-500/10', icon: 'text-amber-500', Icon: Boxes, title: 'Producto Terminado (PT)' },
+  } as const;
+  const cfg = typeConfig[type];
+  const bgColor = cfg.bg;
+  const borderColor = isDragging ? cfg.borderActive : cfg.border;
+  const iconColor = cfg.icon;
+  const Icon = cfg.Icon;
 
   return (
     <div
