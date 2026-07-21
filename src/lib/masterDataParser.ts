@@ -70,8 +70,15 @@ const PP_COLUMN_MAP: Record<string, keyof ParsedRow> = {
   'costo.t': 'costo_t',
 };
 
+// Column mapping for PT file (skeleton — columnas específicas se agregarán después)
+const PT_COLUMN_MAP: Record<string, keyof ParsedRow> = {
+  'referencia': 'referencia',
+  'control': 'control',
+};
+
 const REQUIRED_COLUMNS_MP = ['referencia'];
 const REQUIRED_COLUMNS_PP = ['referencia'];
+const REQUIRED_COLUMNS_PT = ['referencia'];
 
 function normalizeColumnName(name: string): string {
   return name
