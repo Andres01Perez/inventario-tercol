@@ -207,8 +207,8 @@ export function parseExcelFile(file: File, type: MaterialType): Promise<ParseRes
         });
 
         // Validate required columns
-        const columnMap = type === 'MP' ? MP_COLUMN_MAP : PP_COLUMN_MAP;
-        const requiredColumns = type === 'MP' ? REQUIRED_COLUMNS_MP : REQUIRED_COLUMNS_PP;
+        const columnMap = type === 'MP' ? MP_COLUMN_MAP : type === 'PP' ? PP_COLUMN_MAP : PT_COLUMN_MAP;
+        const requiredColumns = type === 'MP' ? REQUIRED_COLUMNS_MP : type === 'PP' ? REQUIRED_COLUMNS_PP : REQUIRED_COLUMNS_PT;
         
         const missingColumns = requiredColumns.filter(
           (col) => !normalizedColumns.includes(col)
