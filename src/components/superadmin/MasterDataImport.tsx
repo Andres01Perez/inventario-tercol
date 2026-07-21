@@ -483,6 +483,7 @@ const MasterDataImport: React.FC = () => {
   const allWarnings = [
     ...(mpResult?.warnings || []),
     ...(ppResult?.warnings || []),
+    ...(ptResult?.warnings || []),
     ...(validation?.warnings || []),
   ];
 
@@ -498,10 +499,10 @@ const MasterDataImport: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold text-foreground">Importar Maestra</h2>
           <p className="text-muted-foreground">
-            Carga los archivos de Materia Prima y Producto Proceso
+            Carga los archivos de Materia Prima, Producto Proceso y Producto Terminado (solo se reemplaza la familia importada)
           </p>
         </div>
-        {(mpFile || ppFile) && state !== 'importing' && (
+        {(mpFile || ppFile || ptFile) && state !== 'importing' && (
           <Button variant="outline" onClick={handleClear}>
             <Trash2 className="w-4 h-4 mr-2" />
             Limpiar
@@ -510,7 +511,7 @@ const MasterDataImport: React.FC = () => {
       </div>
 
       {/* Upload Zones */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <FileUploadZone
           type="MP"
           file={mpFile}
@@ -525,7 +526,15 @@ const MasterDataImport: React.FC = () => {
           disabled={state === 'importing'}
           parseResult={ppResult}
         />
+        <FileUploadZone
+          type="PT"
+          file={ptFile}
+          onFileSelect={handlePtFileSelect}
+          disabled={state === 'importing'}
+          parseResult={ptResult}
+        />
       </div>
+
 
       {/* Warnings */}
       {allWarnings.length > 0 && (
