@@ -9,6 +9,7 @@ import {
   Trash2,
   Package,
   Factory,
+  Boxes,
   AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -109,13 +110,16 @@ const FileUploadZone: React.FC<FileUploadZoneProps> = ({
     );
   };
 
-  const isMP = type === 'MP';
-  const bgColor = isMP ? 'bg-blue-500/5' : 'bg-emerald-500/5';
-  const borderColor = isMP 
-    ? isDragging ? 'border-blue-500' : 'border-blue-500/30' 
-    : isDragging ? 'border-emerald-500' : 'border-emerald-500/30';
-  const iconColor = isMP ? 'text-blue-500' : 'text-emerald-500';
-  const Icon = isMP ? Package : Factory;
+  const typeConfig = {
+    MP: { bg: 'bg-blue-500/5', border: 'border-blue-500/30', borderActive: 'border-blue-500', iconBg: 'bg-blue-500/10', icon: 'text-blue-500', Icon: Package, title: 'Materia Prima (MP)' },
+    PP: { bg: 'bg-emerald-500/5', border: 'border-emerald-500/30', borderActive: 'border-emerald-500', iconBg: 'bg-emerald-500/10', icon: 'text-emerald-500', Icon: Factory, title: 'Producto Proceso (PP)' },
+    PT: { bg: 'bg-amber-500/5', border: 'border-amber-500/30', borderActive: 'border-amber-500', iconBg: 'bg-amber-500/10', icon: 'text-amber-500', Icon: Boxes, title: 'Producto Terminado (PT)' },
+  } as const;
+  const cfg = typeConfig[type];
+  const bgColor = cfg.bg;
+  const borderColor = isDragging ? cfg.borderActive : cfg.border;
+  const iconColor = cfg.icon;
+  const Icon = cfg.Icon;
 
   return (
     <div
@@ -141,12 +145,12 @@ const FileUploadZone: React.FC<FileUploadZoneProps> = ({
       />
 
       <div className="flex flex-col items-center text-center">
-        <div className={`p-4 rounded-full ${isMP ? 'bg-blue-500/10' : 'bg-emerald-500/10'} mb-4`}>
+        <div className={`p-4 rounded-full ${cfg.iconBg} mb-4`}>
           <Icon className={`w-8 h-8 ${iconColor}`} />
         </div>
 
         <h3 className="text-lg font-semibold text-foreground mb-1">
-          {isMP ? 'Materia Prima (MP)' : 'Producto Proceso (PP)'}
+          {cfg.title}
         </h3>
 
         {file ? (
@@ -213,9 +217,11 @@ const MasterDataImport: React.FC = () => {
   
   const [mpFile, setMpFile] = useState<File | null>(null);
   const [ppFile, setPpFile] = useState<File | null>(null);
+  const [ptFile, setPtFile] = useState<File | null>(null);
   
   const [mpResult, setMpResult] = useState<ParseResult | null>(null);
   const [ppResult, setPpResult] = useState<ParseResult | null>(null);
+  const [ptResult, setPtResult] = useState<ParseResult | null>(null);
   
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [combinedData, setCombinedData] = useState<ParsedRow[]>([]);
@@ -269,61 +275,60 @@ const MasterDataImport: React.FC = () => {
     };
   };
 
-  const handleMpFileSelect = async (file: File | null) => {
-    setMpFile(file);
-    setMpResult(null);
+  const recomputeCombined = (
+    mp: ParseResult | null,
+    pp: ParseResult | null,
+    pt: ParseResult | null
+  ) => {
+    const mpData = mp?.data || [];
+    const ppData = pp?.data || [];
+    const ptData = pt?.data || [];
+    const total = mpData.length + ppData.length + ptData.length;
+
+    if (total === 0) {
+      setValidation(null);
+      setCombinedData([]);
+      setState('idle');
+      return;
+    }
+
+    setValidation(validateCombinedData(mpData, ppData, ptData));
+    setCombinedData([...mpData, ...ppData, ...ptData]);
+    setState('preview');
+  };
+
+  const handleFileSelect = async (type: MaterialType, file: File | null) => {
+    const setFile = type === 'MP' ? setMpFile : type === 'PP' ? setPpFile : setPtFile;
+    const setResult = type === 'MP' ? setMpResult : type === 'PP' ? setPpResult : setPtResult;
+
+    setFile(file);
+    setResult(null);
     setValidation(null);
     setCombinedData([]);
     setState('idle');
 
-    if (file) {
-      setState('parsing');
-      const result = await parseExcelFile(file, 'MP');
-      setMpResult(result);
-      
-      // If PP is also loaded, validate both
-      if (ppResult && ppResult.data.length > 0) {
-        const validationResult = validateCombinedData(result.data, ppResult.data);
-        setValidation(validationResult);
-        setCombinedData([...result.data, ...ppResult.data]);
-        setState('preview');
-      } else if (result.data.length > 0) {
-        setValidation(validateCombinedData(result.data, []));
-        setCombinedData(result.data);
-        setState('preview');
-      } else {
-        setState('idle');
-      }
+    if (!file) {
+      // Recompute using remaining files
+      const nextMp = type === 'MP' ? null : mpResult;
+      const nextPp = type === 'PP' ? null : ppResult;
+      const nextPt = type === 'PT' ? null : ptResult;
+      recomputeCombined(nextMp, nextPp, nextPt);
+      return;
     }
+
+    setState('parsing');
+    const result = await parseExcelFile(file, type);
+    setResult(result);
+
+    const nextMp = type === 'MP' ? result : mpResult;
+    const nextPp = type === 'PP' ? result : ppResult;
+    const nextPt = type === 'PT' ? result : ptResult;
+    recomputeCombined(nextMp, nextPp, nextPt);
   };
 
-  const handlePpFileSelect = async (file: File | null) => {
-    setPpFile(file);
-    setPpResult(null);
-    setValidation(null);
-    setCombinedData([]);
-    setState('idle');
-
-    if (file) {
-      setState('parsing');
-      const result = await parseExcelFile(file, 'PP');
-      setPpResult(result);
-      
-      // If MP is also loaded, validate both
-      if (mpResult && mpResult.data.length > 0) {
-        const validationResult = validateCombinedData(mpResult.data, result.data);
-        setValidation(validationResult);
-        setCombinedData([...mpResult.data, ...result.data]);
-        setState('preview');
-      } else if (result.data.length > 0) {
-        setValidation(validateCombinedData([], result.data));
-        setCombinedData(result.data);
-        setState('preview');
-      } else {
-        setState('idle');
-      }
-    }
-  };
+  const handleMpFileSelect = (file: File | null) => handleFileSelect('MP', file);
+  const handlePpFileSelect = (file: File | null) => handleFileSelect('PP', file);
+  const handlePtFileSelect = (file: File | null) => handleFileSelect('PT', file);
 
   const handleImportClick = async () => {
     if (combinedData.length === 0) return;
@@ -357,23 +362,42 @@ const MasterDataImport: React.FC = () => {
       // Remove cant_total_erp since it's a generated column in the database
       const dataToInsert = combinedData.map(({ cant_total_erp, ...rest }) => rest);
 
-      // Step 1: Delete all existing locations (cascade cleanup)
-      setProgress(5);
-      const { error: locDeleteError } = await supabase
-        .from('locations')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+      // Determinar qué familias se están importando
+      const typesInImport = Array.from(new Set(dataToInsert.map((r) => r.material_type))) as MaterialType[];
 
-      if (locDeleteError) {
-        throw new Error(`Error al eliminar ubicaciones: ${locDeleteError.message}`);
+      // Step 1: Fetch existing references of these types so we can delete their locations first
+      setProgress(3);
+      const { data: existingRefs, error: refsError } = await supabase
+        .from('inventory_master')
+        .select('referencia')
+        .in('material_type', typesInImport);
+
+      if (refsError) {
+        throw new Error(`Error al consultar referencias existentes: ${refsError.message}`);
       }
 
-      // Step 2: Delete all existing inventory records
+      const refsToDelete = (existingRefs || []).map((r) => r.referencia);
+
+      // Step 2: Delete locations tied to those references (in batches to avoid huge URLs)
+      setProgress(6);
+      const LOC_BATCH = 200;
+      for (let i = 0; i < refsToDelete.length; i += LOC_BATCH) {
+        const chunk = refsToDelete.slice(i, i + LOC_BATCH);
+        const { error: locDeleteError } = await supabase
+          .from('locations')
+          .delete()
+          .in('master_reference', chunk);
+        if (locDeleteError) {
+          throw new Error(`Error al eliminar ubicaciones: ${locDeleteError.message}`);
+        }
+      }
+
+      // Step 3: Delete inventory_master rows only for the affected material types
       setProgress(10);
       const { error: deleteError } = await supabase
         .from('inventory_master')
         .delete()
-        .neq('referencia', '');
+        .in('material_type', typesInImport);
 
       if (deleteError) {
         throw new Error(`Error al eliminar datos existentes: ${deleteError.message}`);
@@ -413,8 +437,10 @@ const MasterDataImport: React.FC = () => {
       setTimeout(() => {
         setMpFile(null);
         setPpFile(null);
+        setPtFile(null);
         setMpResult(null);
         setPpResult(null);
+        setPtResult(null);
         setValidation(null);
         setCombinedData([]);
         setState('idle');
@@ -434,8 +460,10 @@ const MasterDataImport: React.FC = () => {
   const handleClear = () => {
     setMpFile(null);
     setPpFile(null);
+    setPtFile(null);
     setMpResult(null);
     setPpResult(null);
+    setPtResult(null);
     setValidation(null);
     setCombinedData([]);
     setState('idle');
@@ -444,11 +472,18 @@ const MasterDataImport: React.FC = () => {
 
   const mpCount = mpResult?.data.length || 0;
   const ppCount = ppResult?.data.length || 0;
-  const totalCount = mpCount + ppCount;
+  const ptCount = ptResult?.data.length || 0;
+  const totalCount = mpCount + ppCount + ptCount;
+  const typesInImport: MaterialType[] = [
+    ...(mpCount > 0 ? (['MP'] as const) : []),
+    ...(ppCount > 0 ? (['PP'] as const) : []),
+    ...(ptCount > 0 ? (['PT'] as const) : []),
+  ];
 
   const allWarnings = [
     ...(mpResult?.warnings || []),
     ...(ppResult?.warnings || []),
+    ...(ptResult?.warnings || []),
     ...(validation?.warnings || []),
   ];
 
@@ -464,10 +499,10 @@ const MasterDataImport: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold text-foreground">Importar Maestra</h2>
           <p className="text-muted-foreground">
-            Carga los archivos de Materia Prima y Producto Proceso
+            Carga los archivos de Materia Prima, Producto Proceso y Producto Terminado (solo se reemplaza la familia importada)
           </p>
         </div>
-        {(mpFile || ppFile) && state !== 'importing' && (
+        {(mpFile || ppFile || ptFile) && state !== 'importing' && (
           <Button variant="outline" onClick={handleClear}>
             <Trash2 className="w-4 h-4 mr-2" />
             Limpiar
@@ -476,7 +511,7 @@ const MasterDataImport: React.FC = () => {
       </div>
 
       {/* Upload Zones */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <FileUploadZone
           type="MP"
           file={mpFile}
@@ -491,7 +526,15 @@ const MasterDataImport: React.FC = () => {
           disabled={state === 'importing'}
           parseResult={ppResult}
         />
+        <FileUploadZone
+          type="PT"
+          file={ptFile}
+          onFileSelect={handlePtFileSelect}
+          disabled={state === 'importing'}
+          parseResult={ptResult}
+        />
       </div>
+
 
       {/* Warnings */}
       {allWarnings.length > 0 && (
@@ -532,7 +575,7 @@ const MasterDataImport: React.FC = () => {
         <div className="space-y-4">
           {/* Summary */}
           <div className="flex flex-wrap items-center gap-4 p-4 rounded-lg bg-muted/50">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Badge variant="secondary" className="bg-blue-500/10 text-blue-600">
                 {mpCount} MP
               </Badge>
@@ -540,12 +583,20 @@ const MasterDataImport: React.FC = () => {
               <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600">
                 {ppCount} PP
               </Badge>
+              <span className="text-muted-foreground">+</span>
+              <Badge variant="secondary" className="bg-amber-500/10 text-amber-600">
+                {ptCount} PT
+              </Badge>
               <span className="text-muted-foreground">=</span>
               <Badge variant="default">
                 {totalCount} Total
               </Badge>
             </div>
+            <div className="text-xs text-muted-foreground ml-auto">
+              Se reemplazará{typesInImport.length > 1 ? 'n' : ''} solo: <strong>{typesInImport.join(', ')}</strong>
+            </div>
           </div>
+
 
           {/* Preview Table */}
           <div className="rounded-lg border border-border overflow-hidden">
@@ -592,9 +643,10 @@ const MasterDataImport: React.FC = () => {
                       <TableCell>
                         <Badge 
                           variant="outline" 
-                          className={row.material_type === 'MP' 
-                            ? 'border-blue-500/50 text-blue-600' 
-                            : 'border-emerald-500/50 text-emerald-600'
+                          className={
+                            row.material_type === 'MP' ? 'border-blue-500/50 text-blue-600'
+                            : row.material_type === 'PP' ? 'border-emerald-500/50 text-emerald-600'
+                            : 'border-amber-500/50 text-amber-600'
                           }
                         >
                           {row.material_type}
@@ -700,7 +752,7 @@ const MasterDataImport: React.FC = () => {
             <AlertDialogDescription asChild>
               <div className="space-y-4 text-left">
                 <p className="text-foreground font-medium">
-                  Esta acción eliminará permanentemente los siguientes datos:
+                  Se reemplazará solo la familia: <strong>{typesInImport.join(', ')}</strong>. Esta acción eliminará permanentemente los datos existentes de esa(s) familia(s):
                 </p>
                 
                 <ul className="space-y-2 text-sm">

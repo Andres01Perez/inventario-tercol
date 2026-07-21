@@ -81,7 +81,7 @@ const InventarioPP: React.FC = () => {
 
       const { error } = await supabase
         .from('inventory_master')
-        .update(updateData)
+        .update(updateData as never)
         .eq('referencia', referencia);
 
       if (error) throw error;

@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 
-export type MaterialType = 'MP' | 'PP';
+export type MaterialType = 'MP' | 'PP' | 'PT';
 
 export interface ParsedRow {
   referencia: string;
@@ -70,8 +70,15 @@ const PP_COLUMN_MAP: Record<string, keyof ParsedRow> = {
   'costo.t': 'costo_t',
 };
 
+// Column mapping for PT file (skeleton — columnas específicas se agregarán después)
+const PT_COLUMN_MAP: Record<string, keyof ParsedRow> = {
+  'referencia': 'referencia',
+  'control': 'control',
+};
+
 const REQUIRED_COLUMNS_MP = ['referencia'];
 const REQUIRED_COLUMNS_PP = ['referencia'];
+const REQUIRED_COLUMNS_PT = ['referencia'];
 
 function normalizeColumnName(name: string): string {
   return name
@@ -200,8 +207,8 @@ export function parseExcelFile(file: File, type: MaterialType): Promise<ParseRes
         });
 
         // Validate required columns
-        const columnMap = type === 'MP' ? MP_COLUMN_MAP : PP_COLUMN_MAP;
-        const requiredColumns = type === 'MP' ? REQUIRED_COLUMNS_MP : REQUIRED_COLUMNS_PP;
+        const columnMap = type === 'MP' ? MP_COLUMN_MAP : type === 'PP' ? PP_COLUMN_MAP : PT_COLUMN_MAP;
+        const requiredColumns = type === 'MP' ? REQUIRED_COLUMNS_MP : type === 'PP' ? REQUIRED_COLUMNS_PP : REQUIRED_COLUMNS_PT;
         
         const missingColumns = requiredColumns.filter(
           (col) => !normalizedColumns.includes(col)
@@ -328,7 +335,8 @@ export interface ValidationResult {
 
 export function validateCombinedData(
   mpData: ParsedRow[],
-  ppData: ParsedRow[]
+  ppData: ParsedRow[],
+  ptData: ParsedRow[] = []
 ): ValidationResult {
   const result: ValidationResult = {
     isValid: true,
@@ -339,43 +347,45 @@ export function validateCombinedData(
     duplicatesBetweenTypes: [],
   };
 
-  // Check duplicates within MP
+  const checkDuplicatesWithin = (data: ParsedRow[], label: string): string[] => {
+    const refs = data.map((r) => r.referencia);
+    const dupes = [...new Set(refs.filter((ref, idx) => refs.indexOf(ref) !== idx))];
+    if (dupes.length > 0) {
+      result.errors.push(
+        `Referencias duplicadas en ${label}: ${dupes.slice(0, 5).join(', ')}${
+          dupes.length > 5 ? ` y ${dupes.length - 5} más` : ''
+        }`
+      );
+      result.isValid = false;
+    }
+    return dupes;
+  };
+
+  result.duplicatesWithinMp = checkDuplicatesWithin(mpData, 'MP');
+  result.duplicatesWithinPp = checkDuplicatesWithin(ppData, 'PP');
+  const ptDupes = checkDuplicatesWithin(ptData, 'PT');
+
   const mpRefs = mpData.map((r) => r.referencia);
-  const mpDuplicates = mpRefs.filter((ref, idx) => mpRefs.indexOf(ref) !== idx);
-  if (mpDuplicates.length > 0) {
-    result.duplicatesWithinMp = [...new Set(mpDuplicates)];
-    result.errors.push(
-      `Referencias duplicadas en MP: ${result.duplicatesWithinMp.slice(0, 5).join(', ')}${
-        result.duplicatesWithinMp.length > 5 ? ` y ${result.duplicatesWithinMp.length - 5} más` : ''
-      }`
-    );
-    result.isValid = false;
-  }
-
-  // Check duplicates within PP
   const ppRefs = ppData.map((r) => r.referencia);
-  const ppDuplicates = ppRefs.filter((ref, idx) => ppRefs.indexOf(ref) !== idx);
-  if (ppDuplicates.length > 0) {
-    result.duplicatesWithinPp = [...new Set(ppDuplicates)];
-    result.errors.push(
-      `Referencias duplicadas en PP: ${result.duplicatesWithinPp.slice(0, 5).join(', ')}${
-        result.duplicatesWithinPp.length > 5 ? ` y ${result.duplicatesWithinPp.length - 5} más` : ''
-      }`
-    );
-    result.isValid = false;
-  }
+  const ptRefs = ptData.map((r) => r.referencia);
 
-  // Check duplicates between MP and PP
-  const crossDuplicates = mpRefs.filter((ref) => ppRefs.includes(ref));
-  if (crossDuplicates.length > 0) {
-    result.duplicatesBetweenTypes = [...new Set(crossDuplicates)];
-    result.errors.push(
-      `Referencias duplicadas entre MP y PP: ${result.duplicatesBetweenTypes.slice(0, 5).join(', ')}${
-        result.duplicatesBetweenTypes.length > 5 ? ` y ${result.duplicatesBetweenTypes.length - 5} más` : ''
-      }`
-    );
-    result.isValid = false;
-  }
+  const crossCheck = (a: string[], b: string[], labelA: string, labelB: string) => {
+    const cross = [...new Set(a.filter((ref) => b.includes(ref)))];
+    if (cross.length > 0) {
+      result.duplicatesBetweenTypes.push(...cross);
+      result.errors.push(
+        `Referencias duplicadas entre ${labelA} y ${labelB}: ${cross.slice(0, 5).join(', ')}${
+          cross.length > 5 ? ` y ${cross.length - 5} más` : ''
+        }`
+      );
+      result.isValid = false;
+    }
+  };
+
+  crossCheck(mpRefs, ppRefs, 'MP', 'PP');
+  crossCheck(mpRefs, ptRefs, 'MP', 'PT');
+  crossCheck(ppRefs, ptRefs, 'PP', 'PT');
 
   return result;
 }
+
