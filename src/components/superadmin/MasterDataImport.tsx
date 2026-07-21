@@ -275,61 +275,60 @@ const MasterDataImport: React.FC = () => {
     };
   };
 
-  const handleMpFileSelect = async (file: File | null) => {
-    setMpFile(file);
-    setMpResult(null);
+  const recomputeCombined = (
+    mp: ParseResult | null,
+    pp: ParseResult | null,
+    pt: ParseResult | null
+  ) => {
+    const mpData = mp?.data || [];
+    const ppData = pp?.data || [];
+    const ptData = pt?.data || [];
+    const total = mpData.length + ppData.length + ptData.length;
+
+    if (total === 0) {
+      setValidation(null);
+      setCombinedData([]);
+      setState('idle');
+      return;
+    }
+
+    setValidation(validateCombinedData(mpData, ppData, ptData));
+    setCombinedData([...mpData, ...ppData, ...ptData]);
+    setState('preview');
+  };
+
+  const handleFileSelect = async (type: MaterialType, file: File | null) => {
+    const setFile = type === 'MP' ? setMpFile : type === 'PP' ? setPpFile : setPtFile;
+    const setResult = type === 'MP' ? setMpResult : type === 'PP' ? setPpResult : setPtResult;
+
+    setFile(file);
+    setResult(null);
     setValidation(null);
     setCombinedData([]);
     setState('idle');
 
-    if (file) {
-      setState('parsing');
-      const result = await parseExcelFile(file, 'MP');
-      setMpResult(result);
-      
-      // If PP is also loaded, validate both
-      if (ppResult && ppResult.data.length > 0) {
-        const validationResult = validateCombinedData(result.data, ppResult.data);
-        setValidation(validationResult);
-        setCombinedData([...result.data, ...ppResult.data]);
-        setState('preview');
-      } else if (result.data.length > 0) {
-        setValidation(validateCombinedData(result.data, []));
-        setCombinedData(result.data);
-        setState('preview');
-      } else {
-        setState('idle');
-      }
+    if (!file) {
+      // Recompute using remaining files
+      const nextMp = type === 'MP' ? null : mpResult;
+      const nextPp = type === 'PP' ? null : ppResult;
+      const nextPt = type === 'PT' ? null : ptResult;
+      recomputeCombined(nextMp, nextPp, nextPt);
+      return;
     }
+
+    setState('parsing');
+    const result = await parseExcelFile(file, type);
+    setResult(result);
+
+    const nextMp = type === 'MP' ? result : mpResult;
+    const nextPp = type === 'PP' ? result : ppResult;
+    const nextPt = type === 'PT' ? result : ptResult;
+    recomputeCombined(nextMp, nextPp, nextPt);
   };
 
-  const handlePpFileSelect = async (file: File | null) => {
-    setPpFile(file);
-    setPpResult(null);
-    setValidation(null);
-    setCombinedData([]);
-    setState('idle');
-
-    if (file) {
-      setState('parsing');
-      const result = await parseExcelFile(file, 'PP');
-      setPpResult(result);
-      
-      // If MP is also loaded, validate both
-      if (mpResult && mpResult.data.length > 0) {
-        const validationResult = validateCombinedData(mpResult.data, result.data);
-        setValidation(validationResult);
-        setCombinedData([...mpResult.data, ...result.data]);
-        setState('preview');
-      } else if (result.data.length > 0) {
-        setValidation(validateCombinedData([], result.data));
-        setCombinedData(result.data);
-        setState('preview');
-      } else {
-        setState('idle');
-      }
-    }
-  };
+  const handleMpFileSelect = (file: File | null) => handleFileSelect('MP', file);
+  const handlePpFileSelect = (file: File | null) => handleFileSelect('PP', file);
+  const handlePtFileSelect = (file: File | null) => handleFileSelect('PT', file);
 
   const handleImportClick = async () => {
     if (combinedData.length === 0) return;
