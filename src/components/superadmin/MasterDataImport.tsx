@@ -575,7 +575,7 @@ const MasterDataImport: React.FC = () => {
         <div className="space-y-4">
           {/* Summary */}
           <div className="flex flex-wrap items-center gap-4 p-4 rounded-lg bg-muted/50">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Badge variant="secondary" className="bg-blue-500/10 text-blue-600">
                 {mpCount} MP
               </Badge>
@@ -583,12 +583,20 @@ const MasterDataImport: React.FC = () => {
               <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600">
                 {ppCount} PP
               </Badge>
+              <span className="text-muted-foreground">+</span>
+              <Badge variant="secondary" className="bg-amber-500/10 text-amber-600">
+                {ptCount} PT
+              </Badge>
               <span className="text-muted-foreground">=</span>
               <Badge variant="default">
                 {totalCount} Total
               </Badge>
             </div>
+            <div className="text-xs text-muted-foreground ml-auto">
+              Se reemplazará{typesInImport.length > 1 ? 'n' : ''} solo: <strong>{typesInImport.join(', ')}</strong>
+            </div>
           </div>
+
 
           {/* Preview Table */}
           <div className="rounded-lg border border-border overflow-hidden">
