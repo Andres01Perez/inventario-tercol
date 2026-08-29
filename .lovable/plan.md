@@ -1,61 +1,82 @@
+# Informe de estado del proyecto — Tercol Inventario Semestral
 
-## Problema 1 — La importación borra la otra familia
+## 1. De qué se trata
 
-En `src/components/superadmin/MasterDataImport.tsx`, `executeImport()` siempre ejecuta:
+**Tercol — Inventario Semestral**: plataforma web (React + Vite + Tailwind + shadcn, backend Lovable Cloud/Supabase) para gestionar el **conteo físico de inventario** de una bodega, contrastándolo contra las cantidades del ERP y resolviendo diferencias mediante rondas sucesivas de reconteo hasta cerrar cada referencia como auditada.
 
-1. `DELETE FROM locations WHERE id != …` (borra TODAS las ubicaciones)
-2. `DELETE FROM inventory_master WHERE referencia != ''` (borra TODAS las referencias)
-3. Inserta solo lo que viene en `combinedData`.
+## 2. Roles y acceso
 
-Cuando el usuario sube solo MP (o solo PP), `combinedData` contiene una sola familia, pero el paso 1 y 2 arrasan con la otra. Por eso al importar MP se borra PP y viceversa.
+| Rol | Alcance |
+|---|---|
+| **Operario** | Solo ve y cuenta las ubicaciones asignadas a su turno (C1 → Turno 1, C2 → Turno 2; C3/C4 cualquier turno). |
+| **Supervisor (Líder)** | Transcripción de conteos por grupo, agregar referencias/ubicaciones, seguimiento de operarios. |
+| **Admin** | Todo lo del supervisor + vistas de auditoría. |
+| **Superadmin** | Todo: importación de maestras y ubicaciones, gestión de operarios, inventarios MP/PP, auditoría general, exportaciones. |
 
-### Solución
+Filtrado implícito de permisos: nunca se muestra "Acceso Denegado"; las funciones no autorizadas simplemente no aparecen.
 
-Detectar qué familias están presentes en `combinedData` y borrar solo esas:
+## 3. Flujo principal: rondas de conteo (C1–C4)
 
-- Calcular `typesInImport = new Set(combinedData.map(r => r.material_type))`.
-- Reemplazar los dos DELETE globales por DELETE filtrados:
-  - `inventory_master`: `.delete().in('material_type', [...typesInImport])`
-  - `locations`: borrar solo las ubicaciones cuya `master_reference` pertenezca a `inventory_master` con esos `material_type`. Como no hay columna directa, se hace en dos pasos:
-    1. `select referencia from inventory_master where material_type in (...)`
-    2. `locations.delete().in('master_reference', esasRefs)` (por lotes de ~500 para evitar URLs enormes).
-- Si ambos archivos están presentes, el comportamiento actual (wipe total) se mantiene naturalmente porque `typesInImport` = ['MP','PP'].
-- Actualizar el diálogo de confirmación (`checkActiveInventory` / mensaje "BORRAR") para que indique claramente qué familia(s) se van a reemplazar, no "todo el inventario".
+```text
+C1 ──coincide con ERP?──► sí → auditada (validated_quantity)
+   │ no
+   ▼
+C2 ──coincide con C1 o ERP?──► sí → auditada
+   │ no
+   ▼
+C3 ──coincide con C1, C2 o ERP?──► sí → auditada
+   │ no
+   ▼
+C4 ──conteo final/cierre──► auditada con cantidad C4
+```
 
-## Problema 2 — Esqueleto para familia PT (Producto Terminado)
+Reglas clave:
+- **Auto-validación**: no hay botones de validar en C1–C4; al guardar un conteo se dispara `validate_and_close_round` (RPC) que decide si la referencia queda auditada o escala a la siguiente ronda.
+- **Multi-ubicación**: si una referencia tiene 2+ ubicaciones, todas deben contarse antes de que la referencia avance de ronda. La comparación es por **suma total** de la referencia contra ERP (no ubicación por ubicación) — esto se corrigió tras el caso AL324IE.
+- **Jerarquía de comparación por ronda**: C2 compara contra C1 y ERP; C3 contra C1, C2 y ERP; C4 cierra con lo contado.
+- Botón **"Validar Contados"** manual en /conteo/1 para el usuario almacen@tercol.com.co que limpia de la vista las ubicaciones con `status_c1 = 'contado'`.
 
-Solo esqueleto; las columnas/reglas específicas llegan en el siguiente mensaje del usuario.
+## 4. Módulos / páginas
 
-### Cambios de base de datos (migración)
+- **/conteo/1…4** — vistas de conteo por ronda (operarios/supervisores). Realtime con Supabase para que desaparezcan referencias al guardarse.
+- **/supervisor/transcripcion** — `GroupedTranscriptionTab`: tabla de transcripción agrupada, panel de diagnóstico, agregar referencia (autocomplete con batch fetch), realtime.
+- **/auditoria** — auditoría con paginación server-side de 1000 referencias por página.
+- **/superadmin/auditoria** — auditoría general, editor de conteos (update/insert explícito, sin upsert), sin recargas de página (invalidación de React Query).
+- **/superadmin/importar** — `MasterDataImport`: importación Excel de maestras MP/PP/PT con **borrado selectivo por familia** (corregido: antes borraba todo), validación de duplicados, y `LocationsImport` para ubicaciones (batches de 100).
+- **/superadmin/inventario-mp** y **/inventario-pp** — inventarios por familia con exportación a Excel.
+- **/superadmin/exportar-conteos** — dos tabs: **Totales Validados** (suma por referencia) y **Por Ubicación** (C1–C4 pivoteados por ubicación), con filtros por ronda, fecha y rango horario (`updated_at`). Batch fetch para superar el límite de 1000 filas.
+- **/superadmin/operarios** — gestión de operarios y turnos.
+- **/criticos** — referencias críticas (optimizado con batching).
 
-- Ampliar el enum `material_type` para incluir `'PT'`:
-  ```sql
-  ALTER TYPE public.material_type ADD VALUE IF NOT EXISTS 'PT';
-  ```
-- No se añaden columnas nuevas todavía (esperar directrices). Las columnas específicas de PT se agregarán en otra migración cuando el usuario las defina.
+## 5. Base de datos (tablas principales)
 
-### Cambios de código (esqueleto, sin lógica de columnas todavía)
+- **inventory_master** — referencias, tipo de material (enum `MP` | `PP` | `PT`), cantidad ERP.
+- **locations** — ubicaciones por referencia, estados `status_c1…c4`, `validated_quantity`, `updated_at`.
+- **inventory_counts** — conteos individuales por ronda (cantidad, operario, timestamp).
+- **user_roles** — roles separados (nunca en profiles), con función `has_role()` security-definer.
+- **operarios** — operarios y turnos.
+- RPC **validate_and_close_round** — núcleo de la auto-validación y escalado de rondas; RPC **get_filter_options** para valores distintos eficientes.
+- Realtime: `REPLICA IDENTITY FULL` + publicación `supabase_realtime` en las tablas clave.
 
-1. `src/lib/masterDataParser.ts`
-   - `MaterialType` → `'MP' | 'PP' | 'PT'`.
-   - Añadir `PT_COLUMN_MAP` vacío (placeholder con solo `referencia`) y `REQUIRED_COLUMNS_PT = ['referencia']`.
-   - Extender `parseExcelFile` para aceptar `type: 'PT'` (usa el mapeo PT).
-   - Extender `validateCombinedData` a tres arrays (MP, PP, PT) — o dejar la firma actual y crear un helper que valide duplicados en las tres listas y entre pares. Se ajustará cuando lleguen las columnas reales.
+## 6. Problemas históricos ya resueltos (para no reintroducirlos)
 
-2. `src/components/superadmin/MasterDataImport.tsx`
-   - Añadir tercer `FileUploadZone` con `type="PT"` (nuevo ícono/color, p. ej. ámbar).
-   - Estado `ptFile`, `ptResult`, y handler `handlePtFileSelect` análogo a MP/PP.
-   - `combinedData` ahora concatena las tres listas.
-   - El grid pasa de `md:grid-cols-2` a `md:grid-cols-3`.
-   - Incluir PT en el cálculo de `typesInImport` del fix del Problema 1.
+1. Límite de 1000 filas de PostgREST → todo fetch masivo usa `.range()` en batches.
+2. Validación multi-ubicación por suma total (no por ubicación individual).
+3. Race condition que saltaba de C2 a C4 → RPC verifica conteos existentes + lock `validatingRefs` en frontend.
+4. Realtime C1/C2: comparaciones con `Number()`, `refetchQueries({ type: 'active' })`.
+5. Importación de maestras: borrado solo de la familia importada.
+6. `ON CONFLICT` en editor de auditoría → update/insert explícito + RLS de superadmin en `inventory_counts`.
+7. Exportaciones con batch fetch (1657+ ubicaciones, 3700+ conteos).
+8. `validated_quantity` incorrecto en validación por suma → RPC corregido (caso CCE125TG).
 
-3. `FileUploadZone`: aceptar `type: MaterialType` genérico; agregar caso PT (título "Producto Terminado (PT)", color e ícono nuevos — p. ej. `Boxes` de lucide).
+## 7. Pendientes / observaciones
 
-No se toca aún la exportación ni otras vistas (auditoría, conteos, etc.) hasta que el usuario dé las reglas de PT.
+1. **PT (Producto Terminado)**: esqueleto listo (enum, parser, zona de subida), falta el mapeo de columnas real del Excel PT.
+2. `LocationsImport` aún no deduplica (quedó descartado el `upsert`, se puede retomar si se repite el problema).
+3. `OperariosManagement` solo ofrece turnos 1 y 2 aunque el parser acepta 1–3.
+4. Guardado de conteos funciona pero es algo lento (validación ya es asíncrona; se puede seguir optimizando).
+5. Layouts inconsistentes: algunas pantallas usan `AppLayout` y otras arman su propio header.
 
-## Verificación
+## Próximos pasos
 
-- Subir solo MP con PP existente: PP se conserva, MP se reemplaza.
-- Subir solo PP con MP existente: MP se conserva.
-- Subir MP + PP: se reemplazan ambos (comportamiento anterior).
-- La zona PT aparece en la UI, permite seleccionar archivo y muestra "0 referencias cargadas" o el conteo de filas con `referencia`, sin romper la importación de MP/PP.
+Este informe es la línea base de contexto. Indícame qué cambio quieres hacer y armo el plan específico.
