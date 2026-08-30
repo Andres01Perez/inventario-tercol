@@ -499,6 +499,10 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
   });
 
   const handleSaveCount = (locationId: string) => {
+    if (isReadOnly) {
+      toast.error('Inventario histórico: solo lectura');
+      return;
+    }
     const value = quantities[locationId];
     if (!value || value.trim() === '') {
       toast.error('Ingrese una cantidad');
