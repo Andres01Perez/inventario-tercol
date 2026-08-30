@@ -50,6 +50,7 @@ import {
 const PAGE_SIZE_OPTIONS = [50, 100, 250, 500];
 
 interface LocationWithReference {
+  kind: 'location';
   id: string;
   master_reference: string;
   subcategoria: string | null;
@@ -62,6 +63,15 @@ interface LocationWithReference {
   material_type: 'MP' | 'PP';
   control: string | null;
 }
+
+interface NoLocationRow {
+  kind: 'no-location';
+  master_reference: string;
+  material_type: 'MP' | 'PP';
+  control: string | null;
+}
+
+type ResponsablesRow = LocationWithReference | NoLocationRow;
 
 const GestionResponsables: React.FC = () => {
   const { profile, role } = useAuth();
@@ -107,6 +117,23 @@ const GestionResponsables: React.FC = () => {
 
   // Use cached supervisors hook
   const { data: supervisors } = useSupervisors();
+
+  // Map material type to the admin that owns the bucket (MP → admin_mp, PP → admin_pp)
+  const { data: adminMap } = useQuery({
+    queryKey: ['admin-bodega-map'],
+    queryFn: async () => {
+      const { data: roles, error } = await supabase
+        .from('user_roles')
+        .select('user_id, role')
+        .in('role', ['admin_mp', 'admin_pp']);
+      if (error) throw error;
+      const map = new Map<string, string>();
+      roles?.forEach((r) => map.set(r.role, r.user_id));
+      return map;
+    },
+    staleTime: 5 * 60 * 1000,
+    enabled: !!role,
+  });
 
   const hasActiveFilters = filterTipo !== 'all' || filterSubcategoria || filterUbicacion || filterObservacion || filterSupervisor !== 'all' || filterPuntoReferencia !== 'all';
 
@@ -179,112 +206,137 @@ const GestionResponsables: React.FC = () => {
     enabled: !!role && !!inventoryId,
   });
 
-  // OPTIMIZED QUERY: Start from locations with JOIN to inventory_master
+  // Query from inventory_master so references without locations are visible.
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['locations-responsables', role, debouncedSearchTerm, currentPage, pageSize, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, filterPuntoReferencia, inventoryId],
     queryFn: async () => {
-      // Single query starting from locations with inner join to inventory_master
+      const hasLocationFilter = filterSubcategoria || filterUbicacion || filterObservacion || filterSupervisor !== 'all' || filterPuntoReferencia !== 'all';
+      const locationRelation = hasLocationFilter ? 'locations!inner' : 'locations';
+
       let query = supabase
-        .from('locations')
+        .from('inventory_master')
         .select(`
-          id,
-          master_reference,
-          subcategoria,
-          observaciones,
-          location_name,
-          location_detail,
-          punto_referencia,
-          metodo_conteo,
-          assigned_supervisor_id,
-          inventory_master!inner(material_type, control)
+          referencia,
+          material_type,
+          control,
+          ${locationRelation}(
+            id,
+            master_reference,
+            subcategoria,
+            observaciones,
+            location_name,
+            location_detail,
+            punto_referencia,
+            metodo_conteo,
+            assigned_supervisor_id,
+            assigned_admin_id
+          )
         `, { count: 'exact' })
         .eq('inventory_id', inventoryId!);
 
-      // Superadmin ve todo, admin_mp solo ve referencias con control NOT NULL
-      // admin_pp ve TODAS las referencias para poder agregarles ubicaciones
+      // Role-based filtering on the reference bucket
       if (!isSuperadmin && isAdminMP) {
-        query = query.not('inventory_master.control', 'is', null);
+        query = query.not('control', 'is', null).eq('material_type', 'MP');
       }
-
-      // Admins solo ven sus propias ubicaciones
-      if (!isSuperadmin && profile?.id) {
-        query = query.eq('assigned_admin_id', profile.id);
+      if (!isSuperadmin && isAdminPP) {
+        query = query.eq('material_type', 'PP');
       }
 
       // Filter by material type
       if (filterTipo === 'MP' || filterTipo === 'PP') {
-        query = query.eq('inventory_master.material_type', filterTipo);
+        query = query.eq('material_type', filterTipo);
       }
 
       // Search by reference (use debounced value)
       if (debouncedSearchTerm) {
-        query = query.ilike('master_reference', `%${debouncedSearchTerm}%`);
+        query = query.ilike('referencia', `%${debouncedSearchTerm}%`);
       }
 
       // Filter by subcategoria
       if (filterSubcategoria) {
-        query = query.eq('subcategoria', filterSubcategoria);
+        query = query.ilike('locations.subcategoria', `%${filterSubcategoria}%`);
       }
 
       // Filter by location name
       if (filterUbicacion) {
-        query = query.eq('location_name', filterUbicacion);
+        query = query.ilike('locations.location_name', `%${filterUbicacion}%`);
       }
 
       // Filter by observaciones
       if (filterObservacion) {
-        query = query.eq('observaciones', filterObservacion);
+        query = query.ilike('locations.observaciones', `%${filterObservacion}%`);
       }
 
       // Filter by supervisor
       if (filterSupervisor === 'unassigned') {
-        query = query.is('assigned_supervisor_id', null);
+        query = query.is('locations.assigned_supervisor_id', null);
       } else if (filterSupervisor !== 'all') {
-        query = query.eq('assigned_supervisor_id', filterSupervisor);
+        query = query.eq('locations.assigned_supervisor_id', filterSupervisor);
       }
 
       // Filter by punto_referencia
       if (filterPuntoReferencia !== 'all') {
-        query = query.eq('punto_referencia', filterPuntoReferencia);
+        query = query.ilike('locations.punto_referencia', `%${filterPuntoReferencia}%`);
       }
 
       // Pagination
       const from = (currentPage - 1) * pageSize;
       query = query
-        .order('master_reference')
+        .order('referencia')
         .range(from, from + pageSize - 1);
 
-      const { data: locationsData, error, count } = await query;
+      const { data: masterData, error, count } = await query;
       if (error) throw error;
 
-      // Map the data to our interface
-      const locations: LocationWithReference[] = (locationsData || []).map((loc: any) => ({
-        id: loc.id,
-        master_reference: loc.master_reference,
-        subcategoria: loc.subcategoria,
-        observaciones: loc.observaciones,
-        location_name: loc.location_name,
-        location_detail: loc.location_detail,
-        punto_referencia: loc.punto_referencia,
-        metodo_conteo: loc.metodo_conteo,
-        assigned_supervisor_id: loc.assigned_supervisor_id,
-        material_type: loc.inventory_master.material_type as 'MP' | 'PP',
-        control: loc.inventory_master.control
-      }));
+      // Build rows: existing locations + one synthetic row for references without visible locations.
+      const rows: ResponsablesRow[] = [];
 
-      return { locations, total: count || 0 };
+      (masterData || []).forEach((inv: any) => {
+        const referencia = inv.referencia as string;
+        const material_type = inv.material_type as 'MP' | 'PP';
+        const control = inv.control as string | null;
+        const allLocations: any[] = inv.locations || [];
+
+        const visibleLocations = isSuperadmin
+          ? allLocations
+          : allLocations.filter((loc) => !loc.assigned_admin_id || loc.assigned_admin_id === profile?.id);
+
+        if (visibleLocations.length === 0) {
+          rows.push({ kind: 'no-location', master_reference: referencia, material_type, control });
+          return;
+        }
+
+        visibleLocations.forEach((loc: any) => {
+          rows.push({
+            kind: 'location',
+            id: loc.id,
+            master_reference: referencia,
+            subcategoria: loc.subcategoria,
+            observaciones: loc.observaciones,
+            location_name: loc.location_name,
+            location_detail: loc.location_detail,
+            punto_referencia: loc.punto_referencia,
+            metodo_conteo: loc.metodo_conteo,
+            assigned_supervisor_id: loc.assigned_supervisor_id,
+            material_type,
+            control,
+          });
+        });
+      });
+
+      return { rows, total: count || 0 };
     },
     staleTime: 2 * 60 * 1000, // 2 minutes - data is relatively fresh
-    enabled: !!role,
+    enabled: !!role && !!inventoryId,
   });
 
-  // OPTIMIZED: Memoized selection calculations
+  // OPTIMIZED: Memoized selection calculations (only existing locations are selectable)
   const { isAllSelected, isIndeterminate, allIds } = useMemo(() => {
-    const ids = data?.locations.map(l => l.id) || [];
+    const ids = data?.rows.filter((r): r is LocationWithReference => r.kind === 'location').map(l => l.id) || [];
     const allSelected = ids.length > 0 && ids.every(id => selectedIds.has(id));
     const indeterminate = selectedIds.size > 0 && !allSelected;
     return { isAllSelected: allSelected, isIndeterminate: indeterminate, allIds: ids };
-  }, [data?.locations, selectedIds]);
+  }, [data?.rows, selectedIds]);
 
   // OPTIMIZED: Memoized selection functions
   const toggleSelection = useCallback((id: string) => {
@@ -304,8 +356,8 @@ const GestionResponsables: React.FC = () => {
   }, [isAllSelected, allIds]);
 
   // Memoized handler for supervisor changes
-  const handleSupervisorChange = useCallback((locationId: string, supervisorId: string | null) => {
-    updateAssignmentMutation.mutate({ locationId, supervisorId });
+  const handleSupervisorChange = useCallback((row: ResponsablesRow, supervisorId: string | null) => {
+    handleAssign(row, supervisorId);
   }, []);
 
   // Bulk assignment mutation
@@ -354,6 +406,42 @@ const GestionResponsables: React.FC = () => {
       toast({ title: 'Error', description: 'No se pudo asignar el líder', variant: 'destructive' });
     }
   });
+
+  // Create a location for a reference that doesn't have one, then assign supervisor
+  const createAndAssignMutation = useMutation({
+    mutationFn: async ({ masterReference, materialType, supervisorId }: { masterReference: string, materialType: 'MP' | 'PP', supervisorId: string | null }) => {
+      if (!inventoryId) throw new Error('No hay inventario activo');
+      const targetRole = materialType === 'MP' ? 'admin_mp' : 'admin_pp';
+      const assignedAdminId = isSuperadmin
+        ? adminMap?.get(targetRole)
+        : profile?.id;
+      if (!assignedAdminId) throw new Error(`No hay un admin configurado para ${targetRole}`);
+
+      const { error } = await supabase.from('locations').insert({
+        inventory_id: inventoryId,
+        master_reference: masterReference,
+        assigned_admin_id: assignedAdminId,
+        assigned_supervisor_id: supervisorId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['locations-responsables'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-inventory'] });
+      toast({ title: 'Guardado', description: 'Ubicación creada y líder asignado' });
+    },
+    onError: (error) => {
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'No se pudo crear la ubicación', variant: 'destructive' });
+    }
+  });
+
+  const handleAssign = (row: ResponsablesRow, supervisorId: string | null) => {
+    if (row.kind === 'location') {
+      updateAssignmentMutation.mutate({ locationId: row.id, supervisorId });
+    } else {
+      createAndAssignMutation.mutate({ masterReference: row.master_reference, materialType: row.material_type, supervisorId });
+    }
+  };
 
   const totalPages = Math.ceil((data?.total || 0) / pageSize);
 
@@ -597,11 +685,11 @@ const GestionResponsables: React.FC = () => {
             <div className="flex items-center justify-center py-12">
               <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
-          ) : data?.locations.length === 0 ? (
+          ) : data?.rows.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
               <CheckCircle className="w-12 h-12 text-green-500 mb-4" />
-              <p className="text-foreground font-medium">No hay ubicaciones configuradas</p>
-              <p className="text-sm text-muted-foreground">Primero configura ubicaciones en Gestión de Ubicaciones</p>
+              <p className="text-foreground font-medium">No hay referencias que coincidan con los filtros</p>
+              <p className="text-sm text-muted-foreground">Ajusta los filtros o importa ubicaciones desde Gestión de Ubicaciones</p>
               <Button 
                 variant="outline" 
                 className="mt-4"
@@ -635,47 +723,79 @@ const GestionResponsables: React.FC = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data?.locations.map((location) => (
-                    <TableRow key={location.id}>
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedIds.has(location.id)}
-                          onCheckedChange={() => toggleSelection(location.id)}
-                          aria-label={`Seleccionar ${location.master_reference}`}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant="outline" 
-                          className={location.material_type === 'MP' 
-                            ? 'border-orange-500 text-orange-500' 
-                            : 'border-emerald-500 text-emerald-500'
-                          }
-                        >
-                          {location.material_type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">{location.master_reference}</TableCell>
-                      <TableCell className="text-sm">{location.subcategoria || '-'}</TableCell>
-                      <TableCell className="text-sm max-w-[200px] truncate" title={location.observaciones || ''}>
-                        {location.observaciones || '-'}
-                      </TableCell>
-                      <TableCell className="text-sm">{location.location_name || '-'}</TableCell>
-                      <TableCell className="text-sm">{location.location_detail || '-'}</TableCell>
-                      <TableCell className="text-sm">{location.punto_referencia || '-'}</TableCell>
-                      <TableCell className="text-sm">{location.metodo_conteo || '-'}</TableCell>
-                      <TableCell>
-                        <SupervisorSelect
-                          value={location.assigned_supervisor_id}
-                          onValueChange={(value) => updateAssignmentMutation.mutate({
-                            locationId: location.id,
-                            supervisorId: value
-                          })}
-                          disabled={updateAssignmentMutation.isPending}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {data?.rows.map((row) => {
+                    if (row.kind === 'no-location') {
+                      return (
+                        <TableRow key={`${row.master_reference}-no-location`}>
+                          <TableCell>
+                            <span className="text-muted-foreground">—</span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant="outline" 
+                              className={row.material_type === 'MP' 
+                                ? 'border-orange-500 text-orange-500' 
+                                : 'border-emerald-500 text-emerald-500'
+                              }
+                            >
+                              {row.material_type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">{row.master_reference}</TableCell>
+                          <TableCell colSpan={6} className="text-muted-foreground text-sm italic">
+                            Sin ubicaciones asignadas
+                          </TableCell>
+                          <TableCell>
+                            <SupervisorSelect
+                              value={null}
+                              onValueChange={(value) => handleAssign(row, value)}
+                              placeholder="Asignar líder..."
+                              disabled={createAndAssignMutation.isPending}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+
+                    return (
+                      <TableRow key={row.id}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedIds.has(row.id)}
+                            onCheckedChange={() => toggleSelection(row.id)}
+                            aria-label={`Seleccionar ${row.master_reference}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant="outline" 
+                            className={row.material_type === 'MP' 
+                              ? 'border-orange-500 text-orange-500' 
+                              : 'border-emerald-500 text-emerald-500'
+                            }
+                          >
+                            {row.material_type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{row.master_reference}</TableCell>
+                        <TableCell className="text-sm">{row.subcategoria || '-'}</TableCell>
+                        <TableCell className="text-sm max-w-[200px] truncate" title={row.observaciones || ''}>
+                          {row.observaciones || '-'}
+                        </TableCell>
+                        <TableCell className="text-sm">{row.location_name || '-'}</TableCell>
+                        <TableCell className="text-sm">{row.location_detail || '-'}</TableCell>
+                        <TableCell className="text-sm">{row.punto_referencia || '-'}</TableCell>
+                        <TableCell className="text-sm">{row.metodo_conteo || '-'}</TableCell>
+                        <TableCell>
+                          <SupervisorSelect
+                            value={row.assigned_supervisor_id}
+                            onValueChange={(value) => handleAssign(row, value)}
+                            disabled={updateAssignmentMutation.isPending || createAndAssignMutation.isPending}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
