@@ -359,6 +359,9 @@ const GestionResponsables: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <div className="px-4 sm:px-6 lg:px-8 pt-4">
+        <ReadOnlyBanner />
+      </div>
       {/* Header */}
       <header className="border-b border-border bg-card">
         <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
