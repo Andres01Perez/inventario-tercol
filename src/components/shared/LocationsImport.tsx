@@ -411,6 +411,7 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
               <TableHeader>
                 <TableRow>
                   <TableHead>Referencia</TableHead>
+                  <TableHead>Bodega</TableHead>
                   <TableHead>Ubicación</TableHead>
                   <TableHead>Subcategoría</TableHead>
                 </TableRow>
@@ -419,6 +420,9 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
                 {parsedData.slice(0, 50).map((loc, i) => (
                   <TableRow key={i}>
                     <TableCell className="font-medium">{loc.master_reference}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{loc.bodega === 'almacen' ? 'Almacén' : 'Planta'}</Badge>
+                    </TableCell>
                     <TableCell>{loc.location_name || '-'}</TableCell>
                     <TableCell>{loc.subcategoria || '-'}</TableCell>
                   </TableRow>
