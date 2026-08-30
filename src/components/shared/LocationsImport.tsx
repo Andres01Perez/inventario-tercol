@@ -50,6 +50,7 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
   const [importStats, setImportStats] = useState({ created: 0, updated: 0, skipped: 0 });
   const { toast } = useToast();
   const { profile } = useAuth();
+  const { inventoryId } = useInventory();
 
   const validateReferences = async (locations: ParsedLocation[]): Promise<string[]> => {
     const uniqueRefs = [...new Set(locations.map(l => l.master_reference))];

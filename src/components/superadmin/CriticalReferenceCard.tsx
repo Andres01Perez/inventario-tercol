@@ -60,6 +60,7 @@ interface CriticalReferenceCardProps {
 
 const CriticalReferenceCard: React.FC<CriticalReferenceCardProps> = ({ reference, onClosed }) => {
   const { user } = useAuth();
+  const { inventoryId } = useInventory();
   const queryClient = useQueryClient();
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
