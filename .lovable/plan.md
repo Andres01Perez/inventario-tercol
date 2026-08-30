@@ -1,82 +1,78 @@
-# Informe de estado del proyecto — Tercol Inventario Semestral
+# Tercol Inventario — Evolución a v2 (PT, validaciones por bodega, histórico de inventarios)
 
-## 1. De qué se trata
+## Recomendación honesta: evolucionar este proyecto, no empezar de cero
 
-**Tercol — Inventario Semestral**: plataforma web (React + Vite + Tailwind + shadcn, backend Lovable Cloud/Supabase) para gestionar el **conteo físico de inventario** de una bodega, contrastándolo contra las cantidades del ERP y resolviendo diferencias mediante rondas sucesivas de reconteo hasta cerrar cada referencia como auditada.
+Empezar de cero suena tentador porque ya sabes cómo debe funcionar, pero en este caso perderías más de lo que ganarías:
 
-## 2. Roles y acceso
+- Lo que hoy funciona bien y es caro de reconstruir: el motor `validate_and_close_round` (con reglas C1–C4, ubicaciones descubiertas en rondas posteriores, cierre por suma total), los parsers de Excel (MP/PP, ubicaciones, operarios) con detección de formato regional, las exportaciones con batch fetch, la paginación server-side y todo el trabajo de límites de 1000 filas ya resuelto.
+- Los cuatro cambios que pides son **aditivos o quirúrgicos**, no arquitectónicos: PT ya tiene enum + parser esqueleto; el cambio de validaciones toca una sola función SQL; quitar el rol operario es una limpieza; el `inventory_id` y la tabla de validaciones son dos migraciones.
+- Un proyecto nuevo implicaría rehacer auth, roles, RLS, importadores y exportadores — semanas de trabajo para llegar al mismo punto, con riesgo de reintroducir bugs ya resueltos (los 8 listados en el informe).
 
-| Rol | Alcance |
-|---|---|
-| **Operario** | Solo ve y cuenta las ubicaciones asignadas a su turno (C1 → Turno 1, C2 → Turno 2; C3/C4 cualquier turno). |
-| **Supervisor (Líder)** | Transcripción de conteos por grupo, agregar referencias/ubicaciones, seguimiento de operarios. |
-| **Admin** | Todo lo del supervisor + vistas de auditoría. |
-| **Superadmin** | Todo: importación de maestras y ubicaciones, gestión de operarios, inventarios MP/PP, auditoría general, exportaciones. |
+Lo que sí conviene: tratar esto como una **v2 con limpieza deliberada** — nueva tabla de inventarios como raíz del modelo, tabla de validaciones persistida, y borrar el rol operario y el código muerto asociado. Eso te da el "minimalismo" que buscas sin tirar el motor.
 
-Filtrado implícito de permisos: nunca se muestra "Acceso Denegado"; las funciones no autorizadas simplemente no aparecen.
+Solo recomendaría empezar de cero si además quisieras cambiar de stack o si el modelo de datos fuera incompatible — no es el caso.
 
-## 3. Flujo principal: rondas de conteo (C1–C4)
+## Alcance de la v2
+
+### 1. Informe ejecutivo exportado
+Generar `Informe-Ejecutivo-Tercol-Inventario.md` (y versión PDF) en Documentos, con el mapeo completo del aplicativo: propósito, roles, flujo C1–C4, módulos, modelo de datos, bugs históricos resueltos y pendientes.
+
+### 2. Producto Terminado (PT)
+- Definir el mapeo real de columnas del Excel PT en `PT_COLUMN_MAP` (`src/lib/masterDataParser.ts`) — requiere que nos pases un archivo de ejemplo.
+- Fórmula de `cant_total_erp` para PT en `calculateTotalErp`.
+- Columnas PT en `inventory_master` si el Excel trae campos propios (migración).
+- Vista `/superadmin/inventario-pt` equivalente a MP/PP, con exportación.
+- PT incluido en filtros, auditoría, exportaciones y selector de tipo de material.
+
+### 3. Nueva regla de validación: planta vs planta, almacén vs almacén
+Hoy `validate_and_close_round` compara la **suma total** de todas las ubicaciones contra el ERP total. La nueva regla separa por bodega:
 
 ```text
-C1 ──coincide con ERP?──► sí → auditada (validated_quantity)
-   │ no
-   ▼
-C2 ──coincide con C1 o ERP?──► sí → auditada
-   │ no
-   ▼
-C3 ──coincide con C1, C2 o ERP?──► sí → auditada
-   │ no
-   ▼
-C4 ──conteo final/cierre──► auditada con cantidad C4
+ERP almacén  = cant_alm      ─┐
+ERP planta   = cant_pld + cant_plr + cant_za  ─┘  (a confirmar el desglose exacto)
+
+Conteo almacén = SUM(ubicaciones marcadas como almacén)
+Conteo planta  = SUM(ubicaciones marcadas como planta)
+
+Validación: conteo_almacen = ERP_almacen  Y  conteo_planta = ERP_planta
 ```
 
-Reglas clave:
-- **Auto-validación**: no hay botones de validar en C1–C4; al guardar un conteo se dispara `validate_and_close_round` (RPC) que decide si la referencia queda auditada o escala a la siguiente ronda.
-- **Multi-ubicación**: si una referencia tiene 2+ ubicaciones, todas deben contarse antes de que la referencia avance de ronda. La comparación es por **suma total** de la referencia contra ERP (no ubicación por ubicación) — esto se corrigió tras el caso AL324IE.
-- **Jerarquía de comparación por ronda**: C2 compara contra C1 y ERP; C3 contra C1, C2 y ERP; C4 cierra con lo contado.
-- Botón **"Validar Contados"** manual en /conteo/1 para el usuario almacen@tercol.com.co que limpia de la vista las ubicaciones con `status_c1 = 'contado'`.
+Implica:
+- Un campo que clasifique cada ubicación como `almacen` o `planta` (probablemente derivable de `subcategoria` o `location_name`; si no, columna nueva `bodega` en `locations` + ajuste del importador de ubicaciones).
+- Reescribir la fase de "match por suma total" del RPC para evaluar los dos bloques por separado, manteniendo la jerarquía C1→C4 actual.
 
-## 4. Módulos / páginas
+### 4. Persistir la validación en tabla propia
+Nueva tabla `validated_counts` (o similar): una fila por referencia+ubicación+inventario con la cantidad validada, la ronda que la validó y el motivo (`C1=C2`, `C3=ERP`, etc.). El RPC escribe ahí en vez de depender solo de `locations.validated_quantity`. Las exportaciones leen de esa tabla — elimina la clase de error del caso CCE125TG.
 
-- **/conteo/1…4** — vistas de conteo por ronda (operarios/supervisores). Realtime con Supabase para que desaparezcan referencias al guardarse.
-- **/supervisor/transcripcion** — `GroupedTranscriptionTab`: tabla de transcripción agrupada, panel de diagnóstico, agregar referencia (autocomplete con batch fetch), realtime.
-- **/auditoria** — auditoría con paginación server-side de 1000 referencias por página.
-- **/superadmin/auditoria** — auditoría general, editor de conteos (update/insert explícito, sin upsert), sin recargas de página (invalidación de React Query).
-- **/superadmin/importar** — `MasterDataImport`: importación Excel de maestras MP/PP/PT con **borrado selectivo por familia** (corregido: antes borraba todo), validación de duplicados, y `LocationsImport` para ubicaciones (batches de 100).
-- **/superadmin/inventario-mp** y **/inventario-pp** — inventarios por familia con exportación a Excel.
-- **/superadmin/exportar-conteos** — dos tabs: **Totales Validados** (suma por referencia) y **Por Ubicación** (C1–C4 pivoteados por ubicación), con filtros por ronda, fecha y rango horario (`updated_at`). Batch fetch para superar el límite de 1000 filas.
-- **/superadmin/operarios** — gestión de operarios y turnos.
-- **/criticos** — referencias críticas (optimizado con batching).
+### 5. Historial por inventario (`inventory_id`)
+Nueva tabla `inventories` (nombre, fecha de inicio, estado abierto/cerrado). `inventory_master`, `locations`, `inventory_counts` y `validated_counts` reciben `inventory_id`. Todas las consultas se filtran por el inventario activo. Efectos:
+- Importar una maestra nueva ya no borra nada: crea un inventario nuevo.
+- Selector de inventario en el dashboard para consultar históricos en modo lectura.
+- Migración de los datos actuales a un inventario "Semestral 2026-1".
 
-## 5. Base de datos (tablas principales)
+### 6. Eliminar el rol operario
+Quitar `operario` del enum `app_role`, reasignar usuarios existentes, y limpiar las ramas de UI y RLS que lo referencian.
 
-- **inventory_master** — referencias, tipo de material (enum `MP` | `PP` | `PT`), cantidad ERP.
-- **locations** — ubicaciones por referencia, estados `status_c1…c4`, `validated_quantity`, `updated_at`.
-- **inventory_counts** — conteos individuales por ronda (cantidad, operario, timestamp).
-- **user_roles** — roles separados (nunca en profiles), con función `has_role()` security-definer.
-- **operarios** — operarios y turnos.
-- RPC **validate_and_close_round** — núcleo de la auto-validación y escalado de rondas; RPC **get_filter_options** para valores distintos eficientes.
-- Realtime: `REPLICA IDENTITY FULL` + publicación `supabase_realtime` en las tablas clave.
+## Orden de ejecución propuesto
 
-## 6. Problemas históricos ya resueltos (para no reintroducirlos)
+1. Informe ejecutivo en Documentos (inmediato).
+2. `inventories` + `inventory_id` en todas las tablas (base de todo lo demás).
+3. `validated_counts` + RPC escribiendo ahí + exportaciones leyendo de ahí.
+4. Nueva regla de validación almacén/planta.
+5. PT completo.
+6. Limpieza del rol operario.
 
-1. Límite de 1000 filas de PostgREST → todo fetch masivo usa `.range()` en batches.
-2. Validación multi-ubicación por suma total (no por ubicación individual).
-3. Race condition que saltaba de C2 a C4 → RPC verifica conteos existentes + lock `validatingRefs` en frontend.
-4. Realtime C1/C2: comparaciones con `Number()`, `refetchQueries({ type: 'active' })`.
-5. Importación de maestras: borrado solo de la familia importada.
-6. `ON CONFLICT` en editor de auditoría → update/insert explícito + RLS de superadmin en `inventory_counts`.
-7. Exportaciones con batch fetch (1657+ ubicaciones, 3700+ conteos).
-8. `validated_quantity` incorrecto en validación por suma → RPC corregido (caso CCE125TG).
+Cada paso es independiente y verificable; se puede pausar entre uno y otro.
 
-## 7. Pendientes / observaciones
+## Detalles técnicos
 
-1. **PT (Producto Terminado)**: esqueleto listo (enum, parser, zona de subida), falta el mapeo de columnas real del Excel PT.
-2. `LocationsImport` aún no deduplica (quedó descartado el `upsert`, se puede retomar si se repite el problema).
-3. `OperariosManagement` solo ofrece turnos 1 y 2 aunque el parser acepta 1–3.
-4. Guardado de conteos funciona pero es algo lento (validación ya es asíncrona; se puede seguir optimizando).
-5. Layouts inconsistentes: algunas pantallas usan `AppLayout` y otras arman su propio header.
+- Migraciones: `inventories`, columnas `inventory_id` con FK e índices compuestos (`inventory_id, master_reference`), tabla `validated_counts` con GRANTs y RLS, ajuste del enum `app_role`.
+- `validate_and_close_round`: reescritura de la Fase 0 (match por suma) para operar sobre dos bloques (almacén/planta) y escritura en `validated_counts`.
+- Frontend: todas las queries de `GroupedTranscriptionTab`, `Auditoria`, `Criticos`, `ExportarConteos`, `InventarioMP/PP` reciben el `inventory_id` activo en su query key.
+- Contexto nuevo `InventoryContext` que expone el inventario activo.
 
-## Próximos pasos
+## Antes de empezar necesito
 
-Este informe es la línea base de contexto. Indícame qué cambio quieres hacer y armo el plan específico.
+1. Un Excel de ejemplo de PT con sus columnas reales.
+2. Confirmación del desglose exacto de qué columnas ERP son "almacén" y cuáles "planta".
+3. Cómo se identifica hoy si una ubicación es de almacén o de planta (¿`subcategoria`? ¿nombre? ¿o hay que agregar la columna?).
