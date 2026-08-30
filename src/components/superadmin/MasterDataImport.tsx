@@ -653,9 +653,9 @@ const MasterDataImport: React.FC = () => {
           <div className="flex items-start gap-3">
             <RadioGroupItem value="replace" id="mode-replace" className="mt-1" />
             <Label htmlFor="mode-replace" className="font-normal cursor-pointer">
-              <span className="font-medium">Cargar sobre el inventario abierto</span>
+              <span className="font-medium">Reemplazar familias del inventario abierto</span>
               <span className="block text-sm text-muted-foreground">
-                Reemplaza únicamente las familias que subas (MP, PP o PT) dentro de este inventario. Las demás no se tocan.
+                Solo se borra y vuelve a cargar la familia que elijas (MP, PP o PT). Las demás familias y los inventarios históricos no se tocan.
               </span>
             </Label>
           </div>
