@@ -696,6 +696,17 @@ const GestionUbicacion: React.FC = () => {
           />
         </DialogContent>
       </Dialog>
+
+      {/* Dialog de creación manual */}
+      <CreateLocationDialog
+        open={!!createDialogRef}
+        onOpenChange={(open) => { if (!open) setCreateDialogRef(null); }}
+        masterReference={createDialogRef || ''}
+        onSuccess={() => {
+          refetch();
+          queryClient.invalidateQueries({ queryKey: ['locations-responsables'] });
+        }}
+      />
     </div>
   );
 };
