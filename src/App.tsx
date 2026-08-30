@@ -137,6 +137,14 @@ const App: React.FC = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/superadmin/impresion-masiva"
+              element={
+                <ProtectedRoute allowedRoles={['superadmin', 'admin_mp', 'admin_pp']}>
+                  <ImpresionMasiva />
+                </ProtectedRoute>
+              }
+            />
             {/* Admin Routes */}
             <Route
               path="/admin/gestion-ubicacion"
