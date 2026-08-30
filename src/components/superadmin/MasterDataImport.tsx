@@ -1073,11 +1073,11 @@ const MasterDataImport: React.FC = () => {
                     Verificando...
                   </>
                 ) : state === 'error' ? (
-                  <>Reintentar Importación</>
+                  <>{importMode === 'replace' ? 'Reintentar Reemplazo' : 'Reintentar Importación'}</>
                 ) : (
                   <>
                     <Upload className="w-4 h-4 mr-2" />
-                    Importar {totalCount} Referencias
+                    {importMode === 'replace' ? `Reemplazar ${totalCount} Referencias` : `Importar ${totalCount} Referencias`}
                   </>
                 )}
               </Button>
