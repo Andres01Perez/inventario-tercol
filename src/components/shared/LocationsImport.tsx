@@ -43,6 +43,7 @@ type ImportState = 'idle' | 'parsing' | 'validating' | 'preview' | 'importing' |
 const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose }) => {
   const [state, setState] = useState<ImportState>('idle');
   const [parsedData, setParsedData] = useState<LocationWithStatus[]>([]);
+  const [bodegaAdmins, setBodegaAdmins] = useState<{ almacen?: string; planta?: string }>({});
   const [errors, setErrors] = useState<string[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [invalidReferences, setInvalidReferences] = useState<string[]>([]);
