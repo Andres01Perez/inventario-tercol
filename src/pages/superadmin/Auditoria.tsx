@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useInventory } from '@/contexts/InventoryContext';
+import ReadOnlyBanner from '@/components/shared/ReadOnlyBanner';
 import { useAuth } from '@/contexts/AuthContext';
 import AppLayout from '@/components/layout/AppLayout';
 import { toast } from 'sonner';
@@ -199,6 +201,7 @@ const Auditoria: React.FC = () => {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 1000;
+  const { inventoryId, isReadOnly } = useInventory();
 
   // Debounced search for server-side filtering
   const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
@@ -215,7 +218,8 @@ const Auditoria: React.FC = () => {
 
   // Query for unique location names (for filter dropdown) - fetch in batches to avoid 1000 row limit
   const { data: locationOptions } = useQuery({
-    queryKey: ['audit-location-options'],
+    queryKey: ['audit-location-options', inventoryId],
+    enabled: !!inventoryId,
     queryFn: async () => {
       let allData: { location_name: string | null }[] = [];
       let from = 0;
@@ -225,6 +229,7 @@ const Auditoria: React.FC = () => {
         const { data, error } = await supabase
           .from('locations')
           .select('location_name')
+          .eq('inventory_id', inventoryId!)
           .range(from, from + batchSize - 1);
         
         if (error) throw error;
@@ -242,12 +247,14 @@ const Auditoria: React.FC = () => {
   });
 
   const { data: auditData, isLoading, isFetching } = useQuery({
-    queryKey: ['audit-full-view', debouncedSearch, materialTypeFilter, statusFilter, locationFilter, currentPage],
+    queryKey: ['audit-full-view', debouncedSearch, materialTypeFilter, statusFilter, locationFilter, currentPage, inventoryId],
+    enabled: !!inventoryId,
     queryFn: async () => {
       // First get total count for pagination
       let countQuery = supabase
         .from('inventory_master')
-        .select('referencia', { count: 'exact', head: true });
+        .select('referencia', { count: 'exact', head: true })
+        .eq('inventory_id', inventoryId!);
       
       if (debouncedSearch) {
         countQuery = countQuery.ilike('referencia', `%${debouncedSearch}%`);
@@ -269,6 +276,7 @@ const Auditoria: React.FC = () => {
       let masterQuery = supabase
         .from('inventory_master')
         .select('referencia, material_type, cant_total_erp, status_slug, audit_round, count_history')
+        .eq('inventory_id', inventoryId!)
         .order('referencia')
         .range(from, to);
       
@@ -297,6 +305,7 @@ const Auditoria: React.FC = () => {
         let locationsQuery = supabase
           .from('locations')
           .select('id, master_reference, location_name, location_detail, subcategoria, punto_referencia, metodo_conteo, observaciones, validated_at_round, validated_quantity, discovered_at_round')
+          .eq('inventory_id', inventoryId!)
           .in('master_reference', batchRefs);
         
         if (locationFilter !== 'all') {
@@ -319,6 +328,7 @@ const Auditoria: React.FC = () => {
         const { data: batchCounts, error: countsError } = await supabase
           .from('inventory_counts')
           .select('location_id, audit_round, quantity_counted')
+          .eq('inventory_id', inventoryId!)
           .in('location_id', batchIds);
         
         if (countsError) throw countsError;
@@ -474,6 +484,7 @@ const Auditoria: React.FC = () => {
   // Handle validate manually
   const handleValidateManually = async () => {
     if (!selectedReference || !user) return;
+    if (isReadOnly) { toast.error('Inventario histórico: solo lectura'); return; }
     setIsSubmitting(true);
 
     try {
@@ -494,6 +505,7 @@ const Auditoria: React.FC = () => {
       const { error: masterError } = await supabase
         .from('inventory_master')
         .update({ status_slug: 'auditado' })
+        .eq('inventory_id', inventoryId!)
         .eq('referencia', selectedReference.referencia);
 
       if (masterError) throw masterError;
@@ -519,6 +531,7 @@ const Auditoria: React.FC = () => {
   // Handle force close
   const handleForceClose = async () => {
     if (!selectedReference || !user) return;
+    if (isReadOnly) { toast.error('Inventario histórico: solo lectura'); return; }
     if (!forceCloseReason.trim()) {
       toast.error('Debes ingresar un motivo');
       return;
@@ -543,6 +556,7 @@ const Auditoria: React.FC = () => {
           status_slug: 'cerrado_forzado',
           count_history: newHistory,
         })
+        .eq('inventory_id', inventoryId!)
         .eq('referencia', selectedReference.referencia);
 
       if (masterError) throw masterError;
@@ -568,6 +582,7 @@ const Auditoria: React.FC = () => {
   // Handle save edited counts
   const handleSaveEditedCounts = async () => {
     if (!selectedReference || !user) return;
+    if (isReadOnly) { toast.error('Inventario histórico: solo lectura'); return; }
     setIsSubmitting(true);
 
     try {
