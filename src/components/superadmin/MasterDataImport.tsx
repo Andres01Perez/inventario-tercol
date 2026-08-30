@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { 
   Upload, 
   FileSpreadsheet, 
@@ -206,6 +206,82 @@ const FileUploadZone: React.FC<FileUploadZoneProps> = ({
   );
 };
 
+interface FamilyReplaceButtonProps {
+  type: MaterialType;
+  count: number;
+  isSelected: boolean;
+  hasFile: boolean;
+  fileName?: string;
+  onSelect: () => void;
+  onClear: () => void;
+  disabled: boolean;
+}
+
+const FamilyReplaceButton: React.FC<FamilyReplaceButtonProps> = ({
+  type,
+  count,
+  isSelected,
+  hasFile,
+  fileName,
+  onSelect,
+  onClear,
+  disabled,
+}) => {
+  const cfg = {
+    MP: { bg: 'bg-blue-500/5', border: 'border-blue-500/30', borderActive: 'border-blue-500', iconBg: 'bg-blue-500/10', icon: 'text-blue-500', Icon: Package, title: 'Materia Prima (MP)' },
+    PP: { bg: 'bg-emerald-500/5', border: 'border-emerald-500/30', borderActive: 'border-emerald-500', iconBg: 'bg-emerald-500/10', icon: 'text-emerald-500', Icon: Factory, title: 'Producto Proceso (PP)' },
+    PT: { bg: 'bg-amber-500/5', border: 'border-amber-500/30', borderActive: 'border-amber-500', iconBg: 'bg-amber-500/10', icon: 'text-amber-500', Icon: Boxes, title: 'Producto Terminado (PT)' },
+  } as const;
+  const c = cfg[type];
+  const Icon = c.Icon;
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      disabled={disabled}
+      className={`
+        relative flex flex-col items-center text-center rounded-xl border-2 p-6 transition-all
+        ${c.bg} ${isSelected ? c.borderActive : c.border}
+        ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.01] hover:border-opacity-60 cursor-pointer'}
+        ${isSelected ? 'ring-1 ring-offset-1 ring-offset-background' : ''}
+      `}
+    >
+      <div className={`p-4 rounded-full ${c.iconBg} mb-4`}>
+        <Icon className={`w-8 h-8 ${c.icon}`} />
+      </div>
+      <h3 className="text-lg font-semibold text-foreground mb-1">{c.title}</h3>
+      <p className="text-sm text-muted-foreground mb-3">
+        {count} referencia{count !== 1 ? 's' : ''} cargada{count !== 1 ? 's' : ''}
+      </p>
+
+      {hasFile && fileName ? (
+        <div className="flex items-center gap-2 text-sm">
+          <FileSpreadsheet className="w-4 h-4 text-muted-foreground" />
+          <span className="text-foreground font-medium truncate max-w-[180px]">{fileName}</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClear();
+            }}
+            disabled={disabled}
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+      ) : (
+        <span className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+          <Upload className="w-4 h-4" />
+          Reemplazar {type}
+        </span>
+      )}
+    </button>
+  );
+};
+
 // Helper to format number or show dash for null
 const formatNumber = (value: number | null | undefined): string => {
   if (value === null || value === undefined) return '—';
@@ -220,7 +296,14 @@ const MasterDataImport: React.FC = () => {
   const [importMode, setImportMode] = useState<'replace' | 'new'>('replace');
   const [newInventoryName, setNewInventoryName] = useState('');
   const [newInventoryDate, setNewInventoryDate] = useState(() => new Date().toISOString().slice(0, 10));
-  
+
+  // Familia seleccionada para reemplazar y conteos actuales del inventario abierto
+  const [selectedFamily, setSelectedFamily] = useState<MaterialType | null>(null);
+  const [familyCounts, setFamilyCounts] = useState<{ MP: number; PP: number; PT: number }>({ MP: 0, PP: 0, PT: 0 });
+  const [familyCountsLoading, setFamilyCountsLoading] = useState(false);
+
+  const hasOpenInventory = !!inventoryId && inventory?.status === 'abierto' && !isReadOnly;
+
   const [state, setState] = useState<ImportState>('idle');
   const [progress, setProgress] = useState(0);
   
@@ -239,6 +322,51 @@ const MasterDataImport: React.FC = () => {
   const [activeCheck, setActiveCheck] = useState<ActiveInventoryCheck | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [confirmText, setConfirmText] = useState('');
+
+  // Cargar conteos actuales por familia del inventario abierto
+  useEffect(() => {
+    if (!hasOpenInventory || !inventoryId) {
+      setFamilyCounts({ MP: 0, PP: 0, PT: 0 });
+      return;
+    }
+
+    let cancelled = false;
+    const fetchCounts = async () => {
+      setFamilyCountsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('inventory_master')
+          .select('material_type')
+          .eq('inventory_id', inventoryId);
+
+        if (error) throw error;
+
+        const counts = { MP: 0, PP: 0, PT: 0 };
+        (data || []).forEach((row) => {
+          const t = row.material_type as MaterialType;
+          if (t === 'MP' || t === 'PP' || t === 'PT') {
+            counts[t] += 1;
+          }
+        });
+
+        if (!cancelled) setFamilyCounts(counts);
+      } catch (err) {
+        console.error('Error cargando conteos por familia:', err);
+      } finally {
+        if (!cancelled) setFamilyCountsLoading(false);
+      }
+    };
+
+    fetchCounts();
+    return () => { cancelled = true; };
+  }, [inventoryId, hasOpenInventory, importMode]);
+
+  // Al cambiar a modo nuevo inventario se oculta la selección de familia
+  useEffect(() => {
+    if (importMode === 'new') {
+      setSelectedFamily(null);
+    }
+  }, [importMode]);
 
   const checkActiveInventory = async (): Promise<ActiveInventoryCheck> => {
     // Check locations count
@@ -579,7 +707,7 @@ const MasterDataImport: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold text-foreground">Importar Maestra</h2>
           <p className="text-muted-foreground">
-            Carga los archivos de Materia Prima, Producto Proceso y Producto Terminado (solo se reemplaza la familia importada)
+            Reemplaza familias de maestra en el inventario activo o crea un inventario nuevo
           </p>
         </div>
         {(mpFile || ppFile || ptFile) && state !== 'importing' && (
@@ -608,9 +736,9 @@ const MasterDataImport: React.FC = () => {
           <div className="flex items-start gap-3">
             <RadioGroupItem value="replace" id="mode-replace" className="mt-1" />
             <Label htmlFor="mode-replace" className="font-normal cursor-pointer">
-              <span className="font-medium">Cargar sobre el inventario abierto</span>
+              <span className="font-medium">Reemplazar familias del inventario abierto</span>
               <span className="block text-sm text-muted-foreground">
-                Reemplaza únicamente las familias que subas (MP, PP o PT) dentro de este inventario. Las demás no se tocan.
+                Solo se borra y vuelve a cargar la familia que elijas (MP, PP o PT). Las demás familias y los inventarios históricos no se tocan.
               </span>
             </Label>
           </div>
@@ -651,30 +779,113 @@ const MasterDataImport: React.FC = () => {
         )}
       </div>
 
-      {/* Upload Zones */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <FileUploadZone
-          type="MP"
-          file={mpFile}
-          onFileSelect={handleMpFileSelect}
-          disabled={state === 'importing'}
-          parseResult={mpResult}
-        />
-        <FileUploadZone
-          type="PP"
-          file={ppFile}
-          onFileSelect={handlePpFileSelect}
-          disabled={state === 'importing'}
-          parseResult={ppResult}
-        />
-        <FileUploadZone
-          type="PT"
-          file={ptFile}
-          onFileSelect={handlePtFileSelect}
-          disabled={state === 'importing'}
-          parseResult={ptResult}
-        />
-      </div>
+      {/* Botones de reemplazo (inventario abierto) o zonas de carga (nuevo inventario) */}
+      {hasOpenInventory && importMode === 'replace' ? (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <FamilyReplaceButton
+              type="MP"
+              count={familyCounts.MP}
+              isSelected={selectedFamily === 'MP'}
+              hasFile={!!mpFile}
+              fileName={mpFile?.name}
+              onSelect={() => setSelectedFamily('MP')}
+              onClear={() => handleMpFileSelect(null)}
+              disabled={state === 'importing' || familyCountsLoading}
+            />
+            <FamilyReplaceButton
+              type="PP"
+              count={familyCounts.PP}
+              isSelected={selectedFamily === 'PP'}
+              hasFile={!!ppFile}
+              fileName={ppFile?.name}
+              onSelect={() => setSelectedFamily('PP')}
+              onClear={() => handlePpFileSelect(null)}
+              disabled={state === 'importing' || familyCountsLoading}
+            />
+            <FamilyReplaceButton
+              type="PT"
+              count={familyCounts.PT}
+              isSelected={selectedFamily === 'PT'}
+              hasFile={!!ptFile}
+              fileName={ptFile?.name}
+              onSelect={() => setSelectedFamily('PT')}
+              onClear={() => handlePtFileSelect(null)}
+              disabled={state === 'importing' || familyCountsLoading}
+            />
+          </div>
+
+          {selectedFamily && (
+            <div className="max-w-2xl mx-auto">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-foreground">
+                  Subir archivo para reemplazar <strong>{selectedFamily}</strong>
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedFamily(null)}
+                  disabled={state === 'importing'}
+                >
+                  <X className="w-4 h-4 mr-1" />
+                  Cerrar
+                </Button>
+              </div>
+              {selectedFamily === 'MP' && (
+                <FileUploadZone
+                  type="MP"
+                  file={mpFile}
+                  onFileSelect={handleMpFileSelect}
+                  disabled={state === 'importing'}
+                  parseResult={mpResult}
+                />
+              )}
+              {selectedFamily === 'PP' && (
+                <FileUploadZone
+                  type="PP"
+                  file={ppFile}
+                  onFileSelect={handlePpFileSelect}
+                  disabled={state === 'importing'}
+                  parseResult={ppResult}
+                />
+              )}
+              {selectedFamily === 'PT' && (
+                <FileUploadZone
+                  type="PT"
+                  file={ptFile}
+                  onFileSelect={handlePtFileSelect}
+                  disabled={state === 'importing'}
+                  parseResult={ptResult}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <FileUploadZone
+            type="MP"
+            file={mpFile}
+            onFileSelect={handleMpFileSelect}
+            disabled={state === 'importing'}
+            parseResult={mpResult}
+          />
+          <FileUploadZone
+            type="PP"
+            file={ppFile}
+            onFileSelect={handlePpFileSelect}
+            disabled={state === 'importing'}
+            parseResult={ppResult}
+          />
+          <FileUploadZone
+            type="PT"
+            file={ptFile}
+            onFileSelect={handlePtFileSelect}
+            disabled={state === 'importing'}
+            parseResult={ptResult}
+          />
+        </div>
+      )}
 
 
       {/* Warnings */}
@@ -869,11 +1080,11 @@ const MasterDataImport: React.FC = () => {
                     Verificando...
                   </>
                 ) : state === 'error' ? (
-                  <>Reintentar Importación</>
+                  <>{importMode === 'replace' ? 'Reintentar Reemplazo' : 'Reintentar Importación'}</>
                 ) : (
                   <>
                     <Upload className="w-4 h-4 mr-2" />
-                    Importar {totalCount} Referencias
+                    {importMode === 'replace' ? `Reemplazar ${totalCount} Referencias` : `Importar ${totalCount} Referencias`}
                   </>
                 )}
               </Button>
