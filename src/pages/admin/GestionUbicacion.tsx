@@ -611,7 +611,6 @@ const GestionUbicacion: React.FC = () => {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleAddLocation(row.referencia)}
-                                disabled={addLocationMutation.isPending}
                                 className="text-primary hover:text-primary hover:bg-primary/10"
                                 title="Agregar ubicación"
                               >
