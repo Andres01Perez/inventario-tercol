@@ -138,16 +138,19 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
     const statusColumn = `status_c${roundNumber}` as 'status_c1' | 'status_c2' | 'status_c3' | 'status_c4';
 
     while (hasMore) {
+      // Se consulta la vista por bodega: cada ubicación trae la ronda de SU bloque
+      // (almacén o planta), no la ronda global de la referencia.
       let query = supabase
-        .from('locations')
+        .from('locations_bodega_view')
         .select(`
           id, master_reference, location_name, location_detail,
           subcategoria, observaciones, punto_referencia, metodo_conteo,
-          assigned_supervisor_id,
-          inventory_master!inner(referencia, material_type, control, audit_round)
+          assigned_supervisor_id, material_type, control, bodega, bodega_round, bodega_status
         `)
         .eq('inventory_id', inventoryId!)
-        .eq('inventory_master.audit_round', masterAuditRound)
+        .eq('bodega_round', masterAuditRound)
+        .is('validated_at_round', null)
+        .not('bodega_status', 'in', '("auditado","cerrado_forzado","n/a")')
         .eq(statusColumn, 'pendiente')
         .range(from, from + PAGE_SIZE - 1);
 
@@ -158,16 +161,25 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
 
       // Apply control filter for admins
       if (controlFilter === 'not_null') {
-        query = query.not('inventory_master.control', 'is', null);
+        query = query.not('control', 'is', null);
       } else if (controlFilter === 'null') {
-        query = query.is('inventory_master.control', null);
+        query = query.is('control', null);
       }
 
       const { data, error } = await query;
       if (error) throw error;
 
       if (data && data.length > 0) {
-        allData = [...allData, ...data];
+        const mapped = data.map((row: any) => ({
+          ...row,
+          inventory_master: {
+            referencia: row.master_reference,
+            material_type: row.material_type,
+            control: row.control,
+            audit_round: row.bodega_round,
+          },
+        }));
+        allData = [...allData, ...mapped];
         from += PAGE_SIZE;
         pageCount++;
         hasMore = data.length === PAGE_SIZE; // Continue if we got full page
