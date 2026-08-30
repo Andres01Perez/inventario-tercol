@@ -164,7 +164,6 @@ export function useExportToExcel() {
         location_name: string | null;
         location_detail: string | null;
         subcategoria: string | null;
-        validated_quantity: number | null;
       }[] = [];
 
       const batchSize = 100;
@@ -172,7 +171,7 @@ export function useExportToExcel() {
         const batchRefs = refs.slice(i, i + batchSize);
         let query = supabase
           .from('locations')
-          .select('id, master_reference, location_name, location_detail, subcategoria, validated_quantity')
+          .select('id, master_reference, location_name, location_detail, subcategoria')
           .eq('inventory_id', inventoryId!)
           .in('master_reference', batchRefs);
 
@@ -201,7 +200,22 @@ export function useExportToExcel() {
         if (data) allCounts.push(...data);
       }
 
-      // 4. Build counts map per location
+      // 4. Fetch validated quantities from validated_counts
+      const allValidated: { location_id: string; validated_quantity: number | null; reason: string | null }[] = [];
+      for (let i = 0; i < locationIds.length; i += batchSize) {
+        const batchIds = locationIds.slice(i, i + batchSize);
+        const { data, error } = await supabase
+          .from('validated_counts')
+          .select('location_id, validated_quantity, reason')
+          .eq('inventory_id', inventoryId!)
+          .in('location_id', batchIds);
+
+        if (error) throw error;
+        if (data) allValidated.push(...data);
+      }
+      const validatedMap = new Map(allValidated.map(v => [v.location_id, v]));
+
+      // 5. Build counts map per location
       const countsMap = new Map<string, { c1: number | null; c2: number | null; c3: number | null; c4: number | null; c5: number | null }>();
       allLocations.forEach(loc => {
         countsMap.set(loc.id, { c1: null, c2: null, c3: null, c4: null, c5: null });
@@ -216,13 +230,14 @@ export function useExportToExcel() {
         }
       });
 
-      // 5. Build master lookup
+      // 6. Build master lookup
       const masterMap = new Map(masters.map(m => [m.referencia, m]));
 
-      // 6. Build export data
+      // 7. Build export data
       const exportData = allLocations.map(loc => {
         const master = masterMap.get(loc.master_reference);
         const counts = countsMap.get(loc.id) || { c1: null, c2: null, c3: null, c4: null, c5: null };
+        const validated = validatedMap.get(loc.id);
 
         return {
           referencia: loc.master_reference,
@@ -236,7 +251,8 @@ export function useExportToExcel() {
           conteo_3: counts.c3 ?? '',
           conteo_4: counts.c4 ?? '',
           conteo_5: counts.c5 ?? '',
-          validado: loc.validated_quantity ?? '',
+          validado: validated?.validated_quantity ?? '',
+          motivo_validacion: validated?.reason ?? '',
           estado: master?.status_slug || '',
         };
       });
