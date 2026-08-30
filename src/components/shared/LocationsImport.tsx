@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useInventory } from '@/contexts/InventoryContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -67,6 +68,7 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
         const { data: existingRefs, error } = await supabase
           .from('inventory_master')
           .select('referencia')
+          .eq('inventory_id', inventoryId!)
           .in('referencia', batch);
         
         if (error) {
@@ -185,6 +187,7 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
         const { error } = await supabase
           .from('locations')
           .insert(batch.map(loc => ({
+            inventory_id: inventoryId!,
             master_reference: loc.master_reference,
             subcategoria: loc.subcategoria,
             observaciones: loc.observaciones,
