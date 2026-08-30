@@ -893,8 +893,11 @@ const MasterDataImport: React.FC = () => {
             <AlertDialogDescription asChild>
               <div className="space-y-4 text-left">
                 <p className="text-foreground font-medium">
-                  Se reemplazará solo la familia: <strong>{typesInImport.join(', ')}</strong>. Esta acción eliminará permanentemente los datos existentes de esa(s) familia(s):
+                  Dentro del inventario <strong>{inventory?.nombre || '—'}</strong> se reemplazará solo la familia:{' '}
+                  <strong>{typesInImport.join(', ')}</strong>. Esta acción eliminará permanentemente los datos
+                  existentes de esa(s) familia(s) en ESTE inventario. Los inventarios históricos no se tocan.
                 </p>
+
                 
                 <ul className="space-y-2 text-sm">
                   {activeCheck?.hasLocations && (
