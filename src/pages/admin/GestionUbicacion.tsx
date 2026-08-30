@@ -99,6 +99,7 @@ const GestionUbicacion: React.FC = () => {
   const [filterObservacion, setFilterObservacion] = useState('');
   const [filterSupervisor, setFilterSupervisor] = useState<string>('all');
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [createDialogRef, setCreateDialogRef] = useState<string | null>(null);
 
   const isSuperadmin = role === 'superadmin';
   const isAdminMP = role === 'admin_mp';
