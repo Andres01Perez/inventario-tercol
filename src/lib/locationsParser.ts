@@ -1,7 +1,10 @@
 import * as XLSX from 'xlsx';
 
+export type Bodega = 'almacen' | 'planta';
+
 export interface ParsedLocation {
   master_reference: string;
+  bodega: Bodega;
   subcategoria: string | null;
   observaciones: string | null;
   location_name: string | null;
