@@ -412,16 +412,8 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
 
       // Ejecutar validación de forma asíncrona sin bloquear la UI
       if (result.masterReference) {
-        const validationFn = roundNumber <= 2 
-          ? checkAndAutoValidate 
-          : (roundNumber === 3 || roundNumber === 4) 
-            ? (ref: string) => checkAndAutoValidateHigherRounds(ref, roundNumber as 3 | 4)
-            : null;
-        
-        if (validationFn) {
-          validationFn(result.masterReference)
-            .catch(err => console.error('Error en validación background:', err));
-        }
+        runValidation(result.masterReference)
+          .catch(err => console.error('Error en validación background:', err));
       }
     },
     onError: (error: Error, variables) => {
