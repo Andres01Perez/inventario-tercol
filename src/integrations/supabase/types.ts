@@ -412,6 +412,60 @@ export type Database = {
         }
         Relationships: []
       }
+      validated_counts: {
+        Row: {
+          audit_round: number
+          created_at: string
+          id: string
+          inventory_id: string
+          location_id: string
+          master_reference: string
+          reason: string
+          updated_at: string
+          validated_by: string | null
+          validated_quantity: number
+        }
+        Insert: {
+          audit_round: number
+          created_at?: string
+          id?: string
+          inventory_id: string
+          location_id: string
+          master_reference: string
+          reason: string
+          updated_at?: string
+          validated_by?: string | null
+          validated_quantity?: number
+        }
+        Update: {
+          audit_round?: number
+          created_at?: string
+          id?: string
+          inventory_id?: string
+          location_id?: string
+          master_reference?: string
+          reason?: string
+          updated_at?: string
+          validated_by?: string | null
+          validated_quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "validated_counts_inventory_fk"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "validated_counts_location_fk"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -453,6 +507,18 @@ export type Database = {
       is_superadmin: { Args: { _user_id: string }; Returns: boolean }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      upsert_validated_count: {
+        Args: {
+          _inventory_id: string
+          _location_id: string
+          _master_reference: string
+          _quantity: number
+          _reason: string
+          _round: number
+          _validated_by: string
+        }
+        Returns: undefined
+      }
       validate_and_close_round: {
         Args: { _admin_id: string; _inventory_id?: string; _reference: string }
         Returns: Json
