@@ -177,7 +177,7 @@ const ExportarConteos: React.FC = () => {
     enabled: !!inventoryId,
     queryFn: async () => {
       // Fetch ALL records using batch pagination to avoid Supabase 1000 row limit
-      const [locations, counts, masters] = await Promise.all([
+      const [locations, counts, masters, validated] = await Promise.all([
         fetchAllInBatches<{ id: string; master_reference: string; location_name: string | null; location_detail: string | null; punto_referencia: string | null }>(
           'locations',
           'id, master_reference, location_name, location_detail, punto_referencia',
@@ -193,6 +193,11 @@ const ExportarConteos: React.FC = () => {
           'referencia, material_type',
           inventoryId!
         ),
+        fetchAllInBatches<{ location_id: string; validated_quantity: number; reason: string }>(
+          'validated_counts',
+          'location_id, validated_quantity, reason',
+          inventoryId!
+        ),
       ]);
 
       if (locations.length === 0) return [];
@@ -206,10 +211,12 @@ const ExportarConteos: React.FC = () => {
         }
         countsMap.get(c.location_id)!.set(c.audit_round, c.quantity_counted);
       }
+      const validatedMap = new Map(validated.map(v => [v.location_id, v]));
 
       // Pivot data: one row per location with conteo_1, conteo_2, conteo_3, conteo_4
       const pivotedData: CountByLocation[] = locations.map(location => {
         const locationCounts = countsMap.get(location.id);
+        const validatedRow = validatedMap.get(location.id);
 
         return {
           material_type: masterMap.get(location.master_reference) || '',
@@ -221,6 +228,8 @@ const ExportarConteos: React.FC = () => {
           conteo_2: locationCounts?.get(2) ?? null,
           conteo_3: locationCounts?.get(3) ?? null,
           conteo_4: locationCounts?.get(4) ?? null,
+          validado: validatedRow?.validated_quantity ?? null,
+          motivo: validatedRow?.reason || '',
         };
       });
 
