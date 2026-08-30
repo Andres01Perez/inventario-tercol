@@ -123,14 +123,6 @@ const App: React.FC = () => (
               }
             />
             <Route
-              path="/superadmin/auditoria"
-              element={
-                <ProtectedRoute allowedRoles={['superadmin']}>
-                  <Auditoria />
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/superadmin/auditoria/almacen"
               element={
                 <ProtectedRoute allowedRoles={['superadmin']}>
