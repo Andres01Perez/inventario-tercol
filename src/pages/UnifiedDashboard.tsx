@@ -487,6 +487,10 @@ const UnifiedDashboard: React.FC = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="md:hidden mb-4">
+          <InventorySelector />
+        </div>
+        <ReadOnlyBanner />
         <div className="space-y-8">
           {/* Welcome */}
           <div>
