@@ -330,13 +330,13 @@ const GestionResponsables: React.FC = () => {
     enabled: !!role && !!inventoryId,
   });
 
-  // OPTIMIZED: Memoized selection calculations
+  // OPTIMIZED: Memoized selection calculations (only existing locations are selectable)
   const { isAllSelected, isIndeterminate, allIds } = useMemo(() => {
-    const ids = data?.locations.map(l => l.id) || [];
+    const ids = data?.rows.filter((r): r is LocationWithReference => r.kind === 'location').map(l => l.id) || [];
     const allSelected = ids.length > 0 && ids.every(id => selectedIds.has(id));
     const indeterminate = selectedIds.size > 0 && !allSelected;
     return { isAllSelected: allSelected, isIndeterminate: indeterminate, allIds: ids };
-  }, [data?.locations, selectedIds]);
+  }, [data?.rows, selectedIds]);
 
   // OPTIMIZED: Memoized selection functions
   const toggleSelection = useCallback((id: string) => {
