@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useInventory } from '@/contexts/InventoryContext';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Dialog,
@@ -62,10 +63,11 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
   
   // Combobox state
   const [comboboxOpen, setComboboxOpen] = useState(false);
+  const { inventoryId, isReadOnly } = useInventory();
 
   // Fetch ALL references (no filter by type) - fetch in batches to avoid 1000 row limit
   const { data: references = [], isLoading: loadingRefs } = useQuery({
-    queryKey: ['all-inventory-references'],
+    queryKey: ['all-inventory-references', inventoryId],
     queryFn: async () => {
       let allData: { referencia: string; material_type: string }[] = [];
       let from = 0;
@@ -75,6 +77,7 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
         const { data, error } = await supabase
           .from('inventory_master')
           .select('referencia, material_type')
+          .eq('inventory_id', inventoryId!)
           .order('referencia')
           .range(from, from + batchSize - 1);
         
@@ -88,7 +91,7 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
       
       return allData;
     },
-    enabled: open,
+    enabled: open && !!inventoryId,
   });
 
   const resetForm = () => {
@@ -107,11 +110,15 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
       if (!referencia || !ubicacion || !puntoReferencia) {
         throw new Error('Referencia, ubicación y punto de referencia son requeridos');
       }
+      if (isReadOnly) {
+        throw new Error('Inventario histórico: solo lectura');
+      }
 
       // 1. Get current audit_round from inventory_master
       const { data: master, error: masterError } = await supabase
         .from('inventory_master')
         .select('audit_round')
+        .eq('inventory_id', inventoryId!)
         .eq('referencia', referencia)
         .single();
 
@@ -123,6 +130,7 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
       const { data: newLocation, error: locError } = await supabase
         .from('locations')
         .insert({
+          inventory_id: inventoryId!,
           master_reference: referencia,
           location_name: ubicacion,
           location_detail: ubicacionDetallada || null,
