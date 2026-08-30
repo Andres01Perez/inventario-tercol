@@ -287,6 +287,7 @@ const ExportarConteos: React.FC = () => {
         'Referencia': ref.referencia,
         'Conteo': ref.conteo,
         'Cantidad Validada': ref.cantidad_validada,
+        'Motivo': ref.motivo,
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -325,6 +326,8 @@ const ExportarConteos: React.FC = () => {
         'Conteo 2': row.conteo_2 ?? '',
         'Conteo 3': row.conteo_3 ?? '',
         'Conteo 4': row.conteo_4 ?? '',
+        'Validado': row.validado ?? '',
+        'Motivo': row.motivo,
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(exportData);
