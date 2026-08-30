@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useInventory } from '@/contexts/InventoryContext';
 
 interface ExportConfig {
   filename: string;
@@ -34,6 +35,7 @@ async function fetchAllData<T>(
 
 export function useExportToExcel() {
   const [isExporting, setIsExporting] = useState(false);
+  const { inventoryId } = useInventory();
 
   const exportInventoryMP = useCallback(async (searchTerm?: string) => {
     setIsExporting(true);
@@ -42,6 +44,7 @@ export function useExportToExcel() {
         let query = supabase
           .from('inventory_master')
           .select('referencia, control, cant_alm_mp, cant_prov_d, cant_prov_r, cant_t_mp, costo_u_mp, costo_t')
+          .eq('inventory_id', inventoryId!)
           .eq('material_type', 'MP')
           .order('referencia');
 
@@ -71,7 +74,7 @@ export function useExportToExcel() {
     } finally {
       setIsExporting(false);
     }
-  }, []);
+  }, [inventoryId]);
 
   const exportInventoryPP = useCallback(async (searchTerm?: string) => {
     setIsExporting(true);
@@ -80,6 +83,7 @@ export function useExportToExcel() {
         let query = supabase
           .from('inventory_master')
           .select('referencia, cant_pld, cant_plr, cant_za, cant_prov_pp, cant_total_pp, costo_u_pp, costo_t')
+          .eq('inventory_id', inventoryId!)
           .eq('material_type', 'PP')
           .order('referencia');
 
@@ -109,7 +113,7 @@ export function useExportToExcel() {
     } finally {
       setIsExporting(false);
     }
-  }, []);
+  }, [inventoryId]);
 
   const exportAuditoria = useCallback(async (filters?: {
     searchTerm?: string;
@@ -130,6 +134,7 @@ export function useExportToExcel() {
         let query = supabase
           .from('inventory_master')
           .select('referencia, material_type, cant_total_erp, status_slug, audit_round')
+          .eq('inventory_id', inventoryId!)
           .order('referencia');
 
         if (filters?.searchTerm) {
@@ -168,6 +173,7 @@ export function useExportToExcel() {
         let query = supabase
           .from('locations')
           .select('id, master_reference, location_name, location_detail, subcategoria, validated_quantity')
+          .eq('inventory_id', inventoryId!)
           .in('master_reference', batchRefs);
 
         if (filters?.location && filters.location !== 'all') {
@@ -188,6 +194,7 @@ export function useExportToExcel() {
         const { data, error } = await supabase
           .from('inventory_counts')
           .select('location_id, audit_round, quantity_counted')
+          .eq('inventory_id', inventoryId!)
           .in('location_id', batchIds);
 
         if (error) throw error;
@@ -258,7 +265,7 @@ export function useExportToExcel() {
     } finally {
       setIsExporting(false);
     }
-  }, []);
+  }, [inventoryId]);
 
   return { isExporting, exportInventoryMP, exportInventoryPP, exportAuditoria };
 }
