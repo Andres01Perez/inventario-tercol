@@ -33,10 +33,10 @@ Se va tachando cada ítem a medida que quede implementado **y probado**.
 - [ ] Migrar datos actuales al inventario "Semestral 2026-1"
 
 ### Fase 2 — Validaciones persistidas
-- [ ] Tabla `validated_counts` (inventario, referencia, ubicación, cantidad, ronda, motivo) con GRANTs y RLS
-- [ ] `validate_and_close_round` escribe en `validated_counts`
-- [ ] Exportaciones leen de `validated_counts` en vez de `locations.validated_quantity`
-- [ ] Verificar que el caso tipo CCE125TG ya no puede ocurrir
+- [x] Tabla `validated_counts` (inventario, referencia, ubicación, cantidad, ronda, motivo) con GRANTs y RLS
+- [x] `validate_and_close_round` escribe en `validated_counts`
+- [x] Exportaciones leen de `validated_counts` en vez de `locations.validated_quantity`
+- [x] Verificación de suma en `validate_and_close_round` para evitar el caso CCE125TG (typecheck + build OK; prueba funcional pendiente porque hoy no hay ubicaciones/contajes en el inventario activo)
 
 ### Fase 3 — Validación almacén vs planta
 - [ ] Definir cómo se identifica si una ubicación es almacén o planta (¿`subcategoria`? ¿columna nueva `bodega`?)

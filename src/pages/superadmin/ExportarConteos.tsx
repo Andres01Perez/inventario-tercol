@@ -43,6 +43,7 @@ interface AuditedReference {
   referencia: string;
   conteo: number;
   cantidad_validada: number;
+  motivo: string;
 }
 
 interface CountByLocation {
@@ -55,11 +56,13 @@ interface CountByLocation {
   conteo_2: number | null;
   conteo_3: number | null;
   conteo_4: number | null;
+  validado: number | null;
+  motivo: string;
 }
 
 // Helper to fetch all records in batches (Supabase limits to 1000 per query)
 async function fetchAllInBatches<T>(
-  table: 'locations' | 'inventory_counts' | 'inventory_master',
+  table: 'locations' | 'inventory_counts' | 'inventory_master' | 'validated_counts',
   selectQuery: string,
   inventoryId: string,
   batchSize = 1000
@@ -118,7 +121,7 @@ const ExportarConteos: React.FC = () => {
         .eq('status_slug', 'auditado');
 
       if (materialTypeFilter !== 'all') {
-        masterQuery = masterQuery.eq('material_type', materialTypeFilter as 'MP' | 'PP');
+        masterQuery = masterQuery.eq('material_type', materialTypeFilter as 'MP' | 'PP' | 'PT');
       }
 
       if (searchTerm) {
@@ -129,25 +132,37 @@ const ExportarConteos: React.FC = () => {
       if (masterError) throw masterError;
       if (!masters || masters.length === 0) return [];
 
-      const { data: locations, error: locError } = await supabase
-        .from('locations')
-        .select('master_reference, validated_quantity, validated_at_round')
-        .eq('inventory_id', inventoryId!)
-        .in('master_reference', masters.map(m => m.referencia))
-        .not('validated_quantity', 'is', null);
+      const allValidated: {
+        master_reference: string;
+        validated_quantity: number;
+        audit_round: number;
+        reason: string;
+      }[] = [];
 
-      if (locError) throw locError;
+      for (let i = 0; i < masters.length; i += 500) {
+        const batchRefs = masters.slice(i, i + 500).map(m => m.referencia);
+        const { data, error } = await supabase
+          .from('validated_counts')
+          .select('master_reference, validated_quantity, audit_round, reason')
+          .eq('inventory_id', inventoryId!)
+          .in('master_reference', batchRefs);
+
+        if (error) throw error;
+        if (data) allValidated.push(...data);
+      }
 
       const grouped: AuditedReference[] = masters.map(master => {
-        const locs = locations?.filter(l => l.master_reference === master.referencia) || [];
-        const totalValidado = locs.reduce((sum, l) => sum + (Number(l.validated_quantity) || 0), 0);
-        const round = locs[0]?.validated_at_round || 1;
+        const rows = allValidated.filter(v => v.master_reference === master.referencia);
+        const totalValidado = rows.reduce((sum, v) => sum + (Number(v.validated_quantity) || 0), 0);
+        const round = rows[0]?.audit_round || 1;
+        const reason = rows[0]?.reason || '';
 
         return {
           material_type: master.material_type,
           referencia: master.referencia,
           conteo: round,
           cantidad_validada: totalValidado,
+          motivo: reason,
         };
       });
 
@@ -162,7 +177,7 @@ const ExportarConteos: React.FC = () => {
     enabled: !!inventoryId,
     queryFn: async () => {
       // Fetch ALL records using batch pagination to avoid Supabase 1000 row limit
-      const [locations, counts, masters] = await Promise.all([
+      const [locations, counts, masters, validated] = await Promise.all([
         fetchAllInBatches<{ id: string; master_reference: string; location_name: string | null; location_detail: string | null; punto_referencia: string | null }>(
           'locations',
           'id, master_reference, location_name, location_detail, punto_referencia',
@@ -178,6 +193,11 @@ const ExportarConteos: React.FC = () => {
           'referencia, material_type',
           inventoryId!
         ),
+        fetchAllInBatches<{ location_id: string; validated_quantity: number; reason: string }>(
+          'validated_counts',
+          'location_id, validated_quantity, reason',
+          inventoryId!
+        ),
       ]);
 
       if (locations.length === 0) return [];
@@ -191,10 +211,12 @@ const ExportarConteos: React.FC = () => {
         }
         countsMap.get(c.location_id)!.set(c.audit_round, c.quantity_counted);
       }
+      const validatedMap = new Map(validated.map(v => [v.location_id, v]));
 
       // Pivot data: one row per location with conteo_1, conteo_2, conteo_3, conteo_4
       const pivotedData: CountByLocation[] = locations.map(location => {
         const locationCounts = countsMap.get(location.id);
+        const validatedRow = validatedMap.get(location.id);
 
         return {
           material_type: masterMap.get(location.master_reference) || '',
@@ -206,6 +228,8 @@ const ExportarConteos: React.FC = () => {
           conteo_2: locationCounts?.get(2) ?? null,
           conteo_3: locationCounts?.get(3) ?? null,
           conteo_4: locationCounts?.get(4) ?? null,
+          validado: validatedRow?.validated_quantity ?? null,
+          motivo: validatedRow?.reason || '',
         };
       });
 
@@ -263,6 +287,7 @@ const ExportarConteos: React.FC = () => {
         'Referencia': ref.referencia,
         'Conteo': ref.conteo,
         'Cantidad Validada': ref.cantidad_validada,
+        'Motivo': ref.motivo,
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -301,6 +326,8 @@ const ExportarConteos: React.FC = () => {
         'Conteo 2': row.conteo_2 ?? '',
         'Conteo 3': row.conteo_3 ?? '',
         'Conteo 4': row.conteo_4 ?? '',
+        'Validado': row.validado ?? '',
+        'Motivo': row.motivo,
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -430,6 +457,7 @@ const ExportarConteos: React.FC = () => {
                         <SelectItem value="all">Todos</SelectItem>
                         <SelectItem value="MP">MP</SelectItem>
                         <SelectItem value="PP">PP</SelectItem>
+                        <SelectItem value="PT">PT</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -483,12 +511,13 @@ const ExportarConteos: React.FC = () => {
                   <>
                     <div className="overflow-x-auto">
                       <Table>
-                        <TableHeader>
+                          <TableHeader>
                           <TableRow>
                             <TableHead>Tipo Material</TableHead>
                             <TableHead>Referencia</TableHead>
                             <TableHead className="text-center">Conteo</TableHead>
                             <TableHead className="text-right">Cantidad Validada</TableHead>
+                            <TableHead>Motivo</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -496,9 +525,11 @@ const ExportarConteos: React.FC = () => {
                             <TableRow key={ref.referencia}>
                               <TableCell>
                                 <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                  ref.material_type === 'MP' 
-                                    ? 'bg-blue-100 text-blue-800' 
-                                    : 'bg-purple-100 text-purple-800'
+                                  ref.material_type === 'MP'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : ref.material_type === 'PP'
+                                    ? 'bg-purple-100 text-purple-800'
+                                    : 'bg-green-100 text-green-800'
                                 }`}>
                                   {ref.material_type}
                                 </span>
@@ -508,6 +539,7 @@ const ExportarConteos: React.FC = () => {
                               <TableCell className="text-right font-mono font-semibold">
                                 {ref.cantidad_validada.toLocaleString('es-CO')}
                               </TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{ref.motivo}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -544,6 +576,7 @@ const ExportarConteos: React.FC = () => {
                         <SelectItem value="all">Todos</SelectItem>
                         <SelectItem value="MP">MP</SelectItem>
                         <SelectItem value="PP">PP</SelectItem>
+                        <SelectItem value="PT">PT</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -597,7 +630,7 @@ const ExportarConteos: React.FC = () => {
                   <>
                     <div className="overflow-x-auto">
                       <Table>
-                        <TableHeader>
+                          <TableHeader>
                           <TableRow>
                             <TableHead>Tipo</TableHead>
                             <TableHead>Referencia</TableHead>
@@ -608,6 +641,8 @@ const ExportarConteos: React.FC = () => {
                             <TableHead className="text-right">C2</TableHead>
                             <TableHead className="text-right">C3</TableHead>
                             <TableHead className="text-right">C4</TableHead>
+                            <TableHead className="text-right">Validado</TableHead>
+                            <TableHead>Motivo</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -615,9 +650,11 @@ const ExportarConteos: React.FC = () => {
                             <TableRow key={`${row.referencia}-${row.ubicacion}-${idx}`}>
                               <TableCell>
                                 <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                  row.material_type === 'MP' 
-                                    ? 'bg-blue-100 text-blue-800' 
-                                    : 'bg-purple-100 text-purple-800'
+                                  row.material_type === 'MP'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : row.material_type === 'PP'
+                                    ? 'bg-purple-100 text-purple-800'
+                                    : 'bg-green-100 text-green-800'
                                 }`}>
                                   {row.material_type}
                                 </span>
@@ -638,6 +675,10 @@ const ExportarConteos: React.FC = () => {
                               <TableCell className="text-right font-mono">
                                 {row.conteo_4 !== null ? Number(row.conteo_4).toLocaleString('es-CO') : '-'}
                               </TableCell>
+                              <TableCell className="text-right font-mono font-semibold">
+                                {row.validado !== null ? Number(row.validado).toLocaleString('es-CO') : '-'}
+                              </TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{row.motivo}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
