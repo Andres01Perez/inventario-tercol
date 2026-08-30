@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useInventory } from '@/contexts/InventoryContext';
+import ReadOnlyBanner from '@/components/shared/ReadOnlyBanner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -37,6 +39,7 @@ const ITEMS_PER_PAGE = 20;
 
 const InventarioMP: React.FC = () => {
   const { profile } = useAuth();
+  const { inventoryId, isReadOnly } = useInventory();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -46,11 +49,13 @@ const InventarioMP: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['inventory-mp', searchTerm, currentPage],
+    queryKey: ['inventory-mp', searchTerm, currentPage, inventoryId],
+    enabled: !!inventoryId,
     queryFn: async () => {
       let query = supabase
         .from('inventory_master')
         .select('*', { count: 'exact' })
+        .eq('inventory_id', inventoryId!)
         .eq('material_type', 'MP')
         .order('referencia');
 
@@ -82,6 +87,7 @@ const InventarioMP: React.FC = () => {
       const { error } = await supabase
         .from('inventory_master')
         .update(updateData as never)
+        .eq('inventory_id', inventoryId!)
         .eq('referencia', referencia);
 
       if (error) throw error;
