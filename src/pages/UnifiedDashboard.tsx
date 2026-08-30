@@ -10,7 +10,6 @@ import {
   Upload,
   Shield,
   BarChart3,
-  UserCog,
   Boxes,
   MapPin,
   ClipboardList,
@@ -187,7 +186,7 @@ const UnifiedDashboard: React.FC = () => {
       { label: 'Usuarios Registrados', value: stats?.usuarios || 0, icon: Users, color: 'bg-primary/10 text-primary' },
       { label: 'Referencias Totales', value: stats?.referencias || 0, icon: Package, color: 'bg-blue-500/10 text-blue-500' },
       { label: 'Ubicaciones Configuradas', value: stats?.ubicaciones || 0, icon: MapPin, color: 'bg-amber-500/10 text-amber-500' },
-      { label: 'Operarios Activos', value: stats?.operarios || 0, icon: UserCog, color: 'bg-green-500/10 text-green-500' },
+      { label: 'Referencias Críticas', value: stats?.criticos || 0, icon: AlertCircle, color: 'bg-destructive/10 text-destructive' },
     ];
   }, [role, stats, roleConfig]);
 
@@ -249,15 +248,6 @@ const UnifiedDashboard: React.FC = () => {
       iconColor: 'text-emerald-500',
       bgColor: 'bg-emerald-500/10',
       hoverBg: 'group-hover:bg-emerald-500',
-    },
-    operarios: { 
-      label: 'Gestionar Operarios', 
-      icon: UserCog, 
-      description: 'Administrar operarios del sistema',
-      onClick: () => navigate('/superadmin/operarios'),
-      iconColor: 'text-amber-500',
-      bgColor: 'bg-amber-500/10',
-      hoverBg: 'group-hover:bg-amber-500',
     },
     inventarioMP: { 
       label: 'Inventario MP', 
@@ -336,7 +326,6 @@ const UnifiedDashboard: React.FC = () => {
         actions: [
           baseActions.usuarios,
           baseActions.importar,
-          baseActions.operarios,
         ]
       });
     }
