@@ -34,9 +34,30 @@ Se crea el inventario **"Semestral 2026-1"** en estado abierto y las 776 referen
 
 Un contexto nuevo que expone el inventario seleccionado, la lista de inventarios y si el seleccionado es de solo lectura (todo el que no sea el abierto). Por defecto arranca en el inventario abierto y recuerda la selección del superadmin en `localStorage`. Todas las claves de React Query incluyen el `inventory_id`, de modo que cambiar de inventario no mezcla caché.
 
-## 7. Selector de inventario
+## 7. Selector de inventario: solo el superadmin
 
-En el encabezado del dashboard, visible solo para superadmin y admins. Los supervisores siempre trabajan sobre el inventario abierto, sin selector. Al elegir un inventario cerrado aparece un aviso de "solo lectura" y se ocultan botones de guardar, validar, importar y editar.
+- **Superadmin**: único rol con selector. Puede pararse sobre cualquier inventario histórico para consultar y exportar; el histórico se ve pero no se edita.
+- **Admins, líderes de bodega y supervisores**: no ven selector ni saben que existe. Su `InventoryContext` resuelve siempre y automáticamente el único inventario abierto. No hay forma de que apunten a otro: no es una preferencia de UI, es lo que devuelve el servidor.
+- El inventario abierto es único por diseño (índice único parcial en la base). Si por error hubiera cero inventarios abiertos, la app muestra a los no-superadmin un mensaje de "no hay inventario activo" en vez de dejarlos escribir en cualquier lado.
+
+## 7b. Cómo se blinda el histórico (lo que impide tocar un inventario cerrado)
+
+Tres candados, de adentro hacia afuera. El primero es el que realmente importa: aunque alguien manipule el navegador, la base rechaza la escritura.
+
+1. **Candado en la base (definitivo).** Un trigger `BEFORE INSERT/UPDATE/DELETE` en `inventory_master`, `locations` e `inventory_counts` lanza error si la fila pertenece a un inventario cuyo estado no es `abierto`. Cubre por igual a la app, a un script y al propio superadmin.
+2. **Candado en las funciones.** `validate_and_close_round` verifica que el inventario esté abierto antes de escribir; sobre un inventario cerrado devuelve un error explicativo.
+3. **Candado en la interfaz.** Con un inventario cerrado seleccionado, el superadmin ve un banner de "Histórico — solo lectura" y desaparecen los botones de guardar, validar, importar, editar y asignar. Es comodidad, no seguridad.
+
+Reabrir un inventario cerrado es una acción deliberada y exclusiva del superadmin, con confirmación escrita, y cerrando antes el que esté abierto. Así "septiembre 2026" queda congelado el día que se cierra y en enero 2027 nadie puede escribir sobre él ni por accidente ni a propósito.
+
+## 7c. Qué se hereda al crear el inventario de enero 2027
+
+Al crear un inventario nuevo el superadmin decide qué se arrastra:
+- **Siempre nuevo**: maestra ERP (se importa del Excel), ubicaciones, conteos, rondas y estados. Arranca en cero.
+- **Se conserva global, no por inventario**: usuarios, roles y operarios. No se reasignan roles en cada inventario.
+- **Opcional al crear**: copiar las ubicaciones y las asignaciones de supervisor del inventario anterior como punto de partida, para no reconstruirlas a mano. Si no se marca, se importan desde Excel como hoy.
+
+
 
 ## 8. Queries filtradas
 
@@ -51,8 +72,9 @@ Deja de borrar datos. El flujo pasa a ser:
 
 ## Detalles técnicos
 
-- Migración en un solo paso: crear `inventories` con GRANTs + RLS, insertar "Semestral 2026-1", añadir `inventory_id` con backfill, hacerlo `NOT NULL`, recrear PK y FK compuestas, crear índices, recrear las funciones con el parámetro nuevo.
-- Las políticas RLS existentes se conservan tal cual; el aislamiento por inventario es por filtro de query, no por RLS, salvo el bloqueo de escritura sobre inventarios cerrados, que se hace con un trigger `BEFORE INSERT/UPDATE/DELETE` en las tres tablas — así el modo solo lectura no depende del frontend.
+- Migración en un solo paso: crear `inventories` con GRANTs + RLS, insertar "Semestral 2026-1", añadir `inventory_id` con backfill, hacerlo `NOT NULL`, recrear PK y FK compuestas, crear índices, crear los triggers de bloqueo y recrear las funciones con el parámetro nuevo.
+- El aislamiento de datos es por filtro de query; el bloqueo de escritura sobre inventarios cerrados es por trigger, no por frontend. Las políticas RLS actuales se conservan y se les suma que solo el superadmin escribe en `inventories`.
+- El `inventory_id` que usan los no-superadmin no viaja como parámetro elegible: se resuelve desde el servidor con una función `get_active_inventory()`, así el cliente no puede "pedir" otro inventario para escribir.
 - `src/integrations/supabase/types.ts` se regenera solo tras la migración; el código que dependa del esquema nuevo se escribe después.
 - Realtime: los canales siguen igual, pero los handlers descartan eventos cuyo `inventory_id` no sea el activo.
 
