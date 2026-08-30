@@ -301,14 +301,23 @@ const UnifiedDashboard: React.FC = () => {
       bgColor: 'bg-indigo-500/10',
       hoverBg: 'group-hover:bg-indigo-500',
     },
-    auditoria: { 
-      label: 'Auditoría General', 
-      icon: FileSearch, 
-      description: 'Vista completa de referencias y conteos',
-      onClick: () => navigate('/superadmin/auditoria'),
+    auditoriaAlmacen: {
+      label: 'Auditoría Almacén',
+      icon: FileSearch,
+      description: 'Referencias con ubicaciones de almacén (MP y PP)',
+      onClick: () => navigate('/superadmin/auditoria/almacen'),
       iconColor: 'text-violet-500',
       bgColor: 'bg-violet-500/10',
       hoverBg: 'group-hover:bg-violet-500',
+    },
+    auditoriaPlanta: {
+      label: 'Auditoría Planta',
+      icon: FileSearch,
+      description: 'Referencias con ubicaciones de planta (MP y PP)',
+      onClick: () => navigate('/superadmin/auditoria/planta'),
+      iconColor: 'text-fuchsia-500',
+      bgColor: 'bg-fuchsia-500/10',
+      hoverBg: 'group-hover:bg-fuchsia-500',
     },
     exportarConteos: { 
       label: 'Exportar Conteos', 
