@@ -38,6 +38,7 @@ const queryClient = new QueryClient({
 const App: React.FC = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
+      <InventoryProvider>
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -157,6 +158,7 @@ const App: React.FC = () => (
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
+      </InventoryProvider>
     </AuthProvider>
   </QueryClientProvider>
 );
