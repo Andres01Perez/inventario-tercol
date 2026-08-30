@@ -18,7 +18,8 @@ import {
   FileSpreadsheet,
   AlertCircle,
   FileSearch,
-  Download
+  Download,
+  Printer
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -312,6 +313,15 @@ const UnifiedDashboard: React.FC = () => {
       bgColor: 'bg-sky-500/10',
       hoverBg: 'group-hover:bg-sky-500',
     },
+    impresionMasiva: {
+      label: 'Impresión Masiva',
+      icon: Printer,
+      description: 'Imprimir varias planillas de conteo de una sola vez',
+      onClick: () => navigate('/superadmin/impresion-masiva'),
+      iconColor: 'text-amber-500',
+      bgColor: 'bg-amber-500/10',
+      hoverBg: 'group-hover:bg-amber-500',
+    },
   }), [navigate]);
 
   // Action categories based on role
@@ -353,6 +363,7 @@ const UnifiedDashboard: React.FC = () => {
         actions: [
           baseActions.ubicaciones,
           baseActions.responsables,
+          baseActions.impresionMasiva,
         ]
       });
     }

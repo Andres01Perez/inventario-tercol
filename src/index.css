@@ -357,6 +357,12 @@
     page-break-before: avoid;
   }
 
+  /* Bulk print: each sheet starts on a new page */
+  .print-page-break {
+    break-before: page;
+    page-break-before: always;
+  }
+
   /* Page configuration */
   @page {
     size: letter landscape;
