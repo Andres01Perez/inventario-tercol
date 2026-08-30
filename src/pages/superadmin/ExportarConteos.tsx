@@ -457,6 +457,7 @@ const ExportarConteos: React.FC = () => {
                         <SelectItem value="all">Todos</SelectItem>
                         <SelectItem value="MP">MP</SelectItem>
                         <SelectItem value="PP">PP</SelectItem>
+                        <SelectItem value="PT">PT</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
