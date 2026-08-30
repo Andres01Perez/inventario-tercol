@@ -511,12 +511,13 @@ const ExportarConteos: React.FC = () => {
                   <>
                     <div className="overflow-x-auto">
                       <Table>
-                        <TableHeader>
+                          <TableHeader>
                           <TableRow>
                             <TableHead>Tipo Material</TableHead>
                             <TableHead>Referencia</TableHead>
                             <TableHead className="text-center">Conteo</TableHead>
                             <TableHead className="text-right">Cantidad Validada</TableHead>
+                            <TableHead>Motivo</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -524,9 +525,11 @@ const ExportarConteos: React.FC = () => {
                             <TableRow key={ref.referencia}>
                               <TableCell>
                                 <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                  ref.material_type === 'MP' 
-                                    ? 'bg-blue-100 text-blue-800' 
-                                    : 'bg-purple-100 text-purple-800'
+                                  ref.material_type === 'MP'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : ref.material_type === 'PP'
+                                    ? 'bg-purple-100 text-purple-800'
+                                    : 'bg-green-100 text-green-800'
                                 }`}>
                                   {ref.material_type}
                                 </span>
@@ -536,6 +539,7 @@ const ExportarConteos: React.FC = () => {
                               <TableCell className="text-right font-mono font-semibold">
                                 {ref.cantidad_validada.toLocaleString('es-CO')}
                               </TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{ref.motivo}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
