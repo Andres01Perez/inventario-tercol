@@ -590,6 +590,67 @@ const MasterDataImport: React.FC = () => {
         )}
       </div>
 
+      {/* Modo de importación */}
+      <div className="p-4 rounded-lg border border-border bg-muted/30 space-y-4">
+        <div>
+          <p className="font-medium text-foreground">¿Dónde se carga esta maestra?</p>
+          <p className="text-sm text-muted-foreground">
+            Inventario abierto actual: <strong>{inventory?.nombre || '—'}</strong>
+          </p>
+        </div>
+
+        <RadioGroup
+          value={importMode}
+          onValueChange={(v) => setImportMode(v as 'replace' | 'new')}
+          className="space-y-2"
+          disabled={state === 'importing'}
+        >
+          <div className="flex items-start gap-3">
+            <RadioGroupItem value="replace" id="mode-replace" className="mt-1" />
+            <Label htmlFor="mode-replace" className="font-normal cursor-pointer">
+              <span className="font-medium">Cargar sobre el inventario abierto</span>
+              <span className="block text-sm text-muted-foreground">
+                Reemplaza únicamente las familias que subas (MP, PP o PT) dentro de este inventario. Las demás no se tocan.
+              </span>
+            </Label>
+          </div>
+          <div className="flex items-start gap-3">
+            <RadioGroupItem value="new" id="mode-new" className="mt-1" />
+            <Label htmlFor="mode-new" className="font-normal cursor-pointer">
+              <span className="font-medium">Crear un inventario nuevo</span>
+              <span className="block text-sm text-muted-foreground">
+                No borra nada. El inventario actual se cierra y queda como histórico de solo lectura.
+              </span>
+            </Label>
+          </div>
+        </RadioGroup>
+
+        {importMode === 'new' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+            <div className="space-y-1">
+              <Label htmlFor="new-inv-name">Nombre del inventario</Label>
+              <Input
+                id="new-inv-name"
+                placeholder="Ej: Semestral 2026-2"
+                value={newInventoryName}
+                onChange={(e) => setNewInventoryName(e.target.value)}
+                disabled={state === 'importing'}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="new-inv-date">Fecha de inicio</Label>
+              <Input
+                id="new-inv-date"
+                type="date"
+                value={newInventoryDate}
+                onChange={(e) => setNewInventoryDate(e.target.value)}
+                disabled={state === 'importing'}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Upload Zones */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <FileUploadZone
