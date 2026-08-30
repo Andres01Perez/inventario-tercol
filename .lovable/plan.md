@@ -1,62 +1,39 @@
-# Importar maestras con costos (MP-4 / PP-3) + silenciar columnas `__EMPTY`
+# Fase 5 — Poder crear ubicaciones desde cero
 
-## Análisis de los archivos
+## Diagnóstico (confirmado)
 
-Revisé los dos archivos con costos:
+Consulté la base de datos y el código:
 
-| Archivo | Filas | Encabezados |
-|---|---|---|
-| MP-4.xlsx | 780 | Referencia, Control, `CostoU`, `Cant.Alm`, Cant.PLd, Cant.PLr, Cant.ZA, Cant.ProvD, Cant.ProvR, Cant.T, `Costo.T` |
-| PP-3.xlsx | 1.771 | Referencia, Control, MP, MO, Servicio, `Costo.U`, `Can.Alm`, Cant.PLd, Cant.PLr, Cant.ZA, `Cant.Prov`, `Cant.Total`, `Costo.T` |
+- Inventario activo `Semestral 2026-1`: **2.551 referencias** en maestras (MP + PP), **0 ubicaciones**.
+- `inventory_master.assigned_admin_id` está en **null** en las 2.551 referencias.
+- `GestionUbicacion.tsx` y `GestionResponsables.tsx` consultan **desde `locations`** con `inventory_master!inner(...)`.
 
-## Conclusión del mapeo: ya cubre ambos archivos
+Conclusión: **no es un bloqueo intencional ni un error de importación**. Las páginas listan ubicaciones, no referencias. Si una referencia no tiene ninguna ubicación, nunca aparece, así que es imposible crear la primera ubicación a mano. Hoy solo el import de ubicaciones por Excel puede crearlas.
 
-Columna por columna contra `src/lib/masterDataParser.ts`:
+Y no, **no depende de que "un admin importe las maestras"**: las maestras no asignan `assigned_admin_id`. La bodega (Almacén / Planta) se define en **cada ubicación** vía `locations.assigned_admin_id` (admin_mp = Almacén, admin_pp = Planta), tal como quedó en la Fase 3.
 
-**MP-4**
-| Encabezado | Normaliza a | Campo destino | Estado |
-|---|---|---|---|
-| CostoU | `costou` | costo_u_mp | ✔ ya soportado |
-| Cant.Alm | `cant.alm` | cant_alm_mp | ✔ |
-| Cant.PLd / Cant.PLr | `cant.pld` / `cant.plr` | cant_pld / cant_plr | ✔ |
-| Cant.ZA | `cant.za` | cant_za | ✔ |
-| Cant.ProvD / Cant.ProvR | `cant.provd` / `cant.provr` | cant_prov_d / cant_prov_r | ✔ |
-| Cant.T | `cant.t` | cant_t_mp | ✔ |
-| Costo.T | `costo.t` | costo_t | ✔ |
+## Qué se va a construir
 
-**PP-3**
-| Encabezado | Normaliza a | Campo destino | Estado |
-|---|---|---|---|
-| MP / MO / Servicio | `mp` / `mo` / `servicio` | mp_costo / mo_costo / servicio | ✔ |
-| Costo.U | `costo.u` | costo_u_pp | ✔ |
-| Can.Alm | `can.alm` | cant_alm_pp | ✔ |
-| Cant.PLd / Cant.PLr | `cant.pld` / `cant.plr` | cant_pld / cant_plr | ✔ |
-| Cant.Prov | `cant.prov` | cant_prov_pp | ✔ |
-| Cant.Total | `cant.total` | cant_total_pp | ✔ |
-| Costo.T | `costo.t` | costo_t | ✔ |
+1. **Listar desde `inventory_master`, no desde `locations`**
+   - La consulta principal parte de `inventory_master` filtrada por `inventory_id`, con las ubicaciones como relación opcional (left join).
+   - Una referencia sin ubicaciones se muestra con la etiqueta **"Sin ubicaciones"** y un botón **"Agregar ubicación"**.
+   - Se conservan los filtros actuales (tipo, subcategoría, ubicación, observación, supervisor) y la paginación; los filtros que aplican a campos de ubicación pasan a filtrar solo referencias que sí tengan ubicaciones.
 
-Los alias de la corrección anterior (`costou`, `can.alm`, `cant.prov`, etc.) ya cubren estos formatos con costos. No hay que tocar el mapeo.
+2. **Alta manual de ubicación**
+   - Diálogo con: nombre de ubicación, detalle, punto de referencia, método de conteo, subcategoría, observaciones, supervisor.
+   - **Bodega obligatoria** cuando el usuario es superadmin: elegir Almacén o Planta. Eso fija `assigned_admin_id` al admin correspondiente (`admin_mp` → Alejandra Londoño, `admin_pp` → Edison Vallejo); si hubiera varios admins de ese tipo, se muestra un selector.
+   - Si quien crea es admin_mp o admin_pp, `assigned_admin_id` se fija automáticamente a su propio id (sin preguntar).
+   - Siempre se guarda `inventory_id` explícito del inventario activo.
 
-## Hallazgo nuevo: falsa advertencia `__EMPTY`
+3. **Misma corrección en Gestión de Responsables**
+   - La vista parte de `inventory_master` para que las referencias sin ubicación se vean; asignar supervisor desde ahí crea/actualiza la ubicación con su bodega.
 
-Al importar MP aparece: *"Columnas no reconocidas y omitidas: `__EMPTY`, `__EMPTY_1`"*. Esas no son columnas reales: el Excel tiene columnas vacías al final (sin encabezado) y SheetJS las nombra automáticamente `__EMPTY`, `__EMPTY_1`, etc. No contienen datos y no afectan la importación, pero la advertencia asusta y ensucia el aviso diseñado para detectar errores de encabezados reales.
+4. **Solo lectura en inventarios cerrados**
+   - Los botones de crear/editar quedan deshabilitados cuando el inventario seleccionado no está abierto (respeta `ReadOnlyBanner`).
 
-## Plan de acción
+## Detalles técnicos
 
-1. **Filtrar columnas vacías en el aviso** (`src/lib/masterDataParser.ts`): excluir del listado de "columnas no reconocidas" cualquier columna cuyo nombre empiece por `__EMPTY`. El resto de la advertencia se conserva intacta para columnas con nombre real.
-2. **Re-importar** con los archivos nuevos usando "Reemplazar MP" y "Reemplazar PP":
-   - MP debe mostrar ACIDO NITRICO: almacén 75, Costo.U 3.120, Costo.T 234.000, **sin** la advertencia de `__EMPTY`.
-   - PP debe mostrar AESTRIADAT: almacén 18.397, planta 3.317,40, Costo.U 26,57, Costo.T 576.951,61.
-3. **Verificar en la base** después de importar: las 780 filas MP traen `costo_u_mp` y las 1.771 PP traen `costo_u_pp` distintos de nulo, y la Auditoría por bodega mostrará el descuadre en valor ($) con datos reales.
-
-## Verificación
-
-- Parseo de prueba de ambos archivos contra `masterDataParser`: todas las columnas con nombre cruzan y la advertencia de `__EMPTY` ya no aparece.
-- Consulta a la base post-importación: conteo de filas con `costo_u_mp`/`costo_u_pp` no nulos.
-- Typecheck y build.
-
-## Notas técnicas
-
-- Archivo a modificar: `src/lib/masterDataParser.ts` (solo el filtro del warning; ningún cambio de mapeo).
-- Con `costo_u_mp`/`costo_u_pp` poblados, las columnas de descuadre en valor de la Fase 4 (Auditoría Almacén/Planta y exportación) pasan de vacías a valores reales sin tocar código.
-- Ejemplo verificado de la fila AESTRIADAT en PP-3: Cant.PLr = 3.317,4 con formato español; `parseNumber` ya lo maneja.
+- Sin cambios de base de datos. `locations` ya tiene `inventory_id`, `assigned_admin_id` y las políticas RLS necesarias.
+- Consulta: `from('inventory_master').select('referencia, material_type, control, locations(...)', { count: 'exact' }).eq('inventory_id', inventoryId)`, ordenada por `referencia`, con `.range()` para paginar.
+- El filtro de Almacén para admin_mp sigue siendo `control is not null`, igual que hoy.
+- Archivos: `src/pages/admin/GestionUbicacion.tsx`, `src/pages/admin/GestionResponsables.tsx` y, si hace falta, un diálogo nuevo reutilizable para crear ubicación.
