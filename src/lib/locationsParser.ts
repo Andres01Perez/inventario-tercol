@@ -153,27 +153,30 @@ export const parseLocationsExcel = async (file: File): Promise<LocationsParseRes
  */
 export const generateLocationsTemplate = (): void => {
   const templateData = [
-    { 
-      Referencia: 'REF-001', 
-      Subcategoría: 'Tornillos', 
+    {
+      Referencia: 'REF-001',
+      Bodega: 'Almacén',
+      Subcategoría: 'Tornillos',
       Observaciones: 'Zona A',
       Ubicación: 'ESTANTE-1',
       'Ubicación Detallada': 'Nivel 3',
       'Punto Referencia': 'Puerta principal',
       'Método Conteo': 'Manual'
     },
-    { 
-      Referencia: 'REF-001', 
-      Subcategoría: 'Tornillos', 
+    {
+      Referencia: 'REF-001',
+      Bodega: 'Planta',
+      Subcategoría: 'Tornillos',
       Observaciones: 'Zona B',
       Ubicación: 'ESTANTE-2',
       'Ubicación Detallada': 'Nivel 1',
       'Punto Referencia': 'Pasillo 2',
       'Método Conteo': 'Conteo rápido'
     },
-    { 
-      Referencia: 'REF-002', 
-      Subcategoría: 'Tuercas', 
+    {
+      Referencia: 'REF-002',
+      Bodega: 'Almacén',
+      Subcategoría: 'Tuercas',
       Observaciones: '',
       Ubicación: 'BODEGA-3',
       'Ubicación Detallada': '',
@@ -183,10 +186,11 @@ export const generateLocationsTemplate = (): void => {
   ];
 
   const worksheet = XLSX.utils.json_to_sheet(templateData);
-  
+
   // Ajustar ancho de columnas
   worksheet['!cols'] = [
     { wch: 15 }, // Referencia
+    { wch: 12 }, // Bodega
     { wch: 15 }, // Subcategoría
     { wch: 20 }, // Observaciones
     { wch: 15 }, // Ubicación
