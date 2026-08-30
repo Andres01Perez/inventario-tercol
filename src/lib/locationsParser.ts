@@ -91,9 +91,10 @@ export const parseLocationsExcel = async (file: File): Promise<LocationsParseRes
 
     jsonData.forEach((row, index) => {
       const rowNumber = index + 2; // +2 porque índice 0 + fila de encabezado
-      
+
       // Obtener valores de las columnas
       const referencia = findColumnValue(row, ['referencia', 'ref', 'master_reference']);
+      const bodegaRaw = findColumnValue(row, ['bodega']);
       const subcategoria = findColumnValue(row, ['subcategoria', 'subcategoría', 'sub_categoria']);
       const observaciones = findColumnValue(row, ['observaciones', 'observacion', 'obs', 'notas']);
       const ubicacion = findColumnValue(row, ['ubicacion', 'ubicación', 'location', 'location_name']);
