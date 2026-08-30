@@ -1,4 +1,4 @@
-# Importar maestras con costos (MP-4 / PP-3)
+# Importar maestras con costos (MP-4 / PP-3) + silenciar columnas `__EMPTY`
 
 ## Análisis de los archivos
 
