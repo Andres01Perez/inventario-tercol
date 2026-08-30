@@ -48,9 +48,9 @@ Se va tachando cada ítem a medida que quede implementado **y probado**.
 - [ ] **Auditoría muestra el descuadre desglosado** (aplazado a más adelante)
 
 ### Fase 4 — Auditoría completa
-- [ ] Vista de auditoría que cargue **todas** las referencias (hoy hay tope de 500/1000 por página)
-- [ ] Carga por lotes con `.range()` o scroll infinito, sin degradar el rendimiento con 40 usuarios simultáneos
-- [ ] Columnas de descuadre por bodega (cantidad y valor) visibles y exportables
+- [x] Vista de auditoría dividida en Almacén y Planta, con pestañas MP y PP, cargando todas las referencias por lotes
+- [x] Carga por lotes con `.range()` + "Cargar más" / "Cargar todas", filtros resueltos en servidor
+- [x] Columnas de descuadre por bodega (cantidad y valor) visibles y exportables en dos hojas
 
 ### Fase 5 — Producto Terminado (PT)
 - [ ] Recibir Excel de ejemplo de PT
