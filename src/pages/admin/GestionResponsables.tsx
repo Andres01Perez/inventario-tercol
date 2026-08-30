@@ -50,6 +50,7 @@ import {
 const PAGE_SIZE_OPTIONS = [50, 100, 250, 500];
 
 interface LocationWithReference {
+  kind: 'location';
   id: string;
   master_reference: string;
   subcategoria: string | null;
