@@ -397,7 +397,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['audit-bodega'] });
 
-  const statusColumn = bodega === 'almacen' ? 'status_alm' : 'status_pl';
+  
 
   const handleValidateManually = async () => {
     if (!selectedReference || !user) return;
