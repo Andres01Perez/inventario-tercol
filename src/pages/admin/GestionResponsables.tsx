@@ -685,11 +685,11 @@ const GestionResponsables: React.FC = () => {
             <div className="flex items-center justify-center py-12">
               <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
-          ) : data?.locations.length === 0 ? (
+          ) : data?.rows.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
               <CheckCircle className="w-12 h-12 text-green-500 mb-4" />
-              <p className="text-foreground font-medium">No hay ubicaciones configuradas</p>
-              <p className="text-sm text-muted-foreground">Primero configura ubicaciones en Gestión de Ubicaciones</p>
+              <p className="text-foreground font-medium">No hay referencias que coincidan con los filtros</p>
+              <p className="text-sm text-muted-foreground">Ajusta los filtros o importa ubicaciones desde Gestión de Ubicaciones</p>
               <Button 
                 variant="outline" 
                 className="mt-4"
@@ -723,47 +723,79 @@ const GestionResponsables: React.FC = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data?.locations.map((location) => (
-                    <TableRow key={location.id}>
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedIds.has(location.id)}
-                          onCheckedChange={() => toggleSelection(location.id)}
-                          aria-label={`Seleccionar ${location.master_reference}`}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant="outline" 
-                          className={location.material_type === 'MP' 
-                            ? 'border-orange-500 text-orange-500' 
-                            : 'border-emerald-500 text-emerald-500'
-                          }
-                        >
-                          {location.material_type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">{location.master_reference}</TableCell>
-                      <TableCell className="text-sm">{location.subcategoria || '-'}</TableCell>
-                      <TableCell className="text-sm max-w-[200px] truncate" title={location.observaciones || ''}>
-                        {location.observaciones || '-'}
-                      </TableCell>
-                      <TableCell className="text-sm">{location.location_name || '-'}</TableCell>
-                      <TableCell className="text-sm">{location.location_detail || '-'}</TableCell>
-                      <TableCell className="text-sm">{location.punto_referencia || '-'}</TableCell>
-                      <TableCell className="text-sm">{location.metodo_conteo || '-'}</TableCell>
-                      <TableCell>
-                        <SupervisorSelect
-                          value={location.assigned_supervisor_id}
-                          onValueChange={(value) => updateAssignmentMutation.mutate({
-                            locationId: location.id,
-                            supervisorId: value
-                          })}
-                          disabled={updateAssignmentMutation.isPending}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {data?.rows.map((row) => {
+                    if (row.kind === 'no-location') {
+                      return (
+                        <TableRow key={`${row.master_reference}-no-location`}>
+                          <TableCell>
+                            <span className="text-muted-foreground">—</span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant="outline" 
+                              className={row.material_type === 'MP' 
+                                ? 'border-orange-500 text-orange-500' 
+                                : 'border-emerald-500 text-emerald-500'
+                              }
+                            >
+                              {row.material_type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">{row.master_reference}</TableCell>
+                          <TableCell colSpan={6} className="text-muted-foreground text-sm italic">
+                            Sin ubicaciones asignadas
+                          </TableCell>
+                          <TableCell>
+                            <SupervisorSelect
+                              value={null}
+                              onValueChange={(value) => handleAssign(row, value)}
+                              placeholder="Asignar líder..."
+                              disabled={createAndAssignMutation.isPending}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+
+                    return (
+                      <TableRow key={row.id}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedIds.has(row.id)}
+                            onCheckedChange={() => toggleSelection(row.id)}
+                            aria-label={`Seleccionar ${row.master_reference}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant="outline" 
+                            className={row.material_type === 'MP' 
+                              ? 'border-orange-500 text-orange-500' 
+                              : 'border-emerald-500 text-emerald-500'
+                            }
+                          >
+                            {row.material_type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{row.master_reference}</TableCell>
+                        <TableCell className="text-sm">{row.subcategoria || '-'}</TableCell>
+                        <TableCell className="text-sm max-w-[200px] truncate" title={row.observaciones || ''}>
+                          {row.observaciones || '-'}
+                        </TableCell>
+                        <TableCell className="text-sm">{row.location_name || '-'}</TableCell>
+                        <TableCell className="text-sm">{row.location_detail || '-'}</TableCell>
+                        <TableCell className="text-sm">{row.punto_referencia || '-'}</TableCell>
+                        <TableCell className="text-sm">{row.metodo_conteo || '-'}</TableCell>
+                        <TableCell>
+                          <SupervisorSelect
+                            value={row.assigned_supervisor_id}
+                            onValueChange={(value) => handleAssign(row, value)}
+                            disabled={updateAssignmentMutation.isPending || createAndAssignMutation.isPending}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
