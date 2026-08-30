@@ -63,6 +63,15 @@ interface LocationWithReference {
   control: string | null;
 }
 
+interface NoLocationRow {
+  kind: 'no-location';
+  master_reference: string;
+  material_type: 'MP' | 'PP';
+  control: string | null;
+}
+
+type ResponsablesRow = LocationWithReference | NoLocationRow;
+
 const GestionResponsables: React.FC = () => {
   const { profile, role } = useAuth();
   const { inventoryId } = useInventory();
