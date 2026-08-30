@@ -220,7 +220,14 @@ const MasterDataImport: React.FC = () => {
   const [importMode, setImportMode] = useState<'replace' | 'new'>('replace');
   const [newInventoryName, setNewInventoryName] = useState('');
   const [newInventoryDate, setNewInventoryDate] = useState(() => new Date().toISOString().slice(0, 10));
-  
+
+  // Familia seleccionada para reemplazar y conteos actuales del inventario abierto
+  const [selectedFamily, setSelectedFamily] = useState<MaterialType | null>(null);
+  const [familyCounts, setFamilyCounts] = useState<{ MP: number; PP: number; PT: number }>({ MP: 0, PP: 0, PT: 0 });
+  const [familyCountsLoading, setFamilyCountsLoading] = useState(false);
+
+  const hasOpenInventory = !!inventoryId && inventory?.status === 'abierto' && !isReadOnly;
+
   const [state, setState] = useState<ImportState>('idle');
   const [progress, setProgress] = useState(0);
   
