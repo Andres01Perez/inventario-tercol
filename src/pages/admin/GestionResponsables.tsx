@@ -407,6 +407,42 @@ const GestionResponsables: React.FC = () => {
     }
   });
 
+  // Create a location for a reference that doesn't have one, then assign supervisor
+  const createAndAssignMutation = useMutation({
+    mutationFn: async ({ masterReference, materialType, supervisorId }: { masterReference: string, materialType: 'MP' | 'PP', supervisorId: string | null }) => {
+      if (!inventoryId) throw new Error('No hay inventario activo');
+      const targetRole = materialType === 'MP' ? 'admin_mp' : 'admin_pp';
+      const assignedAdminId = isSuperadmin
+        ? adminMap?.get(targetRole)
+        : profile?.id;
+      if (!assignedAdminId) throw new Error(`No hay un admin configurado para ${targetRole}`);
+
+      const { error } = await supabase.from('locations').insert({
+        inventory_id: inventoryId,
+        master_reference: masterReference,
+        assigned_admin_id: assignedAdminId,
+        assigned_supervisor_id: supervisorId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['locations-responsables'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-inventory'] });
+      toast({ title: 'Guardado', description: 'Ubicación creada y líder asignado' });
+    },
+    onError: (error) => {
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'No se pudo crear la ubicación', variant: 'destructive' });
+    }
+  });
+
+  const handleAssign = (row: ResponsablesRow, supervisorId: string | null) => {
+    if (row.kind === 'location') {
+      updateAssignmentMutation.mutate({ locationId: row.id, supervisorId });
+    } else {
+      createAndAssignMutation.mutate({ masterReference: row.master_reference, materialType: row.material_type, supervisorId });
+    }
+  };
+
   const totalPages = Math.ceil((data?.total || 0) / pageSize);
 
   return (
