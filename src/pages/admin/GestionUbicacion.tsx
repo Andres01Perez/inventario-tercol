@@ -272,27 +272,6 @@ const GestionUbicacion: React.FC = () => {
     }
   });
 
-  // Add new location
-  const addLocationMutation = useMutation({
-    mutationFn: async (referencia: string) => {
-      const { error } = await supabase
-        .from('locations')
-        .insert({
-          master_reference: referencia,
-          assigned_admin_id: profile?.id
-        });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-inventory'] });
-      toast({ title: 'Ubicación agregada', description: 'Nueva ubicación creada para la referencia' });
-    },
-    onError: (error) => {
-      toast({ title: 'Error', description: 'No se pudo agregar la ubicación', variant: 'destructive' });
-      console.error('Add location error:', error);
-    }
-  });
-
   // Delete location
   const deleteLocationMutation = useMutation({
     mutationFn: async (locationId: string) => {
@@ -304,6 +283,7 @@ const GestionUbicacion: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['locations-responsables'] });
       toast({ title: 'Ubicación eliminada', description: 'La ubicación fue eliminada correctamente' });
     },
     onError: (error) => {
@@ -316,8 +296,8 @@ const GestionUbicacion: React.FC = () => {
     await updateLocationMutation.mutateAsync({ locationId, field, value });
   };
 
-  const handleAddLocation = async (referencia: string) => {
-    await addLocationMutation.mutateAsync(referencia);
+  const handleAddLocation = (referencia: string) => {
+    setCreateDialogRef(referencia);
   };
 
   const handleDeleteLocation = async (locationId: string) => {
