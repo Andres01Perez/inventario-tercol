@@ -288,7 +288,233 @@ export function useExportToExcel() {
     }
   }, [inventoryId]);
 
-  return { isExporting, exportInventoryMP, exportInventoryPP, exportAuditoria };
+  const exportAuditoriaBodega = useCallback(async (params: {
+    bodega: 'almacen' | 'planta';
+    materialType: 'MP' | 'PP';
+    searchTerm?: string;
+    status?: string;
+    location?: string;
+  }) => {
+    setIsExporting(true);
+    try {
+      const { bodega, materialType } = params;
+
+      // 1. Ubicaciones de la bodega/familia (todas, por lotes)
+      const locations = await fetchAllData<{
+        id: string;
+        master_reference: string;
+        location_name: string | null;
+        location_detail: string | null;
+        subcategoria: string | null;
+        bodega_erp: number | null;
+        bodega_round: number | null;
+        bodega_status: string | null;
+      }>(() => {
+        let query = supabase
+          .from('locations_bodega_view')
+          .select('id, master_reference, location_name, location_detail, subcategoria, bodega_erp, bodega_round, bodega_status')
+          .eq('inventory_id', inventoryId!)
+          .eq('bodega', bodega)
+          .eq('material_type', materialType)
+          .order('master_reference');
+
+        if (params.searchTerm) query = query.ilike('master_reference', `%${params.searchTerm}%`);
+        if (params.status && params.status !== 'all') query = query.eq('bodega_status', params.status);
+        if (params.location && params.location !== 'all') query = query.eq('location_name', params.location);
+
+        return query;
+      });
+
+      if (locations.length === 0) {
+        toast.info('No hay datos para exportar');
+        setIsExporting(false);
+        return;
+      }
+
+      const locationIds = locations.map((l) => l.id);
+      const refs = [...new Set(locations.map((l) => l.master_reference))];
+      const batchSize = 100;
+
+      // 2. Conteos
+      const allCounts: { location_id: string; audit_round: number; quantity_counted: number }[] = [];
+      for (let i = 0; i < locationIds.length; i += batchSize) {
+        const { data, error } = await supabase
+          .from('inventory_counts')
+          .select('location_id, audit_round, quantity_counted')
+          .eq('inventory_id', inventoryId!)
+          .in('location_id', locationIds.slice(i, i + batchSize));
+        if (error) throw error;
+        if (data) allCounts.push(...data);
+      }
+
+      // 3. Validaciones
+      const allValidated: { location_id: string; validated_quantity: number; audit_round: number; reason: string }[] = [];
+      for (let i = 0; i < locationIds.length; i += batchSize) {
+        const { data, error } = await supabase
+          .from('validated_counts')
+          .select('location_id, validated_quantity, audit_round, reason')
+          .eq('inventory_id', inventoryId!)
+          .in('location_id', locationIds.slice(i, i + batchSize));
+        if (error) throw error;
+        if (data) allValidated.push(...data);
+      }
+      const validatedMap = new Map(allValidated.map((v) => [v.location_id, v]));
+
+      // 4. Costos unitarios
+      const costMap = new Map<string, number | null>();
+      for (let i = 0; i < refs.length; i += batchSize) {
+        const { data, error } = await supabase
+          .from('inventory_master')
+          .select('referencia, costo_u_mp, costo_u_pp')
+          .eq('inventory_id', inventoryId!)
+          .in('referencia', refs.slice(i, i + batchSize));
+        if (error) throw error;
+        data?.forEach((m) => costMap.set(m.referencia, materialType === 'MP' ? m.costo_u_mp : m.costo_u_pp));
+      }
+
+      const countsMap = new Map<string, Record<string, number | null>>();
+      locationIds.forEach((id) => countsMap.set(id, { c1: null, c2: null, c3: null, c4: null, c5: null }));
+      allCounts.forEach((c) => {
+        const entry = countsMap.get(c.location_id);
+        if (entry) entry[`c${c.audit_round}`] = c.quantity_counted;
+      });
+
+      const bodegaLabel = bodega === 'almacen' ? 'Almacén' : 'Planta';
+
+      const detalle = locations.map((loc) => {
+        const counts = countsMap.get(loc.id) || {};
+        const validated = validatedMap.get(loc.id);
+        return {
+          referencia: loc.master_reference,
+          tipo: materialType,
+          bodega: bodegaLabel,
+          ubicacion: loc.location_name || '',
+          detalle: loc.location_detail || '',
+          subcategoria: loc.subcategoria || '',
+          conteo_1: counts.c1 ?? '',
+          conteo_2: counts.c2 ?? '',
+          conteo_3: counts.c3 ?? '',
+          conteo_4: counts.c4 ?? '',
+          conteo_5: counts.c5 ?? '',
+          validado: validated?.validated_quantity ?? '',
+          ronda_validacion: validated?.audit_round ?? '',
+          motivo: validated?.reason ?? '',
+        };
+      });
+
+      // Resumen por referencia
+      const resumenMap = new Map<string, {
+        referencia: string; tipo: string; bodega: string; erp: number; validado: number;
+        estado: string; ronda: number; ubicaciones: number;
+      }>();
+      locations.forEach((loc) => {
+        const v = validatedMap.get(loc.id);
+        const existing = resumenMap.get(loc.master_reference);
+        if (existing) {
+          existing.validado += Number(v?.validated_quantity ?? 0);
+          existing.ubicaciones += 1;
+        } else {
+          resumenMap.set(loc.master_reference, {
+            referencia: loc.master_reference,
+            tipo: materialType,
+            bodega: bodegaLabel,
+            erp: Number(loc.bodega_erp ?? 0),
+            validado: Number(v?.validated_quantity ?? 0),
+            estado: loc.bodega_status || '',
+            ronda: loc.bodega_round || 1,
+            ubicaciones: 1,
+          });
+        }
+      });
+
+      const resumen = [...resumenMap.values()].map((r) => {
+        const costo = costMap.get(r.referencia) ?? null;
+        const descuadre = r.validado - r.erp;
+        return {
+          referencia: r.referencia,
+          tipo: r.tipo,
+          bodega: r.bodega,
+          ubicaciones: r.ubicaciones,
+          erp: r.erp,
+          validado: r.validado,
+          descuadre,
+          costo_unitario: costo ?? '',
+          descuadre_valor: costo !== null ? descuadre * costo : '',
+          estado: r.estado,
+          ronda: r.ronda,
+        };
+      });
+
+      exportMultiSheet(`auditoria_${bodega}_${materialType.toLowerCase()}`, [
+        {
+          sheetName: 'Detalle por ubicación',
+          data: detalle,
+          columns: [
+            { key: 'referencia', label: 'Referencia' },
+            { key: 'tipo', label: 'Tipo' },
+            { key: 'bodega', label: 'Bodega' },
+            { key: 'ubicacion', label: 'Ubicación' },
+            { key: 'detalle', label: 'Detalle' },
+            { key: 'subcategoria', label: 'Subcategoría' },
+            { key: 'conteo_1', label: 'C1' },
+            { key: 'conteo_2', label: 'C2' },
+            { key: 'conteo_3', label: 'C3' },
+            { key: 'conteo_4', label: 'C4' },
+            { key: 'conteo_5', label: 'C5' },
+            { key: 'validado', label: 'Validado' },
+            { key: 'ronda_validacion', label: 'Ronda Validación' },
+            { key: 'motivo', label: 'Motivo' },
+          ],
+        },
+        {
+          sheetName: 'Resumen por referencia',
+          data: resumen,
+          columns: [
+            { key: 'referencia', label: 'Referencia' },
+            { key: 'tipo', label: 'Tipo' },
+            { key: 'bodega', label: 'Bodega' },
+            { key: 'ubicaciones', label: 'Ubicaciones' },
+            { key: 'erp', label: 'ERP Bodega' },
+            { key: 'validado', label: 'Total Validado' },
+            { key: 'descuadre', label: 'Descuadre (und)' },
+            { key: 'costo_unitario', label: 'Costo Unitario' },
+            { key: 'descuadre_valor', label: 'Descuadre ($)' },
+            { key: 'estado', label: 'Estado' },
+            { key: 'ronda', label: 'Ronda' },
+          ],
+        },
+      ]);
+
+      toast.success(`Exportadas ${resumen.length} referencias (${detalle.length} ubicaciones)`);
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Error al exportar');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [inventoryId]);
+
+  return { isExporting, exportInventoryMP, exportInventoryPP, exportAuditoria, exportAuditoriaBodega };
+}
+
+function exportMultiSheet(
+  filename: string,
+  sheets: { sheetName: string; data: Record<string, unknown>[]; columns: { key: string; label: string }[] }[]
+) {
+  const workbook = XLSX.utils.book_new();
+  sheets.forEach((sheet) => {
+    const rows = sheet.data.map((row) => {
+      const mapped: Record<string, unknown> = {};
+      sheet.columns.forEach((col) => {
+        mapped[col.label] = row[col.key] ?? '';
+      });
+      return mapped;
+    });
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheet.sheetName.slice(0, 31));
+  });
+  const date = new Date().toISOString().split('T')[0];
+  XLSX.writeFile(workbook, `${filename}_${date}.xlsx`);
 }
 
 function exportToExcel(data: Record<string, unknown>[], config: ExportConfig) {
