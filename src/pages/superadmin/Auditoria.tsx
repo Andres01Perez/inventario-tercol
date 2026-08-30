@@ -521,7 +521,7 @@ const Auditoria: React.FC = () => {
 
       const { error: masterError } = await supabase
         .from('inventory_master')
-        .update({ status_slug: 'auditado' })
+        .update({ status_slug: 'auditado', status_alm: 'auditado', status_pl: 'auditado' })
         .eq('inventory_id', inventoryId!)
         .eq('referencia', selectedReference.referencia);
 
