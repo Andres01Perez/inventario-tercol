@@ -26,6 +26,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import LocationsImport from '@/components/shared/LocationsImport';
+import CreateLocationDialog from '@/components/shared/CreateLocationDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
