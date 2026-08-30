@@ -307,6 +307,7 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
             <p className="font-medium text-foreground mb-2">Columnas esperadas:</p>
             <div className="flex gap-2 flex-wrap text-muted-foreground">
               <code className="bg-background px-2 py-1 rounded text-xs">Referencia*</code>
+              <code className="bg-background px-2 py-1 rounded text-xs">Bodega*</code>
               <code className="bg-background px-2 py-1 rounded text-xs">Subcategoría</code>
               <code className="bg-background px-2 py-1 rounded text-xs">Observaciones</code>
               <code className="bg-background px-2 py-1 rounded text-xs">Ubicación</code>
@@ -315,6 +316,7 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
               <code className="bg-background px-2 py-1 rounded text-xs">Método Conteo</code>
             </div>
             <p className="text-xs text-muted-foreground mt-2">* Campo obligatorio. Una referencia puede tener múltiples ubicaciones.</p>
+            <p className="text-xs text-muted-foreground mt-1">Bodega acepta solo <strong>Almacén</strong> o <strong>Planta</strong>. Almacén se asigna al Admin MP y Planta al Admin PP configurados en Gestión de Usuarios.</p>
           </div>
         </>
       )}
