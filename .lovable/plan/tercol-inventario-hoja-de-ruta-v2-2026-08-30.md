@@ -39,12 +39,13 @@ Se va tachando cada ítem a medida que quede implementado **y probado**.
 - [x] Verificación de suma en `validate_and_close_round` para evitar el caso CCE125TG (typecheck + build OK; prueba funcional pendiente porque hoy no hay ubicaciones/contajes en el inventario activo)
 
 ### Fase 3 — Validación almacén vs planta
-- [ ] Definir cómo se identifica si una ubicación es almacén o planta (¿`subcategoria`? ¿columna nueva `bodega`?)
-- [ ] Confirmar qué columnas ERP suman "almacén" y cuáles "planta"
-- [ ] Columna/derivación de bodega en `locations` + ajuste del importador de ubicaciones
-- [ ] Reescribir la fase de match por suma del RPC: comparar almacén contra almacén y planta contra planta por separado
-- [ ] Probar con referencias multi-ubicación mixtas
-- [ ] **Auditoría muestra el descuadre desglosado**: si el total no cuadra, indicar si el faltante/sobrante es de almacén o de planta, con la diferencia en cantidad y en valor ($, usando `costo_u`)
+- [x] Bodega = rol del admin dueño de la ubicación (`admin_mp` → almacén, `admin_pp` → planta)
+- [x] ERP almacén = `Cant.Alm`; ERP planta = `Cant.PLd + Cant.PLr`; `Cant.ZA` fuera de la comparación por bodega
+- [x] Descartada la columna `bodega` en `locations` (se deriva en BD con `location_bodega` + vista `locations_bodega_view`)
+- [x] RPC reescrito: `validate_bucket` valida almacén y planta por separado, con ronda y estado propios (`audit_round_alm/pl`, `status_alm/pl`)
+- [x] Cada bloque espera solo sus propias ubicaciones; el conteo filtra por la ronda del bloque
+- [ ] Probar con referencias multi-ubicación mixtas (pendiente del lado de Andrés)
+- [ ] **Auditoría muestra el descuadre desglosado** (aplazado a más adelante)
 
 ### Fase 4 — Auditoría completa
 - [ ] Vista de auditoría que cargue **todas** las referencias (hoy hay tope de 500/1000 por página)

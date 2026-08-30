@@ -134,10 +134,18 @@ const CriticalReferenceCard: React.FC<CriticalReferenceCardProps> = ({ reference
       return result;
     },
     onSuccess: (result) => {
-      const validationResult = result as { success?: boolean; action?: string } | null;
-      
-      if (validationResult?.action === 'forced_close_superadmin') {
-        toast.success(`✅ ${reference.referencia} - CERRADO FORZADO exitosamente`);
+      const validationResult = result as unknown as {
+        reference_status?: string;
+        almacen?: { action?: string; status?: string };
+        planta?: { action?: string; status?: string };
+      } | null;
+
+      const closed =
+        validationResult?.reference_status === 'cerrado_forzado' ||
+        validationResult?.reference_status === 'auditado';
+
+      if (closed) {
+        toast.success(`✅ ${reference.referencia} - CERRADO exitosamente`);
       } else {
         toast.success(`✅ ${reference.referencia} - Procesado correctamente`);
       }
