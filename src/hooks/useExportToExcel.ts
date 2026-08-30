@@ -11,8 +11,12 @@ interface ExportConfig {
 }
 
 // Helper to fetch all data in batches
+type RangeableQuery = {
+  range: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: unknown }>;
+};
+
 async function fetchAllData<T>(
-  queryBuilder: () => ReturnType<ReturnType<typeof supabase.from>['select']>,
+  queryBuilder: () => RangeableQuery,
   batchSize = 1000
 ): Promise<T[]> {
   const allData: T[] = [];
