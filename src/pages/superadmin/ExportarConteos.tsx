@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useInventory } from '@/contexts/InventoryContext';
+import ReadOnlyBanner from '@/components/shared/ReadOnlyBanner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -59,6 +61,7 @@ interface CountByLocation {
 async function fetchAllInBatches<T>(
   table: 'locations' | 'inventory_counts' | 'inventory_master',
   selectQuery: string,
+  inventoryId: string,
   batchSize = 1000
 ): Promise<T[]> {
   let allData: T[] = [];
@@ -69,6 +72,7 @@ async function fetchAllInBatches<T>(
     const { data, error } = await supabase
       .from(table)
       .select(selectQuery)
+      .eq('inventory_id', inventoryId)
       .range(from, from + batchSize - 1);
 
     if (error) throw error;
@@ -88,6 +92,7 @@ async function fetchAllInBatches<T>(
 const ExportarConteos: React.FC = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
+  const { inventoryId } = useInventory();
   
   // Tab Validados state
   const [searchTerm, setSearchTerm] = useState('');
@@ -103,11 +108,13 @@ const ExportarConteos: React.FC = () => {
 
   // ===== TAB VALIDADOS: Query =====
   const { data: auditedReferences, isLoading, refetch } = useQuery({
-    queryKey: ['export-auditados', searchTerm, materialTypeFilter],
+    queryKey: ['export-auditados', searchTerm, materialTypeFilter, inventoryId],
+    enabled: !!inventoryId,
     queryFn: async () => {
       let masterQuery = supabase
         .from('inventory_master')
         .select('referencia, material_type')
+        .eq('inventory_id', inventoryId!)
         .eq('status_slug', 'auditado');
 
       if (materialTypeFilter !== 'all') {
@@ -125,6 +132,7 @@ const ExportarConteos: React.FC = () => {
       const { data: locations, error: locError } = await supabase
         .from('locations')
         .select('master_reference, validated_quantity, validated_at_round')
+        .eq('inventory_id', inventoryId!)
         .in('master_reference', masters.map(m => m.referencia))
         .not('validated_quantity', 'is', null);
 
@@ -150,21 +158,25 @@ const ExportarConteos: React.FC = () => {
 
   // ===== TAB POR UBICACIÓN: Query =====
   const { data: countsByLocation, isLoading: isLoadingLoc, refetch: refetchLoc } = useQuery({
-    queryKey: ['export-counts-by-location', searchTermLoc, materialTypeFilterLoc],
+    queryKey: ['export-counts-by-location', searchTermLoc, materialTypeFilterLoc, inventoryId],
+    enabled: !!inventoryId,
     queryFn: async () => {
       // Fetch ALL records using batch pagination to avoid Supabase 1000 row limit
       const [locations, counts, masters] = await Promise.all([
         fetchAllInBatches<{ id: string; master_reference: string; location_name: string | null; location_detail: string | null; punto_referencia: string | null }>(
           'locations',
-          'id, master_reference, location_name, location_detail, punto_referencia'
+          'id, master_reference, location_name, location_detail, punto_referencia',
+          inventoryId!
         ),
         fetchAllInBatches<{ location_id: string; audit_round: number; quantity_counted: number }>(
           'inventory_counts',
-          'location_id, audit_round, quantity_counted'
+          'location_id, audit_round, quantity_counted',
+          inventoryId!
         ),
         fetchAllInBatches<{ referencia: string; material_type: string }>(
           'inventory_master',
-          'referencia, material_type'
+          'referencia, material_type',
+          inventoryId!
         ),
       ]);
 
