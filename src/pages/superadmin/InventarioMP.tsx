@@ -183,6 +183,7 @@ const InventarioMP: React.FC = () => {
 
       {/* Table */}
       <main className="px-4 sm:px-6 lg:px-8 py-6">
+        <ReadOnlyBanner />
         <div className="bg-card rounded-lg border border-border overflow-hidden">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
@@ -211,7 +212,7 @@ const InventarioMP: React.FC = () => {
                     <TableRow key={item.referencia}>
                       {columns.map((col) => (
                         <TableCell key={col.key} className="py-1">
-                          {col.editable ? (
+                          {col.editable && !isReadOnly ? (
                             <EditableCell
                               value={item[col.key as keyof typeof item] as string | number | null}
                               onSave={(value) => handleSave(item.referencia, col.key, value)}
