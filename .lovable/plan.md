@@ -72,8 +72,9 @@ Deja de borrar datos. El flujo pasa a ser:
 
 ## Detalles técnicos
 
-- Migración en un solo paso: crear `inventories` con GRANTs + RLS, insertar "Semestral 2026-1", añadir `inventory_id` con backfill, hacerlo `NOT NULL`, recrear PK y FK compuestas, crear índices, recrear las funciones con el parámetro nuevo.
-- Las políticas RLS existentes se conservan tal cual; el aislamiento por inventario es por filtro de query, no por RLS, salvo el bloqueo de escritura sobre inventarios cerrados, que se hace con un trigger `BEFORE INSERT/UPDATE/DELETE` en las tres tablas — así el modo solo lectura no depende del frontend.
+- Migración en un solo paso: crear `inventories` con GRANTs + RLS, insertar "Semestral 2026-1", añadir `inventory_id` con backfill, hacerlo `NOT NULL`, recrear PK y FK compuestas, crear índices, crear los triggers de bloqueo y recrear las funciones con el parámetro nuevo.
+- El aislamiento de datos es por filtro de query; el bloqueo de escritura sobre inventarios cerrados es por trigger, no por frontend. Las políticas RLS actuales se conservan y se les suma que solo el superadmin escribe en `inventories`.
+- El `inventory_id` que usan los no-superadmin no viaja como parámetro elegible: se resuelve desde el servidor con una función `get_active_inventory()`, así el cliente no puede "pedir" otro inventario para escribir.
 - `src/integrations/supabase/types.ts` se regenera solo tras la migración; el código que dependa del esquema nuevo se escribe después.
 - Realtime: los canales siguen igual, pero los handlers descartan eventos cuyo `inventory_id` no sea el activo.
 
