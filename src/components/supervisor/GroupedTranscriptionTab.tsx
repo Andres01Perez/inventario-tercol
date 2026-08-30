@@ -181,7 +181,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
   };
 
   const { data: locations = [], isLoading, refetch } = useQuery({
-    queryKey: ['grouped-transcription-locations', roundNumber, user?.id, isAdminMode, controlFilter, masterAuditRound],
+    queryKey: ['grouped-transcription-locations', roundNumber, user?.id, isAdminMode, controlFilter, masterAuditRound, inventoryId],
     queryFn: async () => {
       const rawData = await fetchAllLocations();
       console.log(`[DEBUG] Query returned ${rawData.length} rows for round ${roundNumber}, masterAuditRound=${masterAuditRound}`);
@@ -212,7 +212,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
       // Return only locations that DON'T have a count for this round
       return (rawData as unknown as Location[]).filter(loc => !countedLocationIds.has(loc.id));
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !!inventoryId,
   });
 
   // Realtime subscription for inventory_counts - optimizado
@@ -257,7 +257,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
     
     // Get current locations from cache
     const currentLocations = queryClient.getQueryData<Location[]>(
-      ['grouped-transcription-locations', roundNumber, user?.id, isAdminMode, controlFilter, masterAuditRound]
+      ['grouped-transcription-locations', roundNumber, user?.id, isAdminMode, controlFilter, masterAuditRound, inventoryId]
     ) || [];
     
     const locationIds = currentLocations.map(l => l.id);
@@ -283,7 +283,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
     
     // Keep ONLY locations with status = 'pendiente' (remove contado)
     queryClient.setQueryData(
-      ['grouped-transcription-locations', roundNumber, user?.id, isAdminMode, controlFilter, masterAuditRound],
+      ['grouped-transcription-locations', roundNumber, user?.id, isAdminMode, controlFilter, masterAuditRound, inventoryId],
       (old: Location[] | undefined) => {
         if (!old) return [];
         const filtered = old.filter(loc => !contadoIds.has(loc.id));
@@ -310,6 +310,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
       const { data: refLocations } = await supabase
         .from('locations')
         .select('id')
+        .eq('inventory_id', inventoryId!)
         .eq('master_reference', masterReference);
 
       if (!refLocations || refLocations.length === 0) return;
@@ -329,6 +330,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
         const { data: result } = await supabase.rpc('validate_and_close_round', {
           _reference: masterReference,
           _admin_id: user!.id,
+          _inventory_id: inventoryId!,
         });
 
         const validationResult = result as { success?: boolean; action?: string; new_round?: number } | null;
@@ -364,6 +366,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
       const { data: refLocations } = await supabase
         .from('locations')
         .select('id')
+        .eq('inventory_id', inventoryId!)
         .eq('master_reference', masterReference)
         .is('validated_at_round', null);
 
@@ -371,6 +374,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
         const { data: result } = await supabase.rpc('validate_and_close_round', {
           _reference: masterReference,
           _admin_id: user!.id,
+          _inventory_id: inventoryId!,
         });
 
         const validationResult = result as { success?: boolean; action?: string } | null;
@@ -402,6 +406,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
       const { data: result } = await supabase.rpc('validate_and_close_round', {
         _reference: masterReference,
         _admin_id: user!.id,
+        _inventory_id: inventoryId!,
       });
 
       const validationResult = result as { success?: boolean; action?: string; new_round?: number } | null;
@@ -526,6 +531,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
       const { data: masterData } = await supabase
         .from('inventory_master')
         .select('referencia, material_type, control, audit_round, status_slug')
+        .eq('inventory_id', inventoryId!)
         .ilike('referencia', `%${refUpper}%`)
         .limit(10);
       
@@ -533,6 +539,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
       const { data: locData } = await supabase
         .from('locations')
         .select('id, master_reference, punto_referencia, location_name, assigned_supervisor_id, status_c1, status_c2, status_c3, status_c4')
+        .eq('inventory_id', inventoryId!)
         .ilike('master_reference', `%${refUpper}%`)
         .limit(20);
       
