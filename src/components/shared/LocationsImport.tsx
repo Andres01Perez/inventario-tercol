@@ -52,6 +52,30 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
   const { profile } = useAuth();
   const { inventoryId } = useInventory();
 
+  const resolveBodegaAdmins = async (locations: ParsedLocation[]): Promise<{ almacen?: string; planta?: string }> => {
+    const needsAlmacen = locations.some(l => l.bodega === 'almacen');
+    const needsPlanta = locations.some(l => l.bodega === 'planta');
+
+    const { data: roleRows, error } = await supabase
+      .from('user_roles')
+      .select('user_id, role')
+      .in('role', ['admin_mp', 'admin_pp']);
+
+    if (error) throw new Error(`Error al consultar admins: ${error.message}`);
+
+    const adminMp = roleRows?.find(r => r.role === 'admin_mp')?.user_id;
+    const adminPp = roleRows?.find(r => r.role === 'admin_pp')?.user_id;
+
+    const missing: string[] = [];
+    if (needsAlmacen && !adminMp) missing.push('Admin Almacén (admin_mp)');
+    if (needsPlanta && !adminPp) missing.push('Admin Planta (admin_pp)');
+    if (missing.length > 0) {
+      throw new Error(`No hay ${missing.join(' ni ')} configurado. Asígnalo desde Gestión de Usuarios antes de importar.`);
+    }
+
+    return { almacen: adminMp, planta: adminPp };
+  };
+
   const validateReferences = async (locations: ParsedLocation[]): Promise<string[]> => {
     const uniqueRefs = [...new Set(locations.map(l => l.master_reference))];
     
