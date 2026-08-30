@@ -3,11 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useInventory } from '@/contexts/InventoryContext';
 import ReadOnlyBanner from '@/components/shared/ReadOnlyBanner';
+import AppLayout from '@/components/layout/AppLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, 
-  ArrowLeft, 
   Search, 
   RefreshCw,
   CheckCircle,
@@ -446,39 +446,18 @@ const GestionResponsables: React.FC = () => {
   const totalPages = Math.ceil((data?.total || 0) / pageSize);
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="px-4 sm:px-6 lg:px-8 pt-4">
-        <ReadOnlyBanner />
-      </div>
-      {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <div className={`w-10 h-10 rounded-xl ${adminBgClass} flex items-center justify-center`}>
-                <Users className={`w-5 h-5 ${adminColorClass}`} />
-              </div>
-              <div>
-                <h1 className="text-lg font-bold text-foreground">Gestión de Responsables</h1>
-                <p className="text-xs text-muted-foreground">{adminTypeLabel} - Asignación masiva de líderes de conteo</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium text-foreground">{profile?.full_name}</p>
-                <p className="text-xs text-muted-foreground">{adminRoleLabel}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+    <AppLayout
+      title="Gestión de Responsables"
+      subtitle={`${adminTypeLabel} - Asignación masiva de líderes de conteo`}
+      showBackButton
+      backPath="/dashboard"
+      fullWidth
+      roleConfig={{ label: adminRoleLabel, icon: Users, colorClass: adminColorClass, bgClass: adminBgClass }}
+    >
+      <ReadOnlyBanner />
 
       {/* Controls */}
-      <div className="border-b border-border bg-card/50 px-4 sm:px-6 lg:px-8 py-4 space-y-4">
+      <div className="border border-border rounded-xl bg-card/50 px-4 py-4 space-y-4 mb-6">
         {/* Search row */}
         <div className="flex items-center gap-4">
           <div className="relative flex-1 max-w-md">
@@ -679,7 +658,7 @@ const GestionResponsables: React.FC = () => {
       )}
 
       {/* Table */}
-      <main className="px-4 sm:px-6 lg:px-8 py-6">
+      <main>
         <div className="bg-card rounded-lg border border-border overflow-hidden">
           {(isLoading || !role) ? (
             <div className="flex items-center justify-center py-12">
@@ -847,7 +826,7 @@ const GestionResponsables: React.FC = () => {
           </div>
         )}
       </main>
-    </div>
+    </AppLayout>
   );
 };
 
