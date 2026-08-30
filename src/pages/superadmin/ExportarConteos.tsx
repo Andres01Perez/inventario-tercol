@@ -128,9 +128,22 @@ const ExportarConteos: React.FC = () => {
         masterQuery = masterQuery.ilike('referencia', `%${searchTerm}%`);
       }
 
-      const { data: masters, error: masterError } = await masterQuery;
-      if (masterError) throw masterError;
-      if (!masters || masters.length === 0) return [];
+      // Paginado: sin .range() Supabase corta en 1000 referencias
+      const masters: { referencia: string; material_type: string }[] = [];
+      {
+        let from = 0;
+        while (true) {
+          const { data, error } = await masterQuery
+            .order('referencia')
+            .range(from, from + 999);
+          if (error) throw error;
+          if (!data || data.length === 0) break;
+          masters.push(...data);
+          if (data.length < 1000) break;
+          from += 1000;
+        }
+      }
+      if (masters.length === 0) return [];
 
       const allValidated: {
         master_reference: string;
@@ -139,16 +152,26 @@ const ExportarConteos: React.FC = () => {
         reason: string;
       }[] = [];
 
-      for (let i = 0; i < masters.length; i += 500) {
-        const batchRefs = masters.slice(i, i + 500).map(m => m.referencia);
-        const { data, error } = await supabase
-          .from('validated_counts')
-          .select('master_reference, validated_quantity, audit_round, reason')
-          .eq('inventory_id', inventoryId!)
-          .in('master_reference', batchRefs);
+      // Lotes de 200 referencias y paginación interna: una sola referencia
+      // puede tener cientos de ubicaciones validadas.
+      for (let i = 0; i < masters.length; i += 200) {
+        const batchRefs = masters.slice(i, i + 200).map(m => m.referencia);
+        let from = 0;
+        while (true) {
+          const { data, error } = await supabase
+            .from('validated_counts')
+            .select('master_reference, validated_quantity, audit_round, reason')
+            .eq('inventory_id', inventoryId!)
+            .in('master_reference', batchRefs)
+            .order('master_reference')
+            .range(from, from + 999);
 
-        if (error) throw error;
-        if (data) allValidated.push(...data);
+          if (error) throw error;
+          if (!data || data.length === 0) break;
+          allValidated.push(...data);
+          if (data.length < 1000) break;
+          from += 1000;
+        }
       }
 
       const grouped: AuditedReference[] = masters.map(master => {
