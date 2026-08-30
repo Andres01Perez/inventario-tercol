@@ -247,6 +247,44 @@ const MasterDataImport: React.FC = () => {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [confirmText, setConfirmText] = useState('');
 
+  // Cargar conteos actuales por familia del inventario abierto
+  useEffect(() => {
+    if (!hasOpenInventory || !inventoryId) {
+      setFamilyCounts({ MP: 0, PP: 0, PT: 0 });
+      return;
+    }
+
+    let cancelled = false;
+    const fetchCounts = async () => {
+      setFamilyCountsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('inventory_master')
+          .select('material_type')
+          .eq('inventory_id', inventoryId);
+
+        if (error) throw error;
+
+        const counts = { MP: 0, PP: 0, PT: 0 };
+        (data || []).forEach((row) => {
+          const t = row.material_type as MaterialType;
+          if (t === 'MP' || t === 'PP' || t === 'PT') {
+            counts[t] += 1;
+          }
+        });
+
+        if (!cancelled) setFamilyCounts(counts);
+      } catch (err) {
+        console.error('Error cargando conteos por familia:', err);
+      } finally {
+        if (!cancelled) setFamilyCountsLoading(false);
+      }
+    };
+
+    fetchCounts();
+    return () => { cancelled = true; };
+  }, [inventoryId, hasOpenInventory, importMode]);
+
   const checkActiveInventory = async (): Promise<ActiveInventoryCheck> => {
     // Check locations count
     const { count: locationsCount } = await supabase
