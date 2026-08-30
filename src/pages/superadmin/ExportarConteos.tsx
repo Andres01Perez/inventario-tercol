@@ -121,7 +121,7 @@ const ExportarConteos: React.FC = () => {
         .eq('status_slug', 'auditado');
 
       if (materialTypeFilter !== 'all') {
-        masterQuery = masterQuery.eq('material_type', materialTypeFilter as 'MP' | 'PP');
+        masterQuery = masterQuery.eq('material_type', materialTypeFilter as 'MP' | 'PP' | 'PT');
       }
 
       if (searchTerm) {
@@ -132,25 +132,37 @@ const ExportarConteos: React.FC = () => {
       if (masterError) throw masterError;
       if (!masters || masters.length === 0) return [];
 
-      const { data: locations, error: locError } = await supabase
-        .from('locations')
-        .select('master_reference, validated_quantity, validated_at_round')
-        .eq('inventory_id', inventoryId!)
-        .in('master_reference', masters.map(m => m.referencia))
-        .not('validated_quantity', 'is', null);
+      const allValidated: {
+        master_reference: string;
+        validated_quantity: number;
+        audit_round: number;
+        reason: string;
+      }[] = [];
 
-      if (locError) throw locError;
+      for (let i = 0; i < masters.length; i += 500) {
+        const batchRefs = masters.slice(i, i + 500).map(m => m.referencia);
+        const { data, error } = await supabase
+          .from('validated_counts')
+          .select('master_reference, validated_quantity, audit_round, reason')
+          .eq('inventory_id', inventoryId!)
+          .in('master_reference', batchRefs);
+
+        if (error) throw error;
+        if (data) allValidated.push(...data);
+      }
 
       const grouped: AuditedReference[] = masters.map(master => {
-        const locs = locations?.filter(l => l.master_reference === master.referencia) || [];
-        const totalValidado = locs.reduce((sum, l) => sum + (Number(l.validated_quantity) || 0), 0);
-        const round = locs[0]?.validated_at_round || 1;
+        const rows = allValidated.filter(v => v.master_reference === master.referencia);
+        const totalValidado = rows.reduce((sum, v) => sum + (Number(v.validated_quantity) || 0), 0);
+        const round = rows[0]?.audit_round || 1;
+        const reason = rows[0]?.reason || '';
 
         return {
           material_type: master.material_type,
           referencia: master.referencia,
           conteo: round,
           cantidad_validada: totalValidado,
+          motivo: reason,
         };
       });
 
