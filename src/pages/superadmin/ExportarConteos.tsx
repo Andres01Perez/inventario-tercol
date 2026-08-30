@@ -43,6 +43,7 @@ interface AuditedReference {
   referencia: string;
   conteo: number;
   cantidad_validada: number;
+  motivo: string;
 }
 
 interface CountByLocation {
@@ -55,11 +56,13 @@ interface CountByLocation {
   conteo_2: number | null;
   conteo_3: number | null;
   conteo_4: number | null;
+  validado: number | null;
+  motivo: string;
 }
 
 // Helper to fetch all records in batches (Supabase limits to 1000 per query)
 async function fetchAllInBatches<T>(
-  table: 'locations' | 'inventory_counts' | 'inventory_master',
+  table: 'locations' | 'inventory_counts' | 'inventory_master' | 'validated_counts',
   selectQuery: string,
   inventoryId: string,
   batchSize = 1000
