@@ -356,8 +356,8 @@ const GestionResponsables: React.FC = () => {
   }, [isAllSelected, allIds]);
 
   // Memoized handler for supervisor changes
-  const handleSupervisorChange = useCallback((locationId: string, supervisorId: string | null) => {
-    updateAssignmentMutation.mutate({ locationId, supervisorId });
+  const handleSupervisorChange = useCallback((row: ResponsablesRow, supervisorId: string | null) => {
+    handleAssign(row, supervisorId);
   }, []);
 
   // Bulk assignment mutation
