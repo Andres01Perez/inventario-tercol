@@ -772,30 +772,113 @@ const MasterDataImport: React.FC = () => {
         )}
       </div>
 
-      {/* Upload Zones */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <FileUploadZone
-          type="MP"
-          file={mpFile}
-          onFileSelect={handleMpFileSelect}
-          disabled={state === 'importing'}
-          parseResult={mpResult}
-        />
-        <FileUploadZone
-          type="PP"
-          file={ppFile}
-          onFileSelect={handlePpFileSelect}
-          disabled={state === 'importing'}
-          parseResult={ppResult}
-        />
-        <FileUploadZone
-          type="PT"
-          file={ptFile}
-          onFileSelect={handlePtFileSelect}
-          disabled={state === 'importing'}
-          parseResult={ptResult}
-        />
-      </div>
+      {/* Botones de reemplazo (inventario abierto) o zonas de carga (nuevo inventario) */}
+      {hasOpenInventory && importMode === 'replace' ? (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <FamilyReplaceButton
+              type="MP"
+              count={familyCounts.MP}
+              isSelected={selectedFamily === 'MP'}
+              hasFile={!!mpFile}
+              fileName={mpFile?.name}
+              onSelect={() => setSelectedFamily('MP')}
+              onClear={() => handleMpFileSelect(null)}
+              disabled={state === 'importing' || familyCountsLoading}
+            />
+            <FamilyReplaceButton
+              type="PP"
+              count={familyCounts.PP}
+              isSelected={selectedFamily === 'PP'}
+              hasFile={!!ppFile}
+              fileName={ppFile?.name}
+              onSelect={() => setSelectedFamily('PP')}
+              onClear={() => handlePpFileSelect(null)}
+              disabled={state === 'importing' || familyCountsLoading}
+            />
+            <FamilyReplaceButton
+              type="PT"
+              count={familyCounts.PT}
+              isSelected={selectedFamily === 'PT'}
+              hasFile={!!ptFile}
+              fileName={ptFile?.name}
+              onSelect={() => setSelectedFamily('PT')}
+              onClear={() => handlePtFileSelect(null)}
+              disabled={state === 'importing' || familyCountsLoading}
+            />
+          </div>
+
+          {selectedFamily && (
+            <div className="max-w-2xl mx-auto">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-foreground">
+                  Subir archivo para reemplazar <strong>{selectedFamily}</strong>
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedFamily(null)}
+                  disabled={state === 'importing'}
+                >
+                  <X className="w-4 h-4 mr-1" />
+                  Cerrar
+                </Button>
+              </div>
+              {selectedFamily === 'MP' && (
+                <FileUploadZone
+                  type="MP"
+                  file={mpFile}
+                  onFileSelect={handleMpFileSelect}
+                  disabled={state === 'importing'}
+                  parseResult={mpResult}
+                />
+              )}
+              {selectedFamily === 'PP' && (
+                <FileUploadZone
+                  type="PP"
+                  file={ppFile}
+                  onFileSelect={handlePpFileSelect}
+                  disabled={state === 'importing'}
+                  parseResult={ppResult}
+                />
+              )}
+              {selectedFamily === 'PT' && (
+                <FileUploadZone
+                  type="PT"
+                  file={ptFile}
+                  onFileSelect={handlePtFileSelect}
+                  disabled={state === 'importing'}
+                  parseResult={ptResult}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <FileUploadZone
+            type="MP"
+            file={mpFile}
+            onFileSelect={handleMpFileSelect}
+            disabled={state === 'importing'}
+            parseResult={mpResult}
+          />
+          <FileUploadZone
+            type="PP"
+            file={ppFile}
+            onFileSelect={handlePpFileSelect}
+            disabled={state === 'importing'}
+            parseResult={ppResult}
+          />
+          <FileUploadZone
+            type="PT"
+            file={ptFile}
+            onFileSelect={handlePtFileSelect}
+            disabled={state === 'importing'}
+            parseResult={ptResult}
+          />
+        </div>
+      )}
 
 
       {/* Warnings */}
