@@ -502,6 +502,23 @@ const Auditoria: React.FC = () => {
 
       if (locError) throw locError;
 
+      // Persistir en validated_counts para que exportaciones usen la fuente única de verdad
+      for (const locationId of locationIds) {
+        const { error: vcError } = await supabase
+          .from('validated_counts')
+          .upsert({
+            inventory_id: inventoryId!,
+            master_reference: selectedReference.referencia,
+            location_id: locationId,
+            validated_quantity: perLocation,
+            audit_round: selectedReference.auditRound,
+            reason: 'manual_edit',
+            validated_by: user.id,
+          }, { onConflict: 'inventory_id,location_id' });
+
+        if (vcError) throw vcError;
+      }
+
       const { error: masterError } = await supabase
         .from('inventory_master')
         .update({ status_slug: 'auditado' })
