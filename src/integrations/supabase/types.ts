@@ -124,6 +124,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "inventory_counts_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations_bodega_view"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "inventory_counts_supervisor_id_fkey"
             columns: ["supervisor_id"]
             isOneToOne: false
@@ -136,6 +143,8 @@ export type Database = {
         Row: {
           assigned_admin_id: string | null
           audit_round: number | null
+          audit_round_alm: number
+          audit_round_pl: number
           cant_alm_mp: number | null
           cant_alm_pp: number | null
           cant_pld: number | null
@@ -159,12 +168,16 @@ export type Database = {
           mp_costo: number | null
           referencia: string
           servicio: number | null
+          status_alm: string
+          status_pl: string
           status_slug: string | null
           updated_at: string | null
         }
         Insert: {
           assigned_admin_id?: string | null
           audit_round?: number | null
+          audit_round_alm?: number
+          audit_round_pl?: number
           cant_alm_mp?: number | null
           cant_alm_pp?: number | null
           cant_pld?: number | null
@@ -188,12 +201,16 @@ export type Database = {
           mp_costo?: number | null
           referencia: string
           servicio?: number | null
+          status_alm?: string
+          status_pl?: string
           status_slug?: string | null
           updated_at?: string | null
         }
         Update: {
           assigned_admin_id?: string | null
           audit_round?: number | null
+          audit_round_alm?: number
+          audit_round_pl?: number
           cant_alm_mp?: number | null
           cant_alm_pp?: number | null
           cant_pld?: number | null
@@ -217,6 +234,8 @@ export type Database = {
           mp_costo?: number | null
           referencia?: string
           servicio?: number | null
+          status_alm?: string
+          status_pl?: string
           status_slug?: string | null
           updated_at?: string | null
         }
@@ -464,11 +483,71 @@ export type Database = {
             referencedRelation: "locations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "validated_counts_location_fk"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations_bodega_view"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
     Views: {
-      [_ in never]: never
+      locations_bodega_view: {
+        Row: {
+          assigned_admin_id: string | null
+          assigned_supervisor_id: string | null
+          bodega: string | null
+          bodega_erp: number | null
+          bodega_round: number | null
+          bodega_status: string | null
+          cant_total_erp: number | null
+          control: string | null
+          created_at: string | null
+          discovered_at_round: number | null
+          id: string | null
+          inventory_id: string | null
+          location_detail: string | null
+          location_name: string | null
+          master_reference: string | null
+          material_type: Database["public"]["Enums"]["material_type"] | null
+          metodo_conteo: string | null
+          observaciones: string | null
+          punto_referencia: string | null
+          status_c1: string | null
+          status_c2: string | null
+          status_c3: string | null
+          status_c4: string | null
+          subcategoria: string | null
+          updated_at: string | null
+          validated_at_round: number | null
+          validated_quantity: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "count_tasks_assigned_admin_id_fkey"
+            columns: ["assigned_admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "locations_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "locations_master_reference_fkey"
+            columns: ["inventory_id", "master_reference"]
+            isOneToOne: false
+            referencedRelation: "inventory_master"
+            referencedColumns: ["inventory_id", "referencia"]
+          },
+        ]
+      }
     }
     Functions: {
       admin_can_access_reference:
@@ -481,6 +560,17 @@ export type Database = {
             }
             Returns: boolean
           }
+      erp_bodega: {
+        Args: {
+          _bodega: string
+          _cant_alm_mp: number
+          _cant_alm_pp: number
+          _cant_pld: number
+          _cant_plr: number
+          _material_type: Database["public"]["Enums"]["material_type"]
+        }
+        Returns: number
+      }
       get_active_inventory: { Args: never; Returns: string }
       get_filter_options:
         | { Args: { _material_type?: string }; Returns: Json }
@@ -505,6 +595,7 @@ export type Database = {
         Returns: boolean
       }
       is_superadmin: { Args: { _user_id: string }; Returns: boolean }
+      location_bodega: { Args: { _assigned_admin_id: string }; Returns: string }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       upsert_validated_count: {
@@ -521,6 +612,15 @@ export type Database = {
       }
       validate_and_close_round: {
         Args: { _admin_id: string; _inventory_id?: string; _reference: string }
+        Returns: Json
+      }
+      validate_bucket: {
+        Args: {
+          _admin_id: string
+          _bodega: string
+          _inv: string
+          _reference: string
+        }
         Returns: Json
       }
     }
