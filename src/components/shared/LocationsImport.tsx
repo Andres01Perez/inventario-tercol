@@ -160,6 +160,17 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
         return;
       }
 
+      // Resolver admin de cada bodega (Almacén -> admin_mp, Planta -> admin_pp)
+      try {
+        const admins = await resolveBodegaAdmins(result.data);
+        setBodegaAdmins(admins);
+      } catch (adminError) {
+        console.error('[LOCATIONS-IMPORT] Error resolviendo admins:', adminError);
+        setErrors([adminError instanceof Error ? adminError.message : 'Error al resolver admins de bodega']);
+        setState('error');
+        return;
+      }
+
       const dataWithStatus: LocationWithStatus[] = result.data.map(loc => ({
         ...loc,
         status: 'valid' as const,
@@ -221,7 +232,7 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
             location_detail: loc.location_detail,
             punto_referencia: loc.punto_referencia,
             metodo_conteo: loc.metodo_conteo,
-            assigned_admin_id: profile?.id,
+            assigned_admin_id: loc.bodega === 'almacen' ? bodegaAdmins.almacen! : bodegaAdmins.planta!,
           })));
 
         if (error) throw error;
