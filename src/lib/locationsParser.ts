@@ -1,7 +1,10 @@
 import * as XLSX from 'xlsx';
 
+export type Bodega = 'almacen' | 'planta';
+
 export interface ParsedLocation {
   master_reference: string;
+  bodega: Bodega;
   subcategoria: string | null;
   observaciones: string | null;
   location_name: string | null;
@@ -88,9 +91,10 @@ export const parseLocationsExcel = async (file: File): Promise<LocationsParseRes
 
     jsonData.forEach((row, index) => {
       const rowNumber = index + 2; // +2 porque índice 0 + fila de encabezado
-      
+
       // Obtener valores de las columnas
       const referencia = findColumnValue(row, ['referencia', 'ref', 'master_reference']);
+      const bodegaRaw = findColumnValue(row, ['bodega']);
       const subcategoria = findColumnValue(row, ['subcategoria', 'subcategoría', 'sub_categoria']);
       const observaciones = findColumnValue(row, ['observaciones', 'observacion', 'obs', 'notas']);
       const ubicacion = findColumnValue(row, ['ubicacion', 'ubicación', 'location', 'location_name']);
@@ -104,6 +108,17 @@ export const parseLocationsExcel = async (file: File): Promise<LocationsParseRes
         return;
       }
 
+      // Validar bodega (campo obligatorio: Almacén o Planta)
+      const bodegaNormalized = bodegaRaw ? normalizeColumnName(bodegaRaw) : '';
+      let bodega: Bodega | null = null;
+      if (bodegaNormalized === 'almacen') bodega = 'almacen';
+      else if (bodegaNormalized === 'planta') bodega = 'planta';
+      if (!bodega) {
+        errors.push(`Fila ${rowNumber}: Bodega vacía o inválida (use "Almacén" o "Planta")`);
+        return;
+      }
+
+
       // Detectar duplicados dentro del archivo (referencia + ubicación detallada + punto referencia)
       const comboKey = `${referencia.toLowerCase()}|${(ubicacionDetallada || '').toLowerCase()}|${(puntoReferencia || '').toLowerCase()}`;
       if (seenCombos.has(comboKey)) {
@@ -114,6 +129,7 @@ export const parseLocationsExcel = async (file: File): Promise<LocationsParseRes
 
       data.push({
         master_reference: referencia,
+        bodega,
         subcategoria: subcategoria || null,
         observaciones: observaciones || null,
         location_name: ubicacion || null,
@@ -137,27 +153,30 @@ export const parseLocationsExcel = async (file: File): Promise<LocationsParseRes
  */
 export const generateLocationsTemplate = (): void => {
   const templateData = [
-    { 
-      Referencia: 'REF-001', 
-      Subcategoría: 'Tornillos', 
+    {
+      Referencia: 'REF-001',
+      Bodega: 'Almacén',
+      Subcategoría: 'Tornillos',
       Observaciones: 'Zona A',
       Ubicación: 'ESTANTE-1',
       'Ubicación Detallada': 'Nivel 3',
       'Punto Referencia': 'Puerta principal',
       'Método Conteo': 'Manual'
     },
-    { 
-      Referencia: 'REF-001', 
-      Subcategoría: 'Tornillos', 
+    {
+      Referencia: 'REF-001',
+      Bodega: 'Planta',
+      Subcategoría: 'Tornillos',
       Observaciones: 'Zona B',
       Ubicación: 'ESTANTE-2',
       'Ubicación Detallada': 'Nivel 1',
       'Punto Referencia': 'Pasillo 2',
       'Método Conteo': 'Conteo rápido'
     },
-    { 
-      Referencia: 'REF-002', 
-      Subcategoría: 'Tuercas', 
+    {
+      Referencia: 'REF-002',
+      Bodega: 'Almacén',
+      Subcategoría: 'Tuercas',
       Observaciones: '',
       Ubicación: 'BODEGA-3',
       'Ubicación Detallada': '',
@@ -167,10 +186,11 @@ export const generateLocationsTemplate = (): void => {
   ];
 
   const worksheet = XLSX.utils.json_to_sheet(templateData);
-  
+
   // Ajustar ancho de columnas
   worksheet['!cols'] = [
     { wch: 15 }, // Referencia
+    { wch: 12 }, // Bodega
     { wch: 15 }, // Subcategoría
     { wch: 20 }, // Observaciones
     { wch: 15 }, // Ubicación

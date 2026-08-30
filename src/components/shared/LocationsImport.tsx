@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useInventory } from '@/contexts/InventoryContext';
-import { useAuth } from '@/contexts/AuthContext';
+
 import { useToast } from '@/hooks/use-toast';
 import { 
   parseLocationsExcel, 
@@ -43,14 +43,39 @@ type ImportState = 'idle' | 'parsing' | 'validating' | 'preview' | 'importing' |
 const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose }) => {
   const [state, setState] = useState<ImportState>('idle');
   const [parsedData, setParsedData] = useState<LocationWithStatus[]>([]);
+  const [bodegaAdmins, setBodegaAdmins] = useState<{ almacen?: string; planta?: string }>({});
   const [errors, setErrors] = useState<string[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [invalidReferences, setInvalidReferences] = useState<string[]>([]);
   const [progress, setProgress] = useState(0);
   const [importStats, setImportStats] = useState({ created: 0, updated: 0, skipped: 0 });
   const { toast } = useToast();
-  const { profile } = useAuth();
+  
   const { inventoryId } = useInventory();
+
+  const resolveBodegaAdmins = async (locations: ParsedLocation[]): Promise<{ almacen?: string; planta?: string }> => {
+    const needsAlmacen = locations.some(l => l.bodega === 'almacen');
+    const needsPlanta = locations.some(l => l.bodega === 'planta');
+
+    const { data: roleRows, error } = await supabase
+      .from('user_roles')
+      .select('user_id, role')
+      .in('role', ['admin_mp', 'admin_pp']);
+
+    if (error) throw new Error(`Error al consultar admins: ${error.message}`);
+
+    const adminMp = roleRows?.find(r => r.role === 'admin_mp')?.user_id;
+    const adminPp = roleRows?.find(r => r.role === 'admin_pp')?.user_id;
+
+    const missing: string[] = [];
+    if (needsAlmacen && !adminMp) missing.push('Admin Almacén (admin_mp)');
+    if (needsPlanta && !adminPp) missing.push('Admin Planta (admin_pp)');
+    if (missing.length > 0) {
+      throw new Error(`No hay ${missing.join(' ni ')} configurado. Asígnalo desde Gestión de Usuarios antes de importar.`);
+    }
+
+    return { almacen: adminMp, planta: adminPp };
+  };
 
   const validateReferences = async (locations: ParsedLocation[]): Promise<string[]> => {
     const uniqueRefs = [...new Set(locations.map(l => l.master_reference))];
@@ -135,6 +160,17 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
         return;
       }
 
+      // Resolver admin de cada bodega (Almacén -> admin_mp, Planta -> admin_pp)
+      try {
+        const admins = await resolveBodegaAdmins(result.data);
+        setBodegaAdmins(admins);
+      } catch (adminError) {
+        console.error('[LOCATIONS-IMPORT] Error resolviendo admins:', adminError);
+        setErrors([adminError instanceof Error ? adminError.message : 'Error al resolver admins de bodega']);
+        setState('error');
+        return;
+      }
+
       const dataWithStatus: LocationWithStatus[] = result.data.map(loc => ({
         ...loc,
         status: 'valid' as const,
@@ -196,7 +232,7 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
             location_detail: loc.location_detail,
             punto_referencia: loc.punto_referencia,
             metodo_conteo: loc.metodo_conteo,
-            assigned_admin_id: profile?.id,
+            assigned_admin_id: loc.bodega === 'almacen' ? bodegaAdmins.almacen! : bodegaAdmins.planta!,
           })));
 
         if (error) throw error;
@@ -271,6 +307,7 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
             <p className="font-medium text-foreground mb-2">Columnas esperadas:</p>
             <div className="flex gap-2 flex-wrap text-muted-foreground">
               <code className="bg-background px-2 py-1 rounded text-xs">Referencia*</code>
+              <code className="bg-background px-2 py-1 rounded text-xs">Bodega*</code>
               <code className="bg-background px-2 py-1 rounded text-xs">Subcategoría</code>
               <code className="bg-background px-2 py-1 rounded text-xs">Observaciones</code>
               <code className="bg-background px-2 py-1 rounded text-xs">Ubicación</code>
@@ -279,6 +316,7 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
               <code className="bg-background px-2 py-1 rounded text-xs">Método Conteo</code>
             </div>
             <p className="text-xs text-muted-foreground mt-2">* Campo obligatorio. Una referencia puede tener múltiples ubicaciones.</p>
+            <p className="text-xs text-muted-foreground mt-1">Bodega acepta solo <strong>Almacén</strong> o <strong>Planta</strong>. Almacén se asigna al Admin MP y Planta al Admin PP configurados en Gestión de Usuarios.</p>
           </div>
         </>
       )}
@@ -373,6 +411,7 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
               <TableHeader>
                 <TableRow>
                   <TableHead>Referencia</TableHead>
+                  <TableHead>Bodega</TableHead>
                   <TableHead>Ubicación</TableHead>
                   <TableHead>Subcategoría</TableHead>
                 </TableRow>
@@ -381,6 +420,9 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
                 {parsedData.slice(0, 50).map((loc, i) => (
                   <TableRow key={i}>
                     <TableCell className="font-medium">{loc.master_reference}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{loc.bodega === 'almacen' ? 'Almacén' : 'Planta'}</Badge>
+                    </TableCell>
                     <TableCell>{loc.location_name || '-'}</TableCell>
                     <TableCell>{loc.subcategoria || '-'}</TableCell>
                   </TableRow>
