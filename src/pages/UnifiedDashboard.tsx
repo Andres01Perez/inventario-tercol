@@ -145,11 +145,6 @@ const UnifiedDashboard: React.FC = () => {
         .select('id', { count: 'exact', head: true })
         .eq('inventory_id', inventoryId!);
 
-      const { count: operariosCount } = await supabase
-        .from('operarios')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_active', true);
-
       const { count: criticosCount } = await supabase
         .from('inventory_master')
         .select('referencia', { count: 'exact', head: true })
@@ -160,7 +155,6 @@ const UnifiedDashboard: React.FC = () => {
         usuarios: usersCount || 0,
         referencias: referencesCount || 0,
         ubicaciones: locationsCount || 0,
-        operarios: operariosCount || 0,
         criticos: criticosCount || 0,
       };
     },
