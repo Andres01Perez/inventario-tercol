@@ -334,19 +334,21 @@ const MasterDataImport: React.FC = () => {
     const fetchCounts = async () => {
       setFamilyCountsLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('inventory_master')
-          .select('material_type')
-          .eq('inventory_id', inventoryId);
-
-        if (error) throw error;
+        const families: MaterialType[] = ['MP', 'PP', 'PT'];
+        const results = await Promise.all(
+          families.map((family) =>
+            supabase
+              .from('inventory_master')
+              .select('*', { count: 'exact', head: true })
+              .eq('inventory_id', inventoryId)
+              .eq('material_type', family)
+          )
+        );
 
         const counts = { MP: 0, PP: 0, PT: 0 };
-        (data || []).forEach((row) => {
-          const t = row.material_type as MaterialType;
-          if (t === 'MP' || t === 'PP' || t === 'PT') {
-            counts[t] += 1;
-          }
+        results.forEach((res, i) => {
+          if (res.error) throw res.error;
+          counts[families[i]] = res.count ?? 0;
         });
 
         if (!cancelled) setFamilyCounts(counts);
