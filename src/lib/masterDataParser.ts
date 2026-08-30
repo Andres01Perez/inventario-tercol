@@ -42,12 +42,19 @@ const MP_COLUMN_MAP: Record<string, keyof ParsedRow> = {
   'costo.u': 'costo_u_mp',
   'costou': 'costo_u_mp',
   'cant.alm': 'cant_alm_mp',
+  'c.alm': 'cant_alm_mp',
   'cant.pld': 'cant_pld',
+  'c.pld': 'cant_pld',
   'cant.plr': 'cant_plr',
+  'c.plr': 'cant_plr',
   'cant.za': 'cant_za',
+  'c.za': 'cant_za',
   'cant.provd': 'cant_prov_d',
+  'c.provd': 'cant_prov_d',
   'cant.provr': 'cant_prov_r',
+  'c.provr': 'cant_prov_r',
   'cant.t': 'cant_t_mp',
+  'c.total': 'cant_t_mp',
   'costo.t': 'costo_t',
 };
 
@@ -62,13 +69,20 @@ const PP_COLUMN_MAP: Record<string, keyof ParsedRow> = {
   'costou': 'costo_u_pp',
   'can.alm': 'cant_alm_pp',
   'cant.alm': 'cant_alm_pp',
+  'c.alm': 'cant_alm_pp',
   'cant.pld': 'cant_pld',
+  'c.pld': 'cant_pld',
   'cant.plr': 'cant_plr',
+  'c.plr': 'cant_plr',
   'cant.za': 'cant_za',
+  'c.za': 'cant_za',
   'cant.prov': 'cant_prov_pp',
+  'proveedor': 'cant_prov_pp',
   'cant.total': 'cant_total_pp',
+  'c.total': 'cant_total_pp',
   'costo.t': 'costo_t',
 };
+
 
 // Column mapping for PT file (skeleton — columnas específicas se agregarán después)
 const PT_COLUMN_MAP: Record<string, keyof ParsedRow> = {
@@ -301,6 +315,30 @@ export function parseExcelFile(file: File, type: MaterialType): Promise<ParseRes
         if (convertedToNullCount > 0) {
           result.warnings.push(`${convertedToNullCount} valores no numéricos ignorados`);
         }
+
+        // Avisar de columnas del Excel que no se reconocieron (evita cargas silenciosas en blanco)
+        const unmapped = originalColumns.filter(
+          (col) => !columnMap[normalizeColumnName(col)]
+        );
+        if (unmapped.length > 0) {
+          result.warnings.push(`Columnas no reconocidas y omitidas: ${unmapped.join(', ')}`);
+        }
+
+        // Avisar si el archivo quedaría sin cantidades ERP de almacén o planta
+        if (type !== 'PT') {
+          const almField = type === 'MP' ? 'cant_alm_mp' : 'cant_alm_pp';
+          const missingErp: string[] = [];
+          if (!result.data.some((r) => r[almField] !== null)) missingErp.push('almacén (Cant.Alm / C.Alm)');
+          if (!result.data.some((r) => r.cant_pld !== null || r.cant_plr !== null)) {
+            missingErp.push('planta (Cant.PLd + Cant.PLr / C.PLd + C.PLr)');
+          }
+          if (missingErp.length > 0) {
+            result.errors.push(
+              `El archivo no trae cantidades ERP de ${missingErp.join(' ni ')}. Revisa los encabezados antes de importar: la comparación contra el conteo quedaría en cero.`
+            );
+          }
+        }
+
 
         resolve(result);
       } catch (error) {
