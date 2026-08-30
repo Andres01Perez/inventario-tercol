@@ -104,19 +104,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sessionStorage.removeItem('cached_role');
         sessionStorage.removeItem('cached_user_id');
       } else {
-        // roleData can be 'superadmin' | 'admin' | 'admin_mp' | 'admin_pp' | 'supervisor' | 'operario' | null
-        // We exclude 'operario' from UI access
+        // roleData can be 'superadmin' | 'admin' | 'admin_mp' | 'admin_pp' | 'supervisor' | null
         const roleData = roleResult.data;
-        if (roleData === 'operario') {
-          setRole(null);
-          sessionStorage.removeItem('cached_role');
-        } else {
-          setRole(roleData as AppRole);
-          // Cache role for faster reloads
-          if (roleData) {
-            sessionStorage.setItem('cached_role', roleData);
-            sessionStorage.setItem('cached_user_id', userId);
-          }
+        setRole(roleData as AppRole);
+        // Cache role for faster reloads
+        if (roleData) {
+          sessionStorage.setItem('cached_role', roleData);
+          sessionStorage.setItem('cached_user_id', userId);
         }
       }
     } catch (error) {
