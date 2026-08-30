@@ -129,6 +129,7 @@ export const parseLocationsExcel = async (file: File): Promise<LocationsParseRes
 
       data.push({
         master_reference: referencia,
+        bodega,
         subcategoria: subcategoria || null,
         observaciones: observaciones || null,
         location_name: ubicacion || null,
