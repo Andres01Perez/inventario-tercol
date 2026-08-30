@@ -270,6 +270,7 @@ export function useExportToExcel() {
         { key: 'conteo_4', label: 'Conteo 4' },
         { key: 'conteo_5', label: 'Conteo 5' },
         { key: 'validado', label: 'Validado' },
+        { key: 'motivo_validacion', label: 'Motivo Validación' },
         { key: 'estado', label: 'Estado' },
       ];
 
