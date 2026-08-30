@@ -347,30 +347,6 @@ export type Database = {
           },
         ]
       }
-      operarios: {
-        Row: {
-          created_at: string | null
-          full_name: string
-          id: string
-          is_active: boolean | null
-          turno: number | null
-        }
-        Insert: {
-          created_at?: string | null
-          full_name: string
-          id?: string
-          is_active?: boolean | null
-          turno?: number | null
-        }
-        Update: {
-          created_at?: string | null
-          full_name?: string
-          id?: string
-          is_active?: boolean | null
-          turno?: number | null
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           created_at: string | null
@@ -420,7 +396,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
-          role?: Database["public"]["Enums"]["app_role"]
+          role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
@@ -625,13 +601,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role:
-        | "superadmin"
-        | "admin"
-        | "admin_mp"
-        | "admin_pp"
-        | "supervisor"
-        | "operario"
+      app_role: "superadmin" | "admin" | "admin_mp" | "admin_pp" | "supervisor"
       material_type: "MP" | "PP" | "PT"
     }
     CompositeTypes: {
@@ -760,14 +730,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: [
-        "superadmin",
-        "admin",
-        "admin_mp",
-        "admin_pp",
-        "supervisor",
-        "operario",
-      ],
+      app_role: ["superadmin", "admin", "admin_mp", "admin_pp", "supervisor"],
       material_type: ["MP", "PP", "PT"],
     },
   },

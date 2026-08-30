@@ -3,11 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useInventory } from '@/contexts/InventoryContext';
 import ReadOnlyBanner from '@/components/shared/ReadOnlyBanner';
+import AppLayout from '@/components/layout/AppLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { 
   MapPin, 
-  ArrowLeft, 
   Search, 
   RefreshCw,
   CheckCircle,
@@ -311,57 +311,40 @@ const GestionUbicacion: React.FC = () => {
   let lastReferencia = '';
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="px-4 sm:px-6 lg:px-8 pt-4">
-        <ReadOnlyBanner />
-      </div>
-      {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <div className={`w-10 h-10 rounded-xl ${adminBgClass} flex items-center justify-center`}>
-                <MapPin className={`w-5 h-5 ${adminColorClass}`} />
-              </div>
-              <div>
-                <h1 className="text-lg font-bold text-foreground">Gestión de Ubicaciones</h1>
-                <p className="text-xs text-muted-foreground">{adminTypeLabel} - Asignar ubicaciones y supervisores</p>
-              </div>
-            </div>
+    <AppLayout
+      title="Gestión de Ubicaciones"
+      subtitle={`${adminTypeLabel} - Asignar ubicaciones y supervisores`}
+      showBackButton
+      backPath="/dashboard"
+      fullWidth
+      roleConfig={{ label: adminRoleLabel, icon: MapPin, colorClass: adminColorClass, bgClass: adminBgClass }}
+    >
+      <ReadOnlyBanner />
 
-            <div className="flex items-center gap-3">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setShowImportDialog(true)}
-                className="gap-2"
-              >
-                <Upload className="w-4 h-4" />
-                Importar
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => navigate('/admin/gestion-responsables')}
-                className="gap-2"
-              >
-                <Users className="w-4 h-4" />
-                Asignar Responsables
-              </Button>
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium text-foreground">{profile?.full_name}</p>
-                <p className="text-xs text-muted-foreground">{adminRoleLabel}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+      {/* Acciones */}
+      <div className="flex items-center gap-3 mb-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowImportDialog(true)}
+          className="gap-2"
+        >
+          <Upload className="w-4 h-4" />
+          Importar
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate('/admin/gestion-responsables')}
+          className="gap-2"
+        >
+          <Users className="w-4 h-4" />
+          Asignar Responsables
+        </Button>
+      </div>
 
       {/* Controls */}
-      <div className="border-b border-border bg-card/50 px-4 sm:px-6 lg:px-8 py-4 space-y-4">
+      <div className="border border-border rounded-xl bg-card/50 px-4 py-4 space-y-4 mb-6">
         {/* Search row */}
         <div className="flex items-center gap-4">
           <div className="relative flex-1 max-w-md">
@@ -470,7 +453,7 @@ const GestionUbicacion: React.FC = () => {
       </div>
 
       {/* Table */}
-      <main className="px-4 sm:px-6 lg:px-8 py-6">
+      <main>
         <div className="bg-card rounded-lg border border-border overflow-hidden">
           {(isLoading || !role) ? (
             <div className="flex items-center justify-center py-12">
@@ -707,7 +690,7 @@ const GestionUbicacion: React.FC = () => {
           queryClient.invalidateQueries({ queryKey: ['locations-responsables'] });
         }}
       />
-    </div>
+    </AppLayout>
   );
 };
 

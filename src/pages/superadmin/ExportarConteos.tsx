@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useInventory } from '@/contexts/InventoryContext';
 import ReadOnlyBanner from '@/components/shared/ReadOnlyBanner';
+import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -32,7 +33,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { ArrowLeft, Download, Search, RefreshCw, CheckCircle2, MapPin } from 'lucide-react';
+import { Download, Search, RefreshCw, CheckCircle2, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -419,30 +420,15 @@ const ExportarConteos: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <div>
-                <h1 className="text-lg font-bold text-foreground">Exportar Conteos</h1>
-                <p className="text-xs text-muted-foreground">Exportar referencias auditadas y conteos por ubicación</p>
-              </div>
-            </div>
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium text-foreground">{profile?.full_name || 'Usuario'}</p>
-              <p className="text-xs text-muted-foreground">{profile?.email}</p>
-            </div>
-          </div>
-        </div>
-      </header>
+    <AppLayout
+      title="Exportar Conteos"
+      subtitle="Exportar referencias auditadas y conteos por ubicación"
+      showBackButton
+      backPath="/dashboard"
+    >
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main>
         <ReadOnlyBanner />
         <Tabs defaultValue="validados" className="space-y-6">
           <TabsList className="grid w-full max-w-md grid-cols-2">
@@ -715,7 +701,7 @@ const ExportarConteos: React.FC = () => {
           </TabsContent>
         </Tabs>
       </main>
-    </div>
+    </AppLayout>
   );
 };
 
