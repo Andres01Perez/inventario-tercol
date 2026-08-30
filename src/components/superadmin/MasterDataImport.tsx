@@ -206,6 +206,82 @@ const FileUploadZone: React.FC<FileUploadZoneProps> = ({
   );
 };
 
+interface FamilyReplaceButtonProps {
+  type: MaterialType;
+  count: number;
+  isSelected: boolean;
+  hasFile: boolean;
+  fileName?: string;
+  onSelect: () => void;
+  onClear: () => void;
+  disabled: boolean;
+}
+
+const FamilyReplaceButton: React.FC<FamilyReplaceButtonProps> = ({
+  type,
+  count,
+  isSelected,
+  hasFile,
+  fileName,
+  onSelect,
+  onClear,
+  disabled,
+}) => {
+  const cfg = {
+    MP: { bg: 'bg-blue-500/5', border: 'border-blue-500/30', borderActive: 'border-blue-500', iconBg: 'bg-blue-500/10', icon: 'text-blue-500', Icon: Package, title: 'Materia Prima (MP)' },
+    PP: { bg: 'bg-emerald-500/5', border: 'border-emerald-500/30', borderActive: 'border-emerald-500', iconBg: 'bg-emerald-500/10', icon: 'text-emerald-500', Icon: Factory, title: 'Producto Proceso (PP)' },
+    PT: { bg: 'bg-amber-500/5', border: 'border-amber-500/30', borderActive: 'border-amber-500', iconBg: 'bg-amber-500/10', icon: 'text-amber-500', Icon: Boxes, title: 'Producto Terminado (PT)' },
+  } as const;
+  const c = cfg[type];
+  const Icon = c.Icon;
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      disabled={disabled}
+      className={`
+        relative flex flex-col items-center text-center rounded-xl border-2 p-6 transition-all
+        ${c.bg} ${isSelected ? c.borderActive : c.border}
+        ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.01] hover:border-opacity-60 cursor-pointer'}
+        ${isSelected ? 'ring-1 ring-offset-1 ring-offset-background' : ''}
+      `}
+    >
+      <div className={`p-4 rounded-full ${c.iconBg} mb-4`}>
+        <Icon className={`w-8 h-8 ${c.icon}`} />
+      </div>
+      <h3 className="text-lg font-semibold text-foreground mb-1">{c.title}</h3>
+      <p className="text-sm text-muted-foreground mb-3">
+        {count} referencia{count !== 1 ? 's' : ''} cargada{count !== 1 ? 's' : ''}
+      </p>
+
+      {hasFile && fileName ? (
+        <div className="flex items-center gap-2 text-sm">
+          <FileSpreadsheet className="w-4 h-4 text-muted-foreground" />
+          <span className="text-foreground font-medium truncate max-w-[180px]">{fileName}</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClear();
+            }}
+            disabled={disabled}
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+      ) : (
+        <span className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+          <Upload className="w-4 h-4" />
+          Reemplazar {type}
+        </span>
+      )}
+    </button>
+  );
+};
+
 // Helper to format number or show dash for null
 const formatNumber = (value: number | null | undefined): string => {
   if (value === null || value === undefined) return '—';
