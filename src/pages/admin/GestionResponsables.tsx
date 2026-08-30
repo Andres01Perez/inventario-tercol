@@ -117,6 +117,23 @@ const GestionResponsables: React.FC = () => {
   // Use cached supervisors hook
   const { data: supervisors } = useSupervisors();
 
+  // Map material type to the admin that owns the bucket (MP → admin_mp, PP → admin_pp)
+  const { data: adminMap } = useQuery({
+    queryKey: ['admin-bodega-map'],
+    queryFn: async () => {
+      const { data: roles, error } = await supabase
+        .from('user_roles')
+        .select('user_id, role')
+        .in('role', ['admin_mp', 'admin_pp']);
+      if (error) throw error;
+      const map = new Map<string, string>();
+      roles?.forEach((r) => map.set(r.role, r.user_id));
+      return map;
+    },
+    staleTime: 5 * 60 * 1000,
+    enabled: !!role,
+  });
+
   const hasActiveFilters = filterTipo !== 'all' || filterSubcategoria || filterUbicacion || filterObservacion || filterSupervisor !== 'all' || filterPuntoReferencia !== 'all';
 
   const clearFilters = () => {
