@@ -58,7 +58,7 @@ y, si faltan las cantidades de almacén o planta, un aviso destacado de que ese 
 
 ### 3. Re-importar PP
 
-Después del cambio hay que volver a usar "Reemplazar PP" con el mismo archivo. La vista previa debe mostrar cantidades distintas de cero (por ejemplo AESTRIADAT: almacén 18.397, planta 3.719,40, total 22.116,40).
+Después del cambio hay que volver a usar "Reemplazar PP" con el mismo archivo. La vista previa debe mostrar cantidades distintas de cero (por ejemplo AESTRIADAT: almacén 18.397, planta 3.317,40, total 21.714,40).
 
 ## Verificación
 
