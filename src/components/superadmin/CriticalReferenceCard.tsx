@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useInventory } from '@/contexts/InventoryContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -59,6 +60,7 @@ interface CriticalReferenceCardProps {
 
 const CriticalReferenceCard: React.FC<CriticalReferenceCardProps> = ({ reference, onClosed }) => {
   const { user } = useAuth();
+  const { inventoryId } = useInventory();
   const queryClient = useQueryClient();
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -124,6 +126,7 @@ const CriticalReferenceCard: React.FC<CriticalReferenceCardProps> = ({ reference
       const { data: result, error: rpcError } = await supabase.rpc('validate_and_close_round', {
         _reference: reference.referencia,
         _admin_id: user!.id,
+        _inventory_id: inventoryId!,
       });
 
       if (rpcError) throw rpcError;

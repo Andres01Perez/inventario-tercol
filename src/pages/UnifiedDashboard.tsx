@@ -24,10 +24,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { useInventory } from '@/contexts/InventoryContext';
+import InventorySelector from '@/components/shared/InventorySelector';
+import ReadOnlyBanner from '@/components/shared/ReadOnlyBanner';
 
 const UnifiedDashboard: React.FC = () => {
   const { profile, role, signOut } = useAuth();
+  const { inventoryId, isReadOnly } = useInventory();
   const navigate = useNavigate();
+
 
   // Role-based configuration
   const roleConfig = useMemo(() => {
@@ -67,13 +72,14 @@ const UnifiedDashboard: React.FC = () => {
 
   // Fetch statistics with optimized staleTime for concurrent users
   const { data: stats } = useQuery({
-    queryKey: ['unified-stats', profile?.id, role],
+    queryKey: ['unified-stats', profile?.id, role, inventoryId],
     staleTime: 30 * 1000, // 30 seconds - reduce unnecessary refetches
     queryFn: async () => {
       if (role === 'supervisor') {
         const { data: locations } = await supabase
           .from('locations')
           .select('id, status_c1, status_c2')
+          .eq('inventory_id', inventoryId!)
           .eq('assigned_supervisor_id', profile!.id);
         
         const pendingC1 = (locations || []).filter(l => l.status_c1 !== 'contado').length;
@@ -88,7 +94,10 @@ const UnifiedDashboard: React.FC = () => {
 
       if (role === 'admin_mp' || role === 'admin_pp') {
         const isAdminMP = role === 'admin_mp';
-        let refQuery = supabase.from('inventory_master').select('referencia', { count: 'exact', head: true });
+        let refQuery = supabase
+          .from('inventory_master')
+          .select('referencia', { count: 'exact', head: true })
+          .eq('inventory_id', inventoryId!);
         if (isAdminMP) {
           refQuery = refQuery.not('control', 'is', null);
         } else {
@@ -99,6 +108,7 @@ const UnifiedDashboard: React.FC = () => {
         const { data: locationsWithSupervisors } = await supabase
           .from('locations')
           .select('assigned_supervisor_id, inventory_master!inner(control)')
+          .eq('inventory_id', inventoryId!)
           .not('assigned_supervisor_id', 'is', null);
         
         const relevantLocations = locationsWithSupervisors?.filter(l => {
@@ -109,7 +119,8 @@ const UnifiedDashboard: React.FC = () => {
 
         const { count: locationsCount } = await supabase
           .from('locations')
-          .select('id', { count: 'exact', head: true });
+          .select('id', { count: 'exact', head: true })
+          .eq('inventory_id', inventoryId!);
 
         return {
           referencias: refCount || 0,
@@ -126,11 +137,13 @@ const UnifiedDashboard: React.FC = () => {
 
       const { count: referencesCount } = await supabase
         .from('inventory_master')
-        .select('referencia', { count: 'exact', head: true });
+        .select('referencia', { count: 'exact', head: true })
+        .eq('inventory_id', inventoryId!);
 
       const { count: locationsCount } = await supabase
         .from('locations')
-        .select('id', { count: 'exact', head: true });
+        .select('id', { count: 'exact', head: true })
+        .eq('inventory_id', inventoryId!);
 
       const { count: operariosCount } = await supabase
         .from('operarios')
@@ -140,6 +153,7 @@ const UnifiedDashboard: React.FC = () => {
       const { count: criticosCount } = await supabase
         .from('inventory_master')
         .select('referencia', { count: 'exact', head: true })
+        .eq('inventory_id', inventoryId!)
         .eq('audit_round', 5);
 
       return {
@@ -150,8 +164,9 @@ const UnifiedDashboard: React.FC = () => {
         criticos: criticosCount || 0,
       };
     },
-    enabled: !!profile?.id,
+    enabled: !!profile?.id && !!inventoryId,
   });
+
 
   // Stats display based on role
   const statsDisplay = useMemo(() => {
@@ -455,6 +470,9 @@ const UnifiedDashboard: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-4">
+              <div className="hidden md:block">
+                <InventorySelector />
+              </div>
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-foreground">{profile?.full_name || 'Usuario'}</p>
                 <p className="text-xs text-muted-foreground">{profile?.email}</p>
@@ -469,6 +487,10 @@ const UnifiedDashboard: React.FC = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="md:hidden mb-4">
+          <InventorySelector />
+        </div>
+        <ReadOnlyBanner />
         <div className="space-y-8">
           {/* Welcome */}
           <div>

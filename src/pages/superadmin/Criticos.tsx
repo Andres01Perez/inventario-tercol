@@ -1,6 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useInventory } from '@/contexts/InventoryContext';
 import AppLayout from '@/components/layout/AppLayout';
 import CriticalReferenceCard from '@/components/superadmin/CriticalReferenceCard';
 import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
@@ -41,14 +42,17 @@ interface CriticalReference {
 }
 
 const Criticos: React.FC = () => {
+  const { inventoryId } = useInventory();
   // OPTIMIZED: Fetch critical references with batch queries (eliminates N+1)
   const { data: criticalReferences = [], isLoading, refetch } = useQuery({
-    queryKey: ['critical-references'],
+    queryKey: ['critical-references', inventoryId],
+    enabled: !!inventoryId,
     queryFn: async () => {
       // 1. Get all inventory_master with audit_round = 5
       const { data: masters, error: mastersError } = await supabase
         .from('inventory_master')
         .select('referencia, material_type, control, cant_total_erp, count_history')
+        .eq('inventory_id', inventoryId!)
         .eq('audit_round', 5);
 
       if (mastersError) throw mastersError;
@@ -63,6 +67,7 @@ const Criticos: React.FC = () => {
           id, master_reference, location_name, location_detail,
           subcategoria, observaciones, punto_referencia, metodo_conteo
         `)
+        .eq('inventory_id', inventoryId!)
         .in('master_reference', references);
 
       if (!allLocations || allLocations.length === 0) return [];

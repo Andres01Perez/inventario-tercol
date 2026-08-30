@@ -15,6 +15,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { useInventory } from '@/contexts/InventoryContext';
 import {
   Table,
   TableBody,
@@ -211,6 +214,12 @@ const formatNumber = (value: number | null | undefined): string => {
 
 const MasterDataImport: React.FC = () => {
   const { toast } = useToast();
+  const { inventoryId, inventory, isReadOnly, refetchInventories, setSelectedInventoryId } = useInventory();
+
+  // Modo de importación: reemplazar dentro del inventario abierto o crear uno nuevo
+  const [importMode, setImportMode] = useState<'replace' | 'new'>('replace');
+  const [newInventoryName, setNewInventoryName] = useState('');
+  const [newInventoryDate, setNewInventoryDate] = useState(() => new Date().toISOString().slice(0, 10));
   
   const [state, setState] = useState<ImportState>('idle');
   const [progress, setProgress] = useState(0);
@@ -235,24 +244,28 @@ const MasterDataImport: React.FC = () => {
     // Check locations count
     const { count: locationsCount } = await supabase
       .from('locations')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .eq('inventory_id', inventoryId!);
 
     // Check assigned supervisors
     const { count: assignedCount } = await supabase
       .from('locations')
       .select('*', { count: 'exact', head: true })
+      .eq('inventory_id', inventoryId!)
       .not('assigned_supervisor_id', 'is', null);
 
     // Check non-pending status
     const { count: nonPendingCount } = await supabase
       .from('inventory_master')
       .select('*', { count: 'exact', head: true })
+      .eq('inventory_id', inventoryId!)
       .neq('status_slug', 'pendiente');
 
     // Check count history (not empty array)
     const { data: historyData } = await supabase
       .from('inventory_master')
       .select('count_history')
+      .eq('inventory_id', inventoryId!)
       .neq('count_history', '[]');
 
     const countHistoryCount = historyData?.length || 0;
@@ -333,6 +346,29 @@ const MasterDataImport: React.FC = () => {
   const handleImportClick = async () => {
     if (combinedData.length === 0) return;
 
+    if (importMode === 'new') {
+      if (!newInventoryName.trim()) {
+        toast({
+          title: 'Falta el nombre',
+          description: 'Escribe el nombre del nuevo inventario (por ejemplo: Semestral 2026-2)',
+          variant: 'destructive',
+        });
+        return;
+      }
+      // Crear inventario nuevo NO borra nada: no requiere confirmación destructiva
+      executeImport();
+      return;
+    }
+
+    if (isReadOnly) {
+      toast({
+        title: 'Inventario histórico',
+        description: 'Selecciona el inventario abierto o crea uno nuevo para poder importar',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setState('checking');
     const check = await checkActiveInventory();
     setActiveCheck(check);
@@ -365,42 +401,78 @@ const MasterDataImport: React.FC = () => {
       // Determinar qué familias se están importando
       const typesInImport = Array.from(new Set(dataToInsert.map((r) => r.material_type))) as MaterialType[];
 
-      // Step 1: Fetch existing references of these types so we can delete their locations first
-      setProgress(3);
-      const { data: existingRefs, error: refsError } = await supabase
-        .from('inventory_master')
-        .select('referencia')
-        .in('material_type', typesInImport);
+      // Inventario destino de esta importación
+      let targetInventoryId = inventoryId!;
 
-      if (refsError) {
-        throw new Error(`Error al consultar referencias existentes: ${refsError.message}`);
-      }
+      if (importMode === 'new') {
+        setProgress(3);
 
-      const refsToDelete = (existingRefs || []).map((r) => r.referencia);
-
-      // Step 2: Delete locations tied to those references (in batches to avoid huge URLs)
-      setProgress(6);
-      const LOC_BATCH = 200;
-      for (let i = 0; i < refsToDelete.length; i += LOC_BATCH) {
-        const chunk = refsToDelete.slice(i, i + LOC_BATCH);
-        const { error: locDeleteError } = await supabase
-          .from('locations')
-          .delete()
-          .in('master_reference', chunk);
-        if (locDeleteError) {
-          throw new Error(`Error al eliminar ubicaciones: ${locDeleteError.message}`);
+        // Cerrar el inventario abierto actual (solo puede haber uno abierto)
+        if (inventoryId) {
+          const { error: closeError } = await supabase
+            .from('inventories')
+            .update({ status: 'cerrado', fecha_cierre: new Date().toISOString() })
+            .eq('id', inventoryId)
+            .eq('status', 'abierto');
+          if (closeError) {
+            throw new Error(`Error al cerrar el inventario actual: ${closeError.message}`);
+          }
         }
-      }
 
-      // Step 3: Delete inventory_master rows only for the affected material types
-      setProgress(10);
-      const { error: deleteError } = await supabase
-        .from('inventory_master')
-        .delete()
-        .in('material_type', typesInImport);
+        const { data: created, error: createError } = await supabase
+          .from('inventories')
+          .insert({
+            nombre: newInventoryName.trim(),
+            fecha_inicio: newInventoryDate,
+            status: 'abierto',
+          })
+          .select('id')
+          .single();
 
-      if (deleteError) {
-        throw new Error(`Error al eliminar datos existentes: ${deleteError.message}`);
+        if (createError || !created) {
+          throw new Error(`Error al crear el inventario: ${createError?.message || 'desconocido'}`);
+        }
+
+        targetInventoryId = created.id;
+      } else {
+        // Reemplazo dentro del inventario abierto: se borra SOLO la familia importada
+        setProgress(3);
+        const { data: existingRefs, error: refsError } = await supabase
+          .from('inventory_master')
+          .select('referencia')
+          .eq('inventory_id', targetInventoryId)
+          .in('material_type', typesInImport);
+
+        if (refsError) {
+          throw new Error(`Error al consultar referencias existentes: ${refsError.message}`);
+        }
+
+        const refsToDelete = (existingRefs || []).map((r) => r.referencia);
+
+        setProgress(6);
+        const LOC_BATCH = 200;
+        for (let i = 0; i < refsToDelete.length; i += LOC_BATCH) {
+          const chunk = refsToDelete.slice(i, i + LOC_BATCH);
+          const { error: locDeleteError } = await supabase
+            .from('locations')
+            .delete()
+            .eq('inventory_id', targetInventoryId)
+            .in('master_reference', chunk);
+          if (locDeleteError) {
+            throw new Error(`Error al eliminar ubicaciones: ${locDeleteError.message}`);
+          }
+        }
+
+        setProgress(10);
+        const { error: deleteError } = await supabase
+          .from('inventory_master')
+          .delete()
+          .eq('inventory_id', targetInventoryId)
+          .in('material_type', typesInImport);
+
+        if (deleteError) {
+          throw new Error(`Error al eliminar datos existentes: ${deleteError.message}`);
+        }
       }
 
       // Step 3: Insert in batches of 500
@@ -416,7 +488,7 @@ const MasterDataImport: React.FC = () => {
         const batch = batches[i];
         const { error: insertError } = await supabase
           .from('inventory_master')
-          .insert(batch as any);
+          .insert(batch.map((row) => ({ ...row, inventory_id: targetInventoryId })) as any);
 
         if (insertError) {
           throw new Error(`Error al insertar lote ${i + 1}: ${insertError.message}`);
@@ -428,9 +500,17 @@ const MasterDataImport: React.FC = () => {
       setProgress(100);
       setState('success');
 
+      await refetchInventories();
+      if (importMode === 'new') {
+        setSelectedInventoryId(targetInventoryId);
+      }
+
       toast({
         title: 'Importación exitosa',
-        description: `Se importaron ${combinedData.length} referencias correctamente`,
+        description:
+          importMode === 'new'
+            ? `Inventario "${newInventoryName.trim()}" creado con ${combinedData.length} referencias`
+            : `Se importaron ${combinedData.length} referencias correctamente`,
       });
 
       // Reset after success
@@ -507,6 +587,67 @@ const MasterDataImport: React.FC = () => {
             <Trash2 className="w-4 h-4 mr-2" />
             Limpiar
           </Button>
+        )}
+      </div>
+
+      {/* Modo de importación */}
+      <div className="p-4 rounded-lg border border-border bg-muted/30 space-y-4">
+        <div>
+          <p className="font-medium text-foreground">¿Dónde se carga esta maestra?</p>
+          <p className="text-sm text-muted-foreground">
+            Inventario abierto actual: <strong>{inventory?.nombre || '—'}</strong>
+          </p>
+        </div>
+
+        <RadioGroup
+          value={importMode}
+          onValueChange={(v) => setImportMode(v as 'replace' | 'new')}
+          className="space-y-2"
+          disabled={state === 'importing'}
+        >
+          <div className="flex items-start gap-3">
+            <RadioGroupItem value="replace" id="mode-replace" className="mt-1" />
+            <Label htmlFor="mode-replace" className="font-normal cursor-pointer">
+              <span className="font-medium">Cargar sobre el inventario abierto</span>
+              <span className="block text-sm text-muted-foreground">
+                Reemplaza únicamente las familias que subas (MP, PP o PT) dentro de este inventario. Las demás no se tocan.
+              </span>
+            </Label>
+          </div>
+          <div className="flex items-start gap-3">
+            <RadioGroupItem value="new" id="mode-new" className="mt-1" />
+            <Label htmlFor="mode-new" className="font-normal cursor-pointer">
+              <span className="font-medium">Crear un inventario nuevo</span>
+              <span className="block text-sm text-muted-foreground">
+                No borra nada. El inventario actual se cierra y queda como histórico de solo lectura.
+              </span>
+            </Label>
+          </div>
+        </RadioGroup>
+
+        {importMode === 'new' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+            <div className="space-y-1">
+              <Label htmlFor="new-inv-name">Nombre del inventario</Label>
+              <Input
+                id="new-inv-name"
+                placeholder="Ej: Semestral 2026-2"
+                value={newInventoryName}
+                onChange={(e) => setNewInventoryName(e.target.value)}
+                disabled={state === 'importing'}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="new-inv-date">Fecha de inicio</Label>
+              <Input
+                id="new-inv-date"
+                type="date"
+                value={newInventoryDate}
+                onChange={(e) => setNewInventoryDate(e.target.value)}
+                disabled={state === 'importing'}
+              />
+            </div>
+          </div>
         )}
       </div>
 
@@ -752,8 +893,11 @@ const MasterDataImport: React.FC = () => {
             <AlertDialogDescription asChild>
               <div className="space-y-4 text-left">
                 <p className="text-foreground font-medium">
-                  Se reemplazará solo la familia: <strong>{typesInImport.join(', ')}</strong>. Esta acción eliminará permanentemente los datos existentes de esa(s) familia(s):
+                  Dentro del inventario <strong>{inventory?.nombre || '—'}</strong> se reemplazará solo la familia:{' '}
+                  <strong>{typesInImport.join(', ')}</strong>. Esta acción eliminará permanentemente los datos
+                  existentes de esa(s) familia(s) en ESTE inventario. Los inventarios históricos no se tocan.
                 </p>
+
                 
                 <ul className="space-y-2 text-sm">
                   {activeCheck?.hasLocations && (

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useInventory } from '@/contexts/InventoryContext';
+import ReadOnlyBanner from '@/components/shared/ReadOnlyBanner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -111,6 +113,7 @@ const GestionUbicacion: React.FC = () => {
 
   // Use cached supervisors hook
   const { data: supervisors } = useSupervisors();
+  const { inventoryId } = useInventory();
 
   const hasActiveFilters = filterTipo !== 'all' || filterSubcategoria || filterUbicacion || filterObservacion || filterSupervisor !== 'all';
 
@@ -125,7 +128,7 @@ const GestionUbicacion: React.FC = () => {
 
   // OPTIMIZED QUERY: Start from locations with JOIN to inventory_master, server-side filtering
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['admin-inventory', profile?.id, role, searchTerm, currentPage, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor],
+    queryKey: ['admin-inventory', profile?.id, role, searchTerm, currentPage, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, inventoryId],
     queryFn: async () => {
       // Single query starting from locations with inner join to inventory_master
       let query = supabase
@@ -142,7 +145,8 @@ const GestionUbicacion: React.FC = () => {
           assigned_supervisor_id,
           assigned_admin_id,
           inventory_master!inner(referencia, material_type, control)
-        `, { count: 'exact' });
+        `, { count: 'exact' })
+        .eq('inventory_id', inventoryId!);
 
       // Role-based filtering
       if (!isSuperadmin && isAdminMP) {
@@ -334,6 +338,9 @@ const GestionUbicacion: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <div className="px-4 sm:px-6 lg:px-8 pt-4">
+        <ReadOnlyBanner />
+      </div>
       {/* Header */}
       <header className="border-b border-border bg-card">
         <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
