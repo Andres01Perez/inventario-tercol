@@ -72,13 +72,14 @@ const UnifiedDashboard: React.FC = () => {
 
   // Fetch statistics with optimized staleTime for concurrent users
   const { data: stats } = useQuery({
-    queryKey: ['unified-stats', profile?.id, role],
+    queryKey: ['unified-stats', profile?.id, role, inventoryId],
     staleTime: 30 * 1000, // 30 seconds - reduce unnecessary refetches
     queryFn: async () => {
       if (role === 'supervisor') {
         const { data: locations } = await supabase
           .from('locations')
           .select('id, status_c1, status_c2')
+          .eq('inventory_id', inventoryId!)
           .eq('assigned_supervisor_id', profile!.id);
         
         const pendingC1 = (locations || []).filter(l => l.status_c1 !== 'contado').length;
@@ -93,7 +94,10 @@ const UnifiedDashboard: React.FC = () => {
 
       if (role === 'admin_mp' || role === 'admin_pp') {
         const isAdminMP = role === 'admin_mp';
-        let refQuery = supabase.from('inventory_master').select('referencia', { count: 'exact', head: true });
+        let refQuery = supabase
+          .from('inventory_master')
+          .select('referencia', { count: 'exact', head: true })
+          .eq('inventory_id', inventoryId!);
         if (isAdminMP) {
           refQuery = refQuery.not('control', 'is', null);
         } else {
@@ -104,6 +108,7 @@ const UnifiedDashboard: React.FC = () => {
         const { data: locationsWithSupervisors } = await supabase
           .from('locations')
           .select('assigned_supervisor_id, inventory_master!inner(control)')
+          .eq('inventory_id', inventoryId!)
           .not('assigned_supervisor_id', 'is', null);
         
         const relevantLocations = locationsWithSupervisors?.filter(l => {
@@ -114,7 +119,8 @@ const UnifiedDashboard: React.FC = () => {
 
         const { count: locationsCount } = await supabase
           .from('locations')
-          .select('id', { count: 'exact', head: true });
+          .select('id', { count: 'exact', head: true })
+          .eq('inventory_id', inventoryId!);
 
         return {
           referencias: refCount || 0,
@@ -131,11 +137,13 @@ const UnifiedDashboard: React.FC = () => {
 
       const { count: referencesCount } = await supabase
         .from('inventory_master')
-        .select('referencia', { count: 'exact', head: true });
+        .select('referencia', { count: 'exact', head: true })
+        .eq('inventory_id', inventoryId!);
 
       const { count: locationsCount } = await supabase
         .from('locations')
-        .select('id', { count: 'exact', head: true });
+        .select('id', { count: 'exact', head: true })
+        .eq('inventory_id', inventoryId!);
 
       const { count: operariosCount } = await supabase
         .from('operarios')
@@ -145,6 +153,7 @@ const UnifiedDashboard: React.FC = () => {
       const { count: criticosCount } = await supabase
         .from('inventory_master')
         .select('referencia', { count: 'exact', head: true })
+        .eq('inventory_id', inventoryId!)
         .eq('audit_round', 5);
 
       return {
@@ -155,8 +164,9 @@ const UnifiedDashboard: React.FC = () => {
         criticos: criticosCount || 0,
       };
     },
-    enabled: !!profile?.id,
+    enabled: !!profile?.id && !!inventoryId,
   });
+
 
   // Stats display based on role
   const statsDisplay = useMemo(() => {
