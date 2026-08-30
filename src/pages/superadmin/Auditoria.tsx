@@ -844,6 +844,7 @@ const Auditoria: React.FC = () => {
   return (
     <AppLayout title="Auditoría General" showBackButton>
       <div className="space-y-4">
+        <ReadOnlyBanner />
         {/* Filters */}
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="relative flex-1">
