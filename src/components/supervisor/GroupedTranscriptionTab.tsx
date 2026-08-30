@@ -97,6 +97,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
   controlFilter = 'all',
 }) => {
   const { user, profile, role } = useAuth();
+  const { inventoryId, isReadOnly } = useInventory();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const [quantities, setQuantities] = useState<Record<string, string>>({});
