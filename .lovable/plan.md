@@ -1,53 +1,74 @@
-# Por qué no salen las referencias al poner ubicaciones
+# Corregir el mapeo de columnas de PP en la importación de maestra
 
-Hay **dos cosas distintas** pasando. Una es un dato faltante, la otra es un error de diseño de la pantalla.
+## Qué encontré
 
-## 1. Hoy la maestra está vacía en la base de datos
+Comparé los dos archivos que subiste y la base de datos. El problema es real y está identificado: **los encabezados de PP cambiaron de nombre y el importador no los reconoce**, así que guarda las 1.771 referencias pero con todas las cantidades vacías.
 
-Consulté la base directamente:
+### Encabezados reales de los archivos
 
-```text
-Inventario           Estado    Referencias   Ubicaciones
-Semestral 2026-1     abierto   0             0
-```
+| Archivo | Encabezados |
+|---|---|
+| MP.xlsx (780 filas) | Referencia, Control, `Cant.Alm`, `Cant.PLd`, `Cant.PLr`, Cant.ZA, Cant.ProvD, Cant.ProvR, Cant.T |
+| PP.xlsx (1.771 filas) | Referencia, Control, `C.Alm`, `C.PLd`, `C.PLr`, Cant.ZA, `Proveedor`, `C.Total` |
 
-No hay ningún otro inventario. Es decir, en este momento **no hay referencias cargadas** en el inventario activo (esta mañana sí había 780 MP y 1.771 PP; hoy la tabla quedó en cero). Sin referencias en la maestra, ninguna pantalla puede mostrarlas.
+### Lo que el importador espera hoy para PP
 
-Primer paso, antes de tocar código: volver a importar MP y PP desde `/superadmin/importar` sobre el inventario abierto y confirmar que las tarjetas muestran 780 / 1.771. Si al terminar vuelven a quedar en cero, eso es un bug de importación aparte y lo atacamos con logs de esa operación.
+| Columna en el Excel PP | Nombre que espera el importador | ¿Coincide? | Campo destino |
+|---|---|---|---|
+| C.Alm | `Cant.Alm` / `Can.Alm` | No | cant_alm_pp |
+| C.PLd | `Cant.PLd` | No | cant_pld |
+| C.PLr | `Cant.PLr` | No | cant_plr |
+| Proveedor | `Cant.Prov` | No | cant_prov_pp |
+| C.Total | `Cant.Total` | No | cant_total_pp |
+| Cant.ZA | `Cant.ZA` | Sí | cant_za |
+| Control | `Control` | Sí | control |
 
-## 2. Aunque la maestra esté cargada, la pantalla no muestra referencias sin ubicación
+### Estado actual en la base (confirma el diagnóstico)
 
-Esto no es adrede, es una limitación real del código actual. Tanto `Gestión de Ubicación` como `Gestión de Responsables` arrancan la consulta desde la tabla `locations` con un cruce obligatorio a la maestra:
+| Tipo | Referencias | Con Cant.Alm | Con Cant.PLd | Con Cant.PLr |
+|---|---|---|---|---|
+| MP | 780 | 780 | 780 | 780 |
+| PP | 1.771 | **0** | **0** | **0** |
 
-```text
-locations  ──(inner join)──►  inventory_master
-```
+MP quedó bien; PP quedó con todas las cantidades en nulo. Con eso, cualquier referencia PP compararía contra un ERP de 0 tanto en almacén como en planta, lo que rompería toda la validación de la Fase 3.
 
-Como una referencia recién importada **todavía no tiene ninguna ubicación**, no aparece en la lista. Y como no aparece, no hay dónde pulsar "agregar ubicación". Resultado: la única forma de crear ubicaciones hoy es el import de Excel. Es un círculo cerrado.
+## Cambios a realizar
 
-## Qué se va a cambiar
+### 1. Ampliar el mapeo de PP (`src/lib/masterDataParser.ts`)
 
-### Gestión de Ubicación
-- La consulta pasa a arrancar desde `inventory_master` (con los mismos filtros de rol: Admin MP solo referencias con control, Admin PP todas) y a traer sus ubicaciones asociadas.
-- Las referencias sin ubicación se muestran igual, con una fila marcada como "Sin ubicaciones" y el botón para crear la primera.
-- Los filtros por subcategoría, ubicación, punto de referencia y supervisor siguen funcionando; cuando se usa uno de esos filtros solo se listan referencias que sí tienen ubicaciones (es lo esperado).
-- Se conserva la paginación y el conteo total, ahora contando referencias en vez de filas de ubicación.
+Agregar los alias reales, conservando los antiguos para archivos viejos:
 
-### Gestión de Responsables
-- Mismo cambio de origen de datos, para que se pueda asignar supervisor a una referencia recién creada.
+| Alias nuevo | Campo |
+|---|---|
+| `c.alm` | cant_alm_pp |
+| `c.pld` | cant_pld |
+| `c.plr` | cant_plr |
+| `proveedor` | cant_prov_pp |
+| `c.total` | cant_total_pp |
 
-### Creación manual de ubicación
-- Al crear la ubicación se guarda explícitamente el inventario activo y el admin dueño (`assigned_admin_id`), que es lo que define si la ubicación es de **almacén** (Admin MP) o de **planta** (Admin PP) para la validación de la Fase 3.
-- Si un superadmin crea la ubicación, se pide a qué bodega pertenece, porque el superadmin no define bodega por sí mismo y una ubicación sin bodega bloquea el cierre de la referencia.
+También se agregan alias equivalentes en MP (`c.alm`, `c.pld`, `c.plr`) por si el ERP exporta MP con la misma abreviatura en el futuro.
+
+### 2. Aviso cuando una columna clave no se reconoce
+
+Hoy el importador no dice nada si una columna no cruza: simplemente guarda nulos. Se agrega una advertencia visible en la vista previa del tipo:
+
+> "Columnas no reconocidas y omitidas: C.Alm, C.PLd, C.PLr, Proveedor, C.Total"
+
+y, si faltan las cantidades de almacén o planta, un aviso destacado de que ese archivo quedaría sin cantidades ERP. Así este error nunca vuelve a pasar en silencio.
+
+### 3. Re-importar PP
+
+Después del cambio hay que volver a usar "Reemplazar PP" con el mismo archivo. La vista previa debe mostrar cantidades distintas de cero (por ejemplo AESTRIADAT: almacén 18.397, planta 3.719,40, total 22.116,40).
 
 ## Verificación
 
-- Con la maestra cargada, abrir Gestión de Ubicación con una referencia nueva y confirmar que aparece con "Sin ubicaciones".
-- Crear una ubicación manual y confirmar que queda con inventario y admin correctos, y que después aparece en el conteo C1.
+- Parseo del PP.xlsx real en pruebas: comprobar que las 1.771 filas traen `cant_alm_pp`, `cant_pld`, `cant_plr` y `cant_total_pp`.
+- Después de re-importar, consultar la base y confirmar que las 1.771 filas PP tienen cantidades y que el total ERP por bodega cuadra con el Excel.
 - Typecheck y build.
 
 ## Notas técnicas
 
-- Archivos: `src/pages/admin/GestionUbicacion.tsx` (consulta principal, `addLocationMutation`), `src/pages/admin/GestionResponsables.tsx` (consulta principal).
-- Se pasa de `from('locations').select('..., inventory_master!inner(...)')` a `from('inventory_master').select('..., locations(...)')` con paginación por referencia y filtros server-side equivalentes.
-- Sin cambios de base de datos: `locations.inventory_id` ya tiene default al inventario activo y las políticas RLS actuales ya permiten a los admins insertar sus ubicaciones.
+- Archivo único a modificar: `src/lib/masterDataParser.ts` (`PP_COLUMN_MAP`, `MP_COLUMN_MAP`, y el bloque de warnings en `parseExcelFile`).
+- El separador decimal español (`18.397,00`) ya lo maneja bien `parseNumber`, no se toca.
+- PT se deja como está; ese mapeo se hará más adelante.
+- Nota aparte: los archivos de hoy no traen `Costo.U` ni `Costo.T`, así que los costos quedan en nulo. Eso no afecta el conteo, pero sí dejaría en cero cualquier descuadre en valor ($). Confirmar si esas columnas deben venir en el archivo.
