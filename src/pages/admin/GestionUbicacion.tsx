@@ -128,129 +128,121 @@ const GestionUbicacion: React.FC = () => {
     setCurrentPage(1);
   };
 
-  // OPTIMIZED QUERY: Start from locations with JOIN to inventory_master, server-side filtering
+  // Query from inventory_master so references without any location are still visible.
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['admin-inventory', profile?.id, role, searchTerm, currentPage, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, inventoryId],
     queryFn: async () => {
-      // Single query starting from locations with inner join to inventory_master
+      const hasLocationFilter = filterSubcategoria || filterUbicacion || filterObservacion || filterSupervisor !== 'all';
+      const locationRelation = hasLocationFilter ? 'locations!inner' : 'locations';
+
       let query = supabase
-        .from('locations')
+        .from('inventory_master')
         .select(`
-          id,
-          master_reference,
-          subcategoria,
-          observaciones,
-          location_name,
-          location_detail,
-          punto_referencia,
-          metodo_conteo,
-          assigned_supervisor_id,
-          assigned_admin_id,
-          inventory_master!inner(referencia, material_type, control)
+          referencia,
+          material_type,
+          control,
+          ${locationRelation}(
+            id,
+            master_reference,
+            subcategoria,
+            observaciones,
+            location_name,
+            location_detail,
+            punto_referencia,
+            metodo_conteo,
+            assigned_supervisor_id,
+            assigned_admin_id
+          )
         `, { count: 'exact' })
         .eq('inventory_id', inventoryId!);
 
-      // Role-based filtering
+      // Role-based filtering on the reference bucket
       if (!isSuperadmin && isAdminMP) {
-        query = query.not('inventory_master.control', 'is', null);
+        query = query.not('control', 'is', null).eq('material_type', 'MP');
       }
-
-      // Admins solo ven sus propias ubicaciones
-      if (!isSuperadmin && profile?.id) {
-        query = query.eq('assigned_admin_id', profile.id);
+      if (!isSuperadmin && isAdminPP) {
+        query = query.eq('material_type', 'PP');
       }
 
       // Filter by material type
       if (filterTipo === 'MP' || filterTipo === 'PP') {
-        query = query.eq('inventory_master.material_type', filterTipo);
+        query = query.eq('material_type', filterTipo);
       }
 
       // Search by reference - server side
       if (searchTerm) {
-        query = query.ilike('master_reference', `%${searchTerm}%`);
+        query = query.ilike('referencia', `%${searchTerm}%`);
       }
 
-      // Filter by subcategoria - server side
+      // Location-specific filters (only apply when there is at least one matching location)
       if (filterSubcategoria) {
-        query = query.ilike('subcategoria', `%${filterSubcategoria}%`);
+        query = query.ilike('locations.subcategoria', `%${filterSubcategoria}%`);
       }
-
-      // Filter by location name - server side
       if (filterUbicacion) {
-        query = query.ilike('location_name', `%${filterUbicacion}%`);
+        query = query.ilike('locations.location_name', `%${filterUbicacion}%`);
       }
-
-      // Filter by observaciones - server side
       if (filterObservacion) {
-        query = query.ilike('observaciones', `%${filterObservacion}%`);
+        query = query.ilike('locations.observaciones', `%${filterObservacion}%`);
       }
-
-      // Filter by supervisor - server side
       if (filterSupervisor !== 'all') {
-        query = query.eq('assigned_supervisor_id', filterSupervisor);
+        query = query.eq('locations.assigned_supervisor_id', filterSupervisor);
       }
 
       // Pagination
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       query = query
-        .order('master_reference')
+        .order('referencia')
         .range(from, from + ITEMS_PER_PAGE - 1);
 
-      const { data: locationsData, error, count } = await query;
+      const { data: masterData, error, count } = await query;
       if (error) throw error;
 
-      if (!locationsData || locationsData.length === 0) {
+      if (!masterData || masterData.length === 0) {
         return { rows: [], total: count || 0 };
       }
 
-      // Group locations by master_reference for display
-      const groupedByRef = new Map<string, { inv: any; locations: LocationData[] }>();
-      
-      locationsData.forEach((loc: any) => {
-        const ref = loc.master_reference;
-        if (!groupedByRef.has(ref)) {
-          groupedByRef.set(ref, {
-            inv: {
-              referencia: loc.inventory_master.referencia,
-              material_type: loc.inventory_master.material_type,
-              control: loc.inventory_master.control
-            },
-            locations: []
-          });
-        }
-        groupedByRef.get(ref)!.locations.push({
-          id: loc.id,
-          master_reference: loc.master_reference,
-          subcategoria: loc.subcategoria,
-          observaciones: loc.observaciones,
-          location_name: loc.location_name,
-          location_detail: loc.location_detail,
-          punto_referencia: loc.punto_referencia,
-          metodo_conteo: loc.metodo_conteo,
-          assigned_supervisor_id: loc.assigned_supervisor_id,
-          assigned_admin_id: loc.assigned_admin_id
-        });
-      });
-
-      // Build rows: one per location
+      // Build rows: one per location, plus a "no locations" row when needed.
       const rows: LocationRow[] = [];
-      
-      groupedByRef.forEach(({ inv, locations }) => {
-        locations.forEach((loc, index) => {
+
+      masterData.forEach((inv: any) => {
+        const referencia = inv.referencia as string;
+        const material_type = inv.material_type as 'MP' | 'PP';
+        const control = inv.control as string | null;
+        const allLocations: LocationData[] = (inv.locations || []) as LocationData[];
+
+        // Non-superadmin admins only see locations assigned to them (defensive).
+        const visibleLocations = isSuperadmin
+          ? allLocations
+          : allLocations.filter((loc) => !loc.assigned_admin_id || loc.assigned_admin_id === profile?.id);
+
+        if (visibleLocations.length === 0) {
           rows.push({
-            referencia: inv.referencia,
-            material_type: inv.material_type as 'MP' | 'PP',
-            control: inv.control,
+            referencia,
+            material_type,
+            control,
+            location: null,
+            isFirstOfGroup: true,
+            groupSize: 0,
+            hasNoLocations: true,
+          });
+          return;
+        }
+
+        visibleLocations.forEach((loc, index) => {
+          rows.push({
+            referencia,
+            material_type,
+            control,
             location: loc,
             isFirstOfGroup: index === 0,
-            groupSize: locations.length
+            groupSize: visibleLocations.length,
           });
         });
       });
 
       return { rows, total: count || 0 };
     },
-    enabled: !!role,
+    enabled: !!role && !!inventoryId,
   });
 
   // Update existing location
