@@ -470,6 +470,9 @@ const UnifiedDashboard: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-4">
+              <div className="hidden md:block">
+                <InventorySelector />
+              </div>
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-foreground">{profile?.full_name || 'Usuario'}</p>
                 <p className="text-xs text-muted-foreground">{profile?.email}</p>
