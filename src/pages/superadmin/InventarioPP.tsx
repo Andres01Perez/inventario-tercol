@@ -3,11 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useInventory } from '@/contexts/InventoryContext';
 import ReadOnlyBanner from '@/components/shared/ReadOnlyBanner';
+import AppLayout from '@/components/layout/AppLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { 
   Boxes, 
-  ArrowLeft, 
   Search, 
   RefreshCw,
   AlertCircle,
@@ -120,37 +120,17 @@ const InventarioPP: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                <Boxes className="w-5 h-5 text-emerald-500" />
-              </div>
-              <div>
-                <h1 className="text-lg font-bold text-foreground">Inventario Producto en Proceso</h1>
-                <p className="text-xs text-muted-foreground">CRUD completo - Doble clic para editar</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium text-foreground">{profile?.full_name}</p>
-                <p className="text-xs text-muted-foreground">Superadmin</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+    <AppLayout
+      title="Inventario Producto en Proceso"
+      subtitle="CRUD completo - Doble clic para editar"
+      showBackButton
+      backPath="/dashboard"
+      fullWidth
+    >
 
       {/* Controls */}
-      <div className="border-b border-border bg-card/50 px-4 sm:px-6 lg:px-8 py-4">
-        <div className="max-w-full mx-auto flex items-center gap-4">
+      <div className="border border-border rounded-xl bg-card/50 px-4 py-4 mb-6">
+        <div className="flex items-center gap-4 flex-wrap">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -182,7 +162,7 @@ const InventarioPP: React.FC = () => {
       </div>
 
       {/* Table */}
-      <main className="px-4 sm:px-6 lg:px-8 py-6">
+      <main>
         <ReadOnlyBanner />
         <div className="bg-card rounded-lg border border-border overflow-hidden">
           {isLoading ? (
@@ -268,7 +248,7 @@ const InventarioPP: React.FC = () => {
           )}
         </div>
       </main>
-    </div>
+    </AppLayout>
   );
 };
 
