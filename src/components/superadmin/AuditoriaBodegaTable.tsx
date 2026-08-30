@@ -433,7 +433,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
 
       const { error: masterError } = await supabase
         .from('inventory_master')
-        .update({ [statusColumn]: 'auditado' })
+        .update(bodega === 'almacen' ? { status_alm: 'auditado' } : { status_pl: 'auditado' })
         .eq('inventory_id', inventoryId!)
         .eq('referencia', selectedReference.referencia);
       if (masterError) throw masterError;
@@ -473,7 +473,9 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
 
       const { error: masterError } = await supabase
         .from('inventory_master')
-        .update({ [statusColumn]: 'cerrado_forzado', count_history: newHistory })
+        .update(bodega === 'almacen'
+          ? { status_alm: 'cerrado_forzado', count_history: newHistory }
+          : { status_pl: 'cerrado_forzado', count_history: newHistory })
         .eq('inventory_id', inventoryId!)
         .eq('referencia', selectedReference.referencia);
       if (masterError) throw masterError;
