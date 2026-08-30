@@ -65,6 +65,7 @@ interface LocationWithReference {
 
 const GestionResponsables: React.FC = () => {
   const { profile, role } = useAuth();
+  const { inventoryId } = useInventory();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
