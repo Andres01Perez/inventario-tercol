@@ -24,10 +24,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { useInventory } from '@/contexts/InventoryContext';
+import InventorySelector from '@/components/shared/InventorySelector';
+import ReadOnlyBanner from '@/components/shared/ReadOnlyBanner';
 
 const UnifiedDashboard: React.FC = () => {
   const { profile, role, signOut } = useAuth();
+  const { inventoryId, isReadOnly } = useInventory();
   const navigate = useNavigate();
+
 
   // Role-based configuration
   const roleConfig = useMemo(() => {
