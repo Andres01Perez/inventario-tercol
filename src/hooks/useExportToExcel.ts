@@ -173,19 +173,26 @@ export function useExportToExcel() {
       const batchSize = 100;
       for (let i = 0; i < refs.length; i += batchSize) {
         const batchRefs = refs.slice(i, i + batchSize);
-        let query = supabase
-          .from('locations')
-          .select('id, master_reference, location_name, location_detail, subcategoria')
-          .eq('inventory_id', inventoryId!)
-          .in('master_reference', batchRefs);
+        // Paginación interna: un lote de referencias puede tener más de 1000 ubicaciones
+        let from = 0;
+        while (true) {
+          let query = supabase
+            .from('locations')
+            .select('id, master_reference, location_name, location_detail, subcategoria')
+            .eq('inventory_id', inventoryId!)
+            .in('master_reference', batchRefs);
 
-        if (filters?.location && filters.location !== 'all') {
-          query = query.eq('location_name', filters.location);
+          if (filters?.location && filters.location !== 'all') {
+            query = query.eq('location_name', filters.location);
+          }
+
+          const { data, error } = await query.order('id').range(from, from + 999);
+          if (error) throw error;
+          if (!data || data.length === 0) break;
+          allLocations.push(...data);
+          if (data.length < 1000) break;
+          from += 1000;
         }
-
-        const { data, error } = await query;
-        if (error) throw error;
-        if (data) allLocations.push(...data);
       }
 
       // 3. Fetch all counts
