@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useInventory } from '@/contexts/InventoryContext';
+import ReadOnlyBanner from '@/components/shared/ReadOnlyBanner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -119,12 +121,13 @@ const GestionResponsables: React.FC = () => {
 
   // OPTIMIZED: Use RPC function for filter options (single efficient query)
   const { data: filterOptions } = useQuery({
-    queryKey: ['filter-options-rpc', role],
+    queryKey: ['filter-options-rpc', role, inventoryId],
     queryFn: async () => {
       // Use optimized SQL function that returns only distinct values
       const materialType = isAdminMP ? 'MP' : isAdminPP ? 'PP' : null;
       const { data, error } = await supabase.rpc('get_filter_options', {
-        _material_type: materialType
+        _material_type: materialType,
+        _inventory_id: inventoryId!,
       });
       
       if (error) {
@@ -132,7 +135,8 @@ const GestionResponsables: React.FC = () => {
         // Fallback to direct query if RPC fails
         const { data: fallbackData } = await supabase
           .from('locations')
-          .select('subcategoria, location_name, observaciones, punto_referencia');
+          .select('subcategoria, location_name, observaciones, punto_referencia')
+          .eq('inventory_id', inventoryId!);
         
         const subcategorias = new Set<string>();
         const ubicaciones = new Set<string>();
@@ -171,12 +175,12 @@ const GestionResponsables: React.FC = () => {
     },
     staleTime: 10 * 60 * 1000, // 10 minutes - filter options don't change often
     gcTime: 30 * 60 * 1000,    // Keep in cache for 30 minutes
-    enabled: !!role,
+    enabled: !!role && !!inventoryId,
   });
 
   // OPTIMIZED QUERY: Start from locations with JOIN to inventory_master
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['locations-responsables', role, debouncedSearchTerm, currentPage, pageSize, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, filterPuntoReferencia],
+    queryKey: ['locations-responsables', role, debouncedSearchTerm, currentPage, pageSize, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, filterPuntoReferencia, inventoryId],
     queryFn: async () => {
       // Single query starting from locations with inner join to inventory_master
       let query = supabase
@@ -192,7 +196,8 @@ const GestionResponsables: React.FC = () => {
           metodo_conteo,
           assigned_supervisor_id,
           inventory_master!inner(material_type, control)
-        `, { count: 'exact' });
+        `, { count: 'exact' })
+        .eq('inventory_id', inventoryId!);
 
       // Superadmin ve todo, admin_mp solo ve referencias con control NOT NULL
       // admin_pp ve TODAS las referencias para poder agregarles ubicaciones
