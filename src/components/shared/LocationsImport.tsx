@@ -50,7 +50,7 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
   const [progress, setProgress] = useState(0);
   const [importStats, setImportStats] = useState({ created: 0, updated: 0, skipped: 0 });
   const { toast } = useToast();
-  const { profile } = useAuth();
+  
   const { inventoryId } = useInventory();
 
   const resolveBodegaAdmins = async (locations: ParsedLocation[]): Promise<{ almacen?: string; planta?: string }> => {
