@@ -316,6 +316,30 @@ export function parseExcelFile(file: File, type: MaterialType): Promise<ParseRes
           result.warnings.push(`${convertedToNullCount} valores no numéricos ignorados`);
         }
 
+        // Avisar de columnas del Excel que no se reconocieron (evita cargas silenciosas en blanco)
+        const unmapped = originalColumns.filter(
+          (col) => !columnMap[normalizeColumnName(col)]
+        );
+        if (unmapped.length > 0) {
+          result.warnings.push(`Columnas no reconocidas y omitidas: ${unmapped.join(', ')}`);
+        }
+
+        // Avisar si el archivo quedaría sin cantidades ERP de almacén o planta
+        if (type !== 'PT') {
+          const almField = type === 'MP' ? 'cant_alm_mp' : 'cant_alm_pp';
+          const missingErp: string[] = [];
+          if (!result.data.some((r) => r[almField] !== null)) missingErp.push('almacén (Cant.Alm / C.Alm)');
+          if (!result.data.some((r) => r.cant_pld !== null || r.cant_plr !== null)) {
+            missingErp.push('planta (Cant.PLd + Cant.PLr / C.PLd + C.PLr)');
+          }
+          if (missingErp.length > 0) {
+            result.errors.push(
+              `El archivo no trae cantidades ERP de ${missingErp.join(' ni ')}. Revisa los encabezados antes de importar: la comparación contra el conteo quedaría en cero.`
+            );
+          }
+        }
+
+
         resolve(result);
       } catch (error) {
         resolve({
