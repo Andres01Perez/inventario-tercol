@@ -146,6 +146,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
           assigned_supervisor_id,
           inventory_master!inner(referencia, material_type, control, audit_round)
         `)
+        .eq('inventory_id', inventoryId!)
         .eq('inventory_master.audit_round', masterAuditRound)
         .eq(statusColumn, 'pendiente')
         .range(from, from + PAGE_SIZE - 1);
