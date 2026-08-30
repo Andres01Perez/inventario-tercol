@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AuditoriaBodegaTable from '@/components/superadmin/AuditoriaBodegaTable';
 
 const AuditoriaPlanta: React.FC = () => (
-  <AppLayout title="Auditoría Planta" subtitle="Referencias con ubicaciones de planta" showBackButton backPath="/superadmin/auditoria">
+  <AppLayout title="Auditoría Planta" subtitle="Referencias con ubicaciones de planta" showBackButton backPath="/dashboard">
     <div className="space-y-4">
       <ReadOnlyBanner />
       <Tabs defaultValue="MP">
