@@ -624,7 +624,7 @@ const MasterDataImport: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold text-foreground">Importar Maestra</h2>
           <p className="text-muted-foreground">
-            Carga los archivos de Materia Prima, Producto Proceso y Producto Terminado (solo se reemplaza la familia importada)
+            Reemplaza familias de maestra en el inventario activo o crea un inventario nuevo
           </p>
         </div>
         {(mpFile || ppFile || ptFile) && state !== 'importing' && (
