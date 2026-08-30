@@ -361,6 +361,13 @@ const MasterDataImport: React.FC = () => {
     return () => { cancelled = true; };
   }, [inventoryId, hasOpenInventory, importMode]);
 
+  // Al cambiar a modo nuevo inventario se oculta la selección de familia
+  useEffect(() => {
+    if (importMode === 'new') {
+      setSelectedFamily(null);
+    }
+  }, [importMode]);
+
   const checkActiveInventory = async (): Promise<ActiveInventoryCheck> => {
     // Check locations count
     const { count: locationsCount } = await supabase
