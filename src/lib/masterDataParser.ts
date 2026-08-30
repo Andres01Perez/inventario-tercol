@@ -42,12 +42,19 @@ const MP_COLUMN_MAP: Record<string, keyof ParsedRow> = {
   'costo.u': 'costo_u_mp',
   'costou': 'costo_u_mp',
   'cant.alm': 'cant_alm_mp',
+  'c.alm': 'cant_alm_mp',
   'cant.pld': 'cant_pld',
+  'c.pld': 'cant_pld',
   'cant.plr': 'cant_plr',
+  'c.plr': 'cant_plr',
   'cant.za': 'cant_za',
+  'c.za': 'cant_za',
   'cant.provd': 'cant_prov_d',
+  'c.provd': 'cant_prov_d',
   'cant.provr': 'cant_prov_r',
+  'c.provr': 'cant_prov_r',
   'cant.t': 'cant_t_mp',
+  'c.total': 'cant_t_mp',
   'costo.t': 'costo_t',
 };
 
@@ -62,13 +69,20 @@ const PP_COLUMN_MAP: Record<string, keyof ParsedRow> = {
   'costou': 'costo_u_pp',
   'can.alm': 'cant_alm_pp',
   'cant.alm': 'cant_alm_pp',
+  'c.alm': 'cant_alm_pp',
   'cant.pld': 'cant_pld',
+  'c.pld': 'cant_pld',
   'cant.plr': 'cant_plr',
+  'c.plr': 'cant_plr',
   'cant.za': 'cant_za',
+  'c.za': 'cant_za',
   'cant.prov': 'cant_prov_pp',
+  'proveedor': 'cant_prov_pp',
   'cant.total': 'cant_total_pp',
+  'c.total': 'cant_total_pp',
   'costo.t': 'costo_t',
 };
+
 
 // Column mapping for PT file (skeleton — columnas específicas se agregarán después)
 const PT_COLUMN_MAP: Record<string, keyof ParsedRow> = {
