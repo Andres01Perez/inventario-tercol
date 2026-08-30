@@ -44,11 +44,45 @@ export type Database = {
         }
         Relationships: []
       }
+      inventories: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          fecha_cierre: string | null
+          fecha_inicio: string
+          id: string
+          nombre: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          fecha_cierre?: string | null
+          fecha_inicio?: string
+          id?: string
+          nombre: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          fecha_cierre?: string | null
+          fecha_inicio?: string
+          id?: string
+          nombre?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       inventory_counts: {
         Row: {
           audit_round: number
           created_at: string | null
           id: string
+          inventory_id: string
           location_id: string | null
           quantity_counted: number
           supervisor_id: string | null
@@ -58,6 +92,7 @@ export type Database = {
           audit_round?: number
           created_at?: string | null
           id?: string
+          inventory_id?: string
           location_id?: string | null
           quantity_counted: number
           supervisor_id?: string | null
@@ -67,12 +102,20 @@ export type Database = {
           audit_round?: number
           created_at?: string | null
           id?: string
+          inventory_id?: string
           location_id?: string | null
           quantity_counted?: number
           supervisor_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "inventory_counts_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "inventory_counts_location_id_fkey"
             columns: ["location_id"]
@@ -110,6 +153,7 @@ export type Database = {
           costo_u_pp: number | null
           count_history: Json | null
           created_at: string | null
+          inventory_id: string
           material_type: Database["public"]["Enums"]["material_type"]
           mo_costo: number | null
           mp_costo: number | null
@@ -138,6 +182,7 @@ export type Database = {
           costo_u_pp?: number | null
           count_history?: Json | null
           created_at?: string | null
+          inventory_id?: string
           material_type: Database["public"]["Enums"]["material_type"]
           mo_costo?: number | null
           mp_costo?: number | null
@@ -166,6 +211,7 @@ export type Database = {
           costo_u_pp?: number | null
           count_history?: Json | null
           created_at?: string | null
+          inventory_id?: string
           material_type?: Database["public"]["Enums"]["material_type"]
           mo_costo?: number | null
           mp_costo?: number | null
@@ -175,6 +221,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "inventory_master_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "inventory_master_status_slug_fkey"
             columns: ["status_slug"]
@@ -191,6 +244,7 @@ export type Database = {
           created_at: string | null
           discovered_at_round: number | null
           id: string
+          inventory_id: string
           location_detail: string | null
           location_name: string | null
           master_reference: string
@@ -212,6 +266,7 @@ export type Database = {
           created_at?: string | null
           discovered_at_round?: number | null
           id?: string
+          inventory_id?: string
           location_detail?: string | null
           location_name?: string | null
           master_reference: string
@@ -233,6 +288,7 @@ export type Database = {
           created_at?: string | null
           discovered_at_round?: number | null
           id?: string
+          inventory_id?: string
           location_detail?: string | null
           location_name?: string | null
           master_reference?: string
@@ -257,11 +313,18 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "count_tasks_master_reference_fkey"
-            columns: ["master_reference"]
+            foreignKeyName: "locations_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "locations_master_reference_fkey"
+            columns: ["inventory_id", "master_reference"]
             isOneToOne: false
             referencedRelation: "inventory_master"
-            referencedColumns: ["referencia"]
+            referencedColumns: ["inventory_id", "referencia"]
           },
         ]
       }
@@ -354,11 +417,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      admin_can_access_reference: {
-        Args: { _reference: string; _user_id: string }
-        Returns: boolean
-      }
-      get_filter_options: { Args: { _material_type?: string }; Returns: Json }
+      admin_can_access_reference:
+        | { Args: { _reference: string; _user_id: string }; Returns: boolean }
+        | {
+            Args: {
+              _inventory_id?: string
+              _reference: string
+              _user_id: string
+            }
+            Returns: boolean
+          }
+      get_active_inventory: { Args: never; Returns: string }
+      get_filter_options:
+        | { Args: { _material_type?: string }; Returns: Json }
+        | {
+            Args: { _inventory_id?: string; _material_type?: string }
+            Returns: Json
+          }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -379,7 +454,7 @@ export type Database = {
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       validate_and_close_round: {
-        Args: { _admin_id: string; _reference: string }
+        Args: { _admin_id: string; _inventory_id?: string; _reference: string }
         Returns: Json
       }
     }
