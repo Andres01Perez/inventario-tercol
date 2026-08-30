@@ -108,6 +108,17 @@ export const parseLocationsExcel = async (file: File): Promise<LocationsParseRes
         return;
       }
 
+      // Validar bodega (campo obligatorio: Almacén o Planta)
+      const bodegaNormalized = bodegaRaw ? normalizeColumnName(bodegaRaw) : '';
+      let bodega: Bodega | null = null;
+      if (bodegaNormalized === 'almacen') bodega = 'almacen';
+      else if (bodegaNormalized === 'planta') bodega = 'planta';
+      if (!bodega) {
+        errors.push(`Fila ${rowNumber}: Bodega vacía o inválida (use "Almacén" o "Planta")`);
+        return;
+      }
+
+
       // Detectar duplicados dentro del archivo (referencia + ubicación detallada + punto referencia)
       const comboKey = `${referencia.toLowerCase()}|${(ubicacionDetallada || '').toLowerCase()}|${(puntoReferencia || '').toLowerCase()}`;
       if (seenCombos.has(comboKey)) {
