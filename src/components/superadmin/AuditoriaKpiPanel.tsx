@@ -48,7 +48,8 @@ interface RefAgg {
   round: number;
   costo: number | null;
   descuadre: number;
-  descuadreValor: number;
+  descuadreValor: number | null;
+  hasValidation: boolean;
   sinCosto: boolean;
   conteosHechos: number;
   conteosRequeridos: number;
@@ -78,6 +79,7 @@ interface Aggregates {
   byFamily: { familia: string; erp: number; validado: number; descuadre: number; valor: number }[];
   descuadreUnd: number;
   descuadreValor: number;
+  hasAnyValidation: boolean;
   faltante: number;
   sobrante: number;
   auditadas: number;
@@ -256,7 +258,8 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
             round,
             costo,
             descuadre: 0,
-            descuadreValor: 0,
+            descuadreValor: null,
+            hasValidation: false,
             sinCosto: !costo,
             conteosHechos: 0,
             conteosRequeridos: 0,
@@ -270,10 +273,12 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
 
       const refs = [...byRef.values()].map((r) => {
         const descuadre = r.validado - r.erp;
+        const hasValidation = r.validado !== 0;
         return {
           ...r,
           descuadre,
-          descuadreValor: descuadre * (r.costo ?? 0),
+          hasValidation,
+          descuadreValor: hasValidation ? descuadre * (r.costo ?? 0) : null,
         };
       });
 
@@ -301,17 +306,17 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
         roundCounts.set(roundKey, (roundCounts.get(roundKey) || 0) + 1);
         if (closed) auditadas += 1;
         descuadreUnd += r.descuadre;
-        descuadreValor += r.descuadreValor;
+        if (r.hasValidation) descuadreValor += r.descuadreValor ?? 0;
         if (r.descuadre < 0) faltante += r.descuadre;
         if (r.descuadre > 0) sobrante += r.descuadre;
-        if (r.sinCosto && r.descuadre !== 0) refsSinCosto += 1;
+        if (r.sinCosto && r.descuadre !== 0 && r.hasValidation) refsSinCosto += 1;
 
         const fam = r.materialType || 'N/A';
         const f = familyMap.get(fam) || { erp: 0, validado: 0, descuadre: 0, valor: 0 };
         f.erp += r.erp;
         f.validado += r.validado;
         f.descuadre += r.descuadre;
-        f.valor += r.descuadreValor;
+        if (r.hasValidation) f.valor += r.descuadreValor ?? 0;
         familyMap.set(fam, f);
       });
 
@@ -360,6 +365,7 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
           .map(([f, v]) => ({ familia: f, ...v })),
         descuadreUnd,
         descuadreValor,
+        hasAnyValidation: refs.some((r) => r.hasValidation),
         faltante,
         sobrante,
         auditadas,
@@ -399,8 +405,8 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
   const topDescuadres = useMemo(
     () =>
       (data?.refs ?? [])
-        .filter((r) => r.descuadre !== 0)
-        .sort((a, b) => Math.abs(b.descuadreValor) - Math.abs(a.descuadreValor) || Math.abs(b.descuadre) - Math.abs(a.descuadre))
+        .filter((r) => r.hasValidation && r.descuadre !== 0)
+        .sort((a, b) => Math.abs(b.descuadreValor ?? 0) - Math.abs(a.descuadreValor ?? 0) || Math.abs(b.descuadre) - Math.abs(a.descuadre))
         .slice(0, 10),
     [data],
   );
@@ -457,9 +463,11 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
     },
     {
       label: 'Descuadre ($)',
-      value: money(data.descuadreValor),
-      hint: data.refsSinCosto > 0 ? `${data.refsSinCosto} refs sin costo cargado` : 'Costos cargados',
-      danger: data.descuadreValor !== 0,
+      value: data.hasAnyValidation ? money(data.descuadreValor) : '—',
+      hint: data.hasAnyValidation
+        ? (data.refsSinCosto > 0 ? `${data.refsSinCosto} refs sin costo cargado` : 'Costos cargados')
+        : 'Sin validaciones consolidadas',
+      danger: data.hasAnyValidation && data.descuadreValor !== 0,
     },
   ];
 
@@ -585,7 +593,9 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
                   <TableCell className="text-right">{nf.format(f.erp)}</TableCell>
                   <TableCell className="text-right">{nf.format(f.validado)}</TableCell>
                   <TableCell className={`text-right ${f.descuadre !== 0 ? 'text-destructive font-medium' : ''}`}>{signed(f.descuadre)}</TableCell>
-                  <TableCell className={`text-right ${f.valor !== 0 ? 'text-destructive font-medium' : ''}`}>{money(f.valor)}</TableCell>
+                  <TableCell className={`text-right ${f.validado !== 0 && f.valor !== 0 ? 'text-destructive font-medium' : ''}`}>
+                    {f.validado === 0 ? '—' : money(f.valor)}
+                  </TableCell>
                 </TableRow>
               ))}
               {data.byFamily.length > 0 && (
@@ -594,7 +604,7 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
                   <TableCell className="text-right">{nf.format(data.byFamily.reduce((a, f) => a + f.erp, 0))}</TableCell>
                   <TableCell className="text-right">{nf.format(data.byFamily.reduce((a, f) => a + f.validado, 0))}</TableCell>
                   <TableCell className="text-right">{signed(data.descuadreUnd)}</TableCell>
-                  <TableCell className="text-right">{money(data.descuadreValor)}</TableCell>
+                  <TableCell className="text-right">{data.hasAnyValidation ? money(data.descuadreValor) : '—'}</TableCell>
                 </TableRow>
               )}
               {data.byFamily.length === 0 && (
@@ -640,7 +650,7 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
                     <TableCell className="text-right">{nf.format(r.validado)}</TableCell>
                     <TableCell className="text-right text-destructive font-medium">{signed(r.descuadre)}</TableCell>
                     <TableCell className="text-right text-destructive font-medium">
-                      {r.sinCosto ? 'Sin costo' : money(r.descuadreValor)}
+                      {r.sinCosto ? 'Sin costo' : money(r.descuadreValor ?? 0)}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={meta.badge}>{meta.label}</Badge>
