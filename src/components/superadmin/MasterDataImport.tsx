@@ -727,7 +727,7 @@ const MasterDataImport: React.FC = () => {
             <Label htmlFor="mode-replace" className="font-normal cursor-pointer">
               <span className="font-medium">Reemplazar familias del inventario abierto</span>
               <span className="block text-sm text-muted-foreground">
-                Solo se borra y vuelve a cargar la familia que elijas (MP, PP o PT). Las demás familias y los inventarios históricos no se tocan.
+                Solo se borra y vuelve a cargar la familia que elijas (MP o PP). La otra familia, la maestra PT y los inventarios históricos no se tocan.
               </span>
             </Label>
           </div>
