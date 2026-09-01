@@ -872,6 +872,22 @@ export type Database = {
       }
       is_superadmin: { Args: { _user_id: string }; Returns: boolean }
       location_bodega: { Args: { _assigned_admin_id: string }; Returns: string }
+      pt_upsert_validated_count: {
+        Args: {
+          _inventory_id: string
+          _location_id: string
+          _quantity: number
+          _reason: string
+          _referencia: string
+          _round: number
+          _validated_by: string
+        }
+        Returns: undefined
+      }
+      pt_validate_and_close_round: {
+        Args: { _inventory_id: string; _referencia: string; _user_id: string }
+        Returns: Json
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       upsert_validated_count: {
