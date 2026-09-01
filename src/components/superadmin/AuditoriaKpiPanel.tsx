@@ -126,10 +126,12 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
         bodega_status: string | null;
         bodega_round: number | null;
         activo: boolean | null;
+        discovered_at_round: number | null;
       }>((from, to) => {
         let q = supabase
           .from('locations_bodega_view')
-          .select('id, master_reference, material_type, bodega_erp, bodega_status, bodega_round, activo')
+          .select('id, master_reference, material_type, bodega_erp, bodega_status, bodega_round, activo, discovered_at_round')
+
           .eq('inventory_id', inventoryId!)
           .eq('bodega', bodega)
           .order('id')
