@@ -557,6 +557,24 @@ const GestionResponsables: React.FC = () => {
             </Select>
           </div>
 
+          {/* Bodega filter (solo superadmin) */}
+          {isSuperadmin && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Bodega:</span>
+              <Select value={filterBodega} onValueChange={(value) => { setFilterBodega(value); setCurrentPage(1); }}>
+                <SelectTrigger className="w-[140px] h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="almacen">Almacén</SelectItem>
+                  <SelectItem value="planta">Planta</SelectItem>
+                  <SelectItem value="sin-bodega">Sin bodega</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Subcategoría filter */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Subcategoría:</span>
@@ -729,6 +747,7 @@ const GestionResponsables: React.FC = () => {
                       />
                     </TableHead>
                     <TableHead className="w-[80px]">Tipo</TableHead>
+                    {isSuperadmin && <TableHead className="w-[110px]">Bodega</TableHead>}
                     <TableHead className="w-[150px]">Referencia</TableHead>
                     <TableHead>Subcategoría</TableHead>
                     <TableHead>Observaciones</TableHead>
