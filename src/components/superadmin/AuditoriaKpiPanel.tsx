@@ -306,17 +306,17 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
         roundCounts.set(roundKey, (roundCounts.get(roundKey) || 0) + 1);
         if (closed) auditadas += 1;
         descuadreUnd += r.descuadre;
-        descuadreValor += r.descuadreValor;
+        if (r.hasValidation) descuadreValor += r.descuadreValor ?? 0;
         if (r.descuadre < 0) faltante += r.descuadre;
         if (r.descuadre > 0) sobrante += r.descuadre;
-        if (r.sinCosto && r.descuadre !== 0) refsSinCosto += 1;
+        if (r.sinCosto && r.descuadre !== 0 && r.hasValidation) refsSinCosto += 1;
 
         const fam = r.materialType || 'N/A';
         const f = familyMap.get(fam) || { erp: 0, validado: 0, descuadre: 0, valor: 0 };
         f.erp += r.erp;
         f.validado += r.validado;
         f.descuadre += r.descuadre;
-        f.valor += r.descuadreValor;
+        if (r.hasValidation) f.valor += r.descuadreValor ?? 0;
         familyMap.set(fam, f);
       });
 
