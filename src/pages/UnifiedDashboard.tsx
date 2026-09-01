@@ -385,6 +385,7 @@ const UnifiedDashboard: React.FC = () => {
         actions: [
           baseActions.inventarioMP,
           baseActions.inventarioPP,
+          baseActions.dashboardAuditoria,
           baseActions.auditoriaAlmacen,
           baseActions.auditoriaPlanta,
           baseActions.exportarConteos,
