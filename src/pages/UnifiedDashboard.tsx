@@ -395,6 +395,19 @@ const UnifiedDashboard: React.FC = () => {
       });
     }
 
+    // 4. PRODUCTO TERMINADO (solo superadmin)
+    if (role === 'superadmin') {
+      categories.push({
+        name: 'Producto Terminado',
+        icon: Package,
+        actions: [
+          baseActions.ptMaestra,
+          baseActions.ptUbicaciones,
+          baseActions.ptResponsables,
+        ]
+      });
+    }
+
     // 4. OPERACIÓN (todos los roles)
     const operacionActions: ActionItem[] = [];
     
