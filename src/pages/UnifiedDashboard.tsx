@@ -18,6 +18,7 @@ import {
   FileSpreadsheet,
   AlertCircle,
   FileSearch,
+  LayoutDashboard,
   Download,
   Printer
 } from 'lucide-react';
