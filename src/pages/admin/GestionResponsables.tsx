@@ -49,6 +49,8 @@ import {
 
 const PAGE_SIZE_OPTIONS = [50, 100, 250, 500];
 
+type Bodega = 'almacen' | 'planta';
+
 interface LocationWithReference {
   kind: 'location';
   id: string;
@@ -60,6 +62,8 @@ interface LocationWithReference {
   punto_referencia: string | null;
   metodo_conteo: string | null;
   assigned_supervisor_id: string | null;
+  assigned_admin_id: string | null;
+  bodega: Bodega | null;
   material_type: 'MP' | 'PP';
   control: string | null;
 }
@@ -93,6 +97,7 @@ const GestionResponsables: React.FC = () => {
   const [filterObservacion, setFilterObservacion] = useState('');
   const [filterSupervisor, setFilterSupervisor] = useState<string>('all');
   const [filterPuntoReferencia, setFilterPuntoReferencia] = useState<string>('all');
+  const [filterBodega, setFilterBodega] = useState<string>('all');
   const [pageSize, setPageSize] = useState(500);
 
   const isSuperadmin = role === 'superadmin';
@@ -113,13 +118,14 @@ const GestionResponsables: React.FC = () => {
   // Clear selection when filters change
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [debouncedSearchTerm, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, filterPuntoReferencia, currentPage, pageSize]);
+  }, [debouncedSearchTerm, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, filterPuntoReferencia, filterBodega, currentPage, pageSize]);
 
   // Use cached supervisors hook
   const { data: supervisors } = useSupervisors();
 
   // Map material type to the admin that owns the bucket (MP → admin_mp, PP → admin_pp)
-  const { data: adminMap } = useQuery({
+  // and resolve the bodega of every location from its assigned_admin_id.
+  const { data: adminBodega } = useQuery({
     queryKey: ['admin-bodega-map'],
     queryFn: async () => {
       const { data: roles, error } = await supabase
@@ -127,15 +133,23 @@ const GestionResponsables: React.FC = () => {
         .select('user_id, role')
         .in('role', ['admin_mp', 'admin_pp']);
       if (error) throw error;
-      const map = new Map<string, string>();
-      roles?.forEach((r) => map.set(r.role, r.user_id));
-      return map;
+      const byRole = new Map<string, string>();
+      const byUser = new Map<string, Bodega>();
+      const mpIds: string[] = [];
+      const ppIds: string[] = [];
+      roles?.forEach((r) => {
+        if (!byRole.has(r.role)) byRole.set(r.role, r.user_id);
+        const bodega: Bodega = r.role === 'admin_mp' ? 'almacen' : 'planta';
+        byUser.set(r.user_id, bodega);
+        (r.role === 'admin_mp' ? mpIds : ppIds).push(r.user_id);
+      });
+      return { byRole, byUser, mpIds, ppIds };
     },
     staleTime: 5 * 60 * 1000,
     enabled: !!role,
   });
 
-  const hasActiveFilters = filterTipo !== 'all' || filterSubcategoria || filterUbicacion || filterObservacion || filterSupervisor !== 'all' || filterPuntoReferencia !== 'all';
+  const hasActiveFilters = filterTipo !== 'all' || filterSubcategoria || filterUbicacion || filterObservacion || filterSupervisor !== 'all' || filterPuntoReferencia !== 'all' || filterBodega !== 'all';
 
   const clearFilters = () => {
     setFilterTipo('all');
@@ -144,6 +158,7 @@ const GestionResponsables: React.FC = () => {
     setFilterObservacion('');
     setFilterSupervisor('all');
     setFilterPuntoReferencia('all');
+    setFilterBodega('all');
     setCurrentPage(1);
   };
 
@@ -208,9 +223,9 @@ const GestionResponsables: React.FC = () => {
 
   // Query from inventory_master so references without locations are visible.
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['locations-responsables', role, debouncedSearchTerm, currentPage, pageSize, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, filterPuntoReferencia, inventoryId],
+    queryKey: ['locations-responsables', role, debouncedSearchTerm, currentPage, pageSize, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, filterPuntoReferencia, filterBodega, inventoryId, adminBodega?.mpIds.join(','), adminBodega?.ppIds.join(',')],
     queryFn: async () => {
-      const hasLocationFilter = filterSubcategoria || filterUbicacion || filterObservacion || filterSupervisor !== 'all' || filterPuntoReferencia !== 'all';
+      const hasLocationFilter = filterSubcategoria || filterUbicacion || filterObservacion || filterSupervisor !== 'all' || filterPuntoReferencia !== 'all' || filterBodega !== 'all';
       const locationRelation = hasLocationFilter ? 'locations!inner' : 'locations';
 
       let query = supabase
@@ -279,6 +294,26 @@ const GestionResponsables: React.FC = () => {
         query = query.ilike('locations.punto_referencia', `%${filterPuntoReferencia}%`);
       }
 
+      // Filter by bodega (derived from the location's admin role)
+      if (filterBodega !== 'all') {
+        const mpIds = adminBodega?.mpIds ?? [];
+        const ppIds = adminBodega?.ppIds ?? [];
+        if (filterBodega === 'almacen') {
+          query = mpIds.length > 0
+            ? query.in('locations.assigned_admin_id', mpIds)
+            : query.is('locations.assigned_admin_id', null).eq('locations.assigned_admin_id', '00000000-0000-0000-0000-000000000000');
+        } else if (filterBodega === 'planta') {
+          query = ppIds.length > 0
+            ? query.in('locations.assigned_admin_id', ppIds)
+            : query.is('locations.assigned_admin_id', null).eq('locations.assigned_admin_id', '00000000-0000-0000-0000-000000000000');
+        } else if (filterBodega === 'sin-bodega') {
+          const allIds = [...mpIds, ...ppIds];
+          query = allIds.length > 0
+            ? query.or(`assigned_admin_id.is.null,assigned_admin_id.not.in.(${allIds.join(',')})`, { referencedTable: 'locations' })
+            : query;
+        }
+      }
+
       // Pagination
       const from = (currentPage - 1) * pageSize;
       query = query
@@ -307,6 +342,7 @@ const GestionResponsables: React.FC = () => {
         }
 
         visibleLocations.forEach((loc: any) => {
+          const adminId = (loc.assigned_admin_id as string | null) ?? null;
           rows.push({
             kind: 'location',
             id: loc.id,
@@ -318,6 +354,8 @@ const GestionResponsables: React.FC = () => {
             punto_referencia: loc.punto_referencia,
             metodo_conteo: loc.metodo_conteo,
             assigned_supervisor_id: loc.assigned_supervisor_id,
+            assigned_admin_id: adminId,
+            bodega: adminId ? adminBodega?.byUser.get(adminId) ?? null : null,
             material_type,
             control,
           });
@@ -413,7 +451,7 @@ const GestionResponsables: React.FC = () => {
       if (!inventoryId) throw new Error('No hay inventario activo');
       const targetRole = materialType === 'MP' ? 'admin_mp' : 'admin_pp';
       const assignedAdminId = isSuperadmin
-        ? adminMap?.get(targetRole)
+        ? adminBodega?.byRole.get(targetRole)
         : profile?.id;
       if (!assignedAdminId) throw new Error(`No hay un admin configurado para ${targetRole}`);
 
@@ -518,6 +556,24 @@ const GestionResponsables: React.FC = () => {
               </SelectContent>
             </Select>
           </div>
+
+          {/* Bodega filter (solo superadmin) */}
+          {isSuperadmin && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Bodega:</span>
+              <Select value={filterBodega} onValueChange={(value) => { setFilterBodega(value); setCurrentPage(1); }}>
+                <SelectTrigger className="w-[140px] h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="almacen">Almacén</SelectItem>
+                  <SelectItem value="planta">Planta</SelectItem>
+                  <SelectItem value="sin-bodega">Sin bodega</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Subcategoría filter */}
           <div className="flex items-center gap-2">
@@ -691,6 +747,7 @@ const GestionResponsables: React.FC = () => {
                       />
                     </TableHead>
                     <TableHead className="w-[80px]">Tipo</TableHead>
+                    {isSuperadmin && <TableHead className="w-[110px]">Bodega</TableHead>}
                     <TableHead className="w-[150px]">Referencia</TableHead>
                     <TableHead>Subcategoría</TableHead>
                     <TableHead>Observaciones</TableHead>
@@ -720,6 +777,11 @@ const GestionResponsables: React.FC = () => {
                               {row.material_type}
                             </Badge>
                           </TableCell>
+                          {isSuperadmin && (
+                            <TableCell>
+                              <span className="text-muted-foreground text-sm">—</span>
+                            </TableCell>
+                          )}
                           <TableCell className="font-mono text-sm">{row.master_reference}</TableCell>
                           <TableCell colSpan={6} className="text-muted-foreground text-sm italic">
                             Sin ubicaciones asignadas
@@ -756,6 +818,23 @@ const GestionResponsables: React.FC = () => {
                             {row.material_type}
                           </Badge>
                         </TableCell>
+                        {isSuperadmin && (
+                          <TableCell>
+                            {row.bodega === 'almacen' ? (
+                              <Badge variant="outline" className="border-orange-500 text-orange-500">Almacén</Badge>
+                            ) : row.bodega === 'planta' ? (
+                              <Badge variant="outline" className="border-emerald-500 text-emerald-500">Planta</Badge>
+                            ) : (
+                              <Badge
+                                variant="outline"
+                                className="text-muted-foreground"
+                                title="La ubicación no tiene admin de bodega asignado"
+                              >
+                                Sin bodega
+                              </Badge>
+                            )}
+                          </TableCell>
+                        )}
                         <TableCell className="font-mono text-sm">{row.master_reference}</TableCell>
                         <TableCell className="text-sm">{row.subcategoria || '-'}</TableCell>
                         <TableCell className="text-sm max-w-[200px] truncate" title={row.observaciones || ''}>
