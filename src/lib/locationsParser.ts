@@ -11,6 +11,8 @@ export interface ParsedLocation {
   location_detail: string | null;
   punto_referencia: string | null;
   metodo_conteo: string | null;
+  activo: boolean;
+  terminado: boolean;
   rowNumber: number;
 }
 
