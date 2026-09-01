@@ -272,10 +272,12 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
 
       const refs = [...byRef.values()].map((r) => {
         const descuadre = r.validado - r.erp;
+        const hasValidation = r.validado !== 0;
         return {
           ...r,
           descuadre,
-          descuadreValor: descuadre * (r.costo ?? 0),
+          hasValidation,
+          descuadreValor: hasValidation ? descuadre * (r.costo ?? 0) : null,
         };
       });
 
