@@ -593,7 +593,9 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
                   <TableCell className="text-right">{nf.format(f.erp)}</TableCell>
                   <TableCell className="text-right">{nf.format(f.validado)}</TableCell>
                   <TableCell className={`text-right ${f.descuadre !== 0 ? 'text-destructive font-medium' : ''}`}>{signed(f.descuadre)}</TableCell>
-                  <TableCell className={`text-right ${f.valor !== 0 ? 'text-destructive font-medium' : ''}`}>{money(f.valor)}</TableCell>
+                  <TableCell className={`text-right ${f.validado !== 0 && f.valor !== 0 ? 'text-destructive font-medium' : ''}`}>
+                    {f.validado === 0 ? '—' : money(f.valor)}
+                  </TableCell>
                 </TableRow>
               ))}
               {data.byFamily.length > 0 && (
@@ -602,7 +604,7 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
                   <TableCell className="text-right">{nf.format(data.byFamily.reduce((a, f) => a + f.erp, 0))}</TableCell>
                   <TableCell className="text-right">{nf.format(data.byFamily.reduce((a, f) => a + f.validado, 0))}</TableCell>
                   <TableCell className="text-right">{signed(data.descuadreUnd)}</TableCell>
-                  <TableCell className="text-right">{money(data.descuadreValor)}</TableCell>
+                  <TableCell className="text-right">{data.hasAnyValidation ? money(data.descuadreValor) : '—'}</TableCell>
                 </TableRow>
               )}
               {data.byFamily.length === 0 && (
