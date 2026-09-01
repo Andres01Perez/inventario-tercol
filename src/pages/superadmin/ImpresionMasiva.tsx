@@ -17,9 +17,11 @@ import {
 } from '@/components/ui/select';
 import { Loader2, Printer, MapPin } from 'lucide-react';
 import BulkPrintableSheets, {
+  printBulkSheets,
   BulkLocationItem,
   BulkPrintGroup,
 } from '@/components/supervisor/BulkPrintableSheets';
+
 
 const BATCH = 1000;
 
