@@ -365,6 +365,7 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
           .map(([f, v]) => ({ familia: f, ...v })),
         descuadreUnd,
         descuadreValor,
+        hasAnyValidation: refs.some((r) => r.hasValidation),
         faltante,
         sobrante,
         auditadas,
