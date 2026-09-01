@@ -189,7 +189,9 @@ export const generateLocationsTemplate = (): void => {
       Ubicación: 'ESTANTE-1',
       'Ubicación Detallada': 'Nivel 3',
       'Punto Referencia': 'Puerta principal',
-      'Método Conteo': 'Manual'
+      'Método Conteo': 'Manual',
+      Activo: 'SI',
+      Terminado: 'NO'
     },
     {
       Referencia: 'REF-001',
@@ -199,7 +201,9 @@ export const generateLocationsTemplate = (): void => {
       Ubicación: 'ESTANTE-2',
       'Ubicación Detallada': 'Nivel 1',
       'Punto Referencia': 'Pasillo 2',
-      'Método Conteo': 'Conteo rápido'
+      'Método Conteo': 'Conteo rápido',
+      Activo: 'SI',
+      Terminado: 'SI'
     },
     {
       Referencia: 'REF-002',
@@ -209,7 +213,9 @@ export const generateLocationsTemplate = (): void => {
       Ubicación: 'BODEGA-3',
       'Ubicación Detallada': '',
       'Punto Referencia': '',
-      'Método Conteo': 'Báscula'
+      'Método Conteo': 'Báscula',
+      Activo: 'NO',
+      Terminado: 'NO'
     },
   ];
 
@@ -225,6 +231,8 @@ export const generateLocationsTemplate = (): void => {
     { wch: 20 }, // Ubicación Detallada
     { wch: 18 }, // Punto Referencia
     { wch: 15 }, // Método Conteo
+    { wch: 8 },  // Activo
+    { wch: 10 }, // Terminado
   ];
   
   const workbook = XLSX.utils.book_new();
