@@ -478,6 +478,7 @@ export type Database = {
     Views: {
       locations_bodega_view: {
         Row: {
+          activo: boolean | null
           assigned_admin_id: string | null
           assigned_supervisor_id: string | null
           bodega: string | null
@@ -502,6 +503,7 @@ export type Database = {
           status_c3: string | null
           status_c4: string | null
           subcategoria: string | null
+          terminado: boolean | null
           updated_at: string | null
           validated_at_round: number | null
           validated_quantity: number | null
