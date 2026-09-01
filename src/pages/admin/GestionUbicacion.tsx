@@ -69,6 +69,8 @@ interface LocationData {
   location_detail: string | null;
   punto_referencia: string | null;
   metodo_conteo: string | null;
+  activo: boolean | null;
+  terminado: boolean | null;
   assigned_supervisor_id: string | null;
   assigned_admin_id: string | null;
 }
@@ -150,6 +152,8 @@ const GestionUbicacion: React.FC = () => {
             location_detail,
             punto_referencia,
             metodo_conteo,
+            activo,
+            terminado,
             assigned_supervisor_id,
             assigned_admin_id
           )
