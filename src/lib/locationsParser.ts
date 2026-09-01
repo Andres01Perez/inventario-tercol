@@ -48,6 +48,18 @@ const findColumnValue = (row: Record<string, unknown>, possibleNames: string[]):
 };
 
 /**
+ * Interpreta un valor SI/NO. Devuelve null si no se reconoce.
+ */
+const parseBooleanFlag = (raw: string | undefined): boolean | null => {
+  if (raw === undefined || raw === '') return null;
+  const v = normalizeColumnName(raw);
+  if (['si', 'sí', 's', 'true', '1', 'x', 'verdadero'].includes(v)) return true;
+  if (['no', 'n', 'false', '0', 'falso'].includes(v)) return false;
+  return null;
+};
+
+
+/**
  * Parsea un archivo Excel de ubicaciones
  * Columnas esperadas: Referencia, Subcategoría, Observaciones, Ubicación, Ubicación Detallada, Punto Referencia, Método Conteo
  */
