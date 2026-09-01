@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Upload, 
   FileSpreadsheet, 
@@ -290,6 +291,7 @@ const formatNumber = (value: number | null | undefined): string => {
 
 const MasterDataImport: React.FC = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { inventoryId, inventory, isReadOnly, refetchInventories, setSelectedInventoryId } = useInventory();
 
   // Modo de importación: reemplazar dentro del inventario abierto o crear uno nuevo
@@ -309,11 +311,9 @@ const MasterDataImport: React.FC = () => {
   
   const [mpFile, setMpFile] = useState<File | null>(null);
   const [ppFile, setPpFile] = useState<File | null>(null);
-  const [ptFile, setPtFile] = useState<File | null>(null);
-  
+
   const [mpResult, setMpResult] = useState<ParseResult | null>(null);
   const [ppResult, setPpResult] = useState<ParseResult | null>(null);
-  const [ptResult, setPtResult] = useState<ParseResult | null>(null);
   
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [combinedData, setCombinedData] = useState<ParsedRow[]>([]);
@@ -334,21 +334,27 @@ const MasterDataImport: React.FC = () => {
     const fetchCounts = async () => {
       setFamilyCountsLoading(true);
       try {
-        const families: MaterialType[] = ['MP', 'PP', 'PT'];
-        const results = await Promise.all(
-          families.map((family) =>
+        const families: Array<'MP' | 'PP'> = ['MP', 'PP'];
+        const results = await Promise.all([
+          ...families.map((family) =>
             supabase
               .from('inventory_master')
               .select('*', { count: 'exact', head: true })
               .eq('inventory_id', inventoryId)
               .eq('material_type', family)
-          )
-        );
+          ),
+          // PT vive en su propia tabla (pt_master), fuera de inventory_master
+          supabase
+            .from('pt_master')
+            .select('*', { count: 'exact', head: true })
+            .eq('inventory_id', inventoryId),
+        ]);
 
         const counts = { MP: 0, PP: 0, PT: 0 };
         results.forEach((res, i) => {
           if (res.error) throw res.error;
-          counts[families[i]] = res.count ?? 0;
+          if (i < 2) counts[families[i]] = res.count ?? 0;
+          else counts.PT = res.count ?? 0;
         });
 
         if (!cancelled) setFamilyCounts(counts);
@@ -418,15 +424,10 @@ const MasterDataImport: React.FC = () => {
     };
   };
 
-  const recomputeCombined = (
-    mp: ParseResult | null,
-    pp: ParseResult | null,
-    pt: ParseResult | null
-  ) => {
+  const recomputeCombined = (mp: ParseResult | null, pp: ParseResult | null) => {
     const mpData = mp?.data || [];
     const ppData = pp?.data || [];
-    const ptData = pt?.data || [];
-    const total = mpData.length + ppData.length + ptData.length;
+    const total = mpData.length + ppData.length;
 
     if (total === 0) {
       setValidation(null);
@@ -435,14 +436,14 @@ const MasterDataImport: React.FC = () => {
       return;
     }
 
-    setValidation(validateCombinedData(mpData, ppData, ptData));
-    setCombinedData([...mpData, ...ppData, ...ptData]);
+    setValidation(validateCombinedData(mpData, ppData, []));
+    setCombinedData([...mpData, ...ppData]);
     setState('preview');
   };
 
-  const handleFileSelect = async (type: MaterialType, file: File | null) => {
-    const setFile = type === 'MP' ? setMpFile : type === 'PP' ? setPpFile : setPtFile;
-    const setResult = type === 'MP' ? setMpResult : type === 'PP' ? setPpResult : setPtResult;
+  const handleFileSelect = async (type: 'MP' | 'PP', file: File | null) => {
+    const setFile = type === 'MP' ? setMpFile : setPpFile;
+    const setResult = type === 'MP' ? setMpResult : setPpResult;
 
     setFile(file);
     setResult(null);
@@ -452,10 +453,7 @@ const MasterDataImport: React.FC = () => {
 
     if (!file) {
       // Recompute using remaining files
-      const nextMp = type === 'MP' ? null : mpResult;
-      const nextPp = type === 'PP' ? null : ppResult;
-      const nextPt = type === 'PT' ? null : ptResult;
-      recomputeCombined(nextMp, nextPp, nextPt);
+      recomputeCombined(type === 'MP' ? null : mpResult, type === 'PP' ? null : ppResult);
       return;
     }
 
@@ -463,15 +461,11 @@ const MasterDataImport: React.FC = () => {
     const result = await parseExcelFile(file, type);
     setResult(result);
 
-    const nextMp = type === 'MP' ? result : mpResult;
-    const nextPp = type === 'PP' ? result : ppResult;
-    const nextPt = type === 'PT' ? result : ptResult;
-    recomputeCombined(nextMp, nextPp, nextPt);
+    recomputeCombined(type === 'MP' ? result : mpResult, type === 'PP' ? result : ppResult);
   };
 
   const handleMpFileSelect = (file: File | null) => handleFileSelect('MP', file);
   const handlePpFileSelect = (file: File | null) => handleFileSelect('PP', file);
-  const handlePtFileSelect = (file: File | null) => handleFileSelect('PT', file);
 
   const handleImportClick = async () => {
     if (combinedData.length === 0) return;
@@ -647,10 +641,8 @@ const MasterDataImport: React.FC = () => {
       setTimeout(() => {
         setMpFile(null);
         setPpFile(null);
-        setPtFile(null);
         setMpResult(null);
         setPpResult(null);
-        setPtResult(null);
         setValidation(null);
         setCombinedData([]);
         setState('idle');
@@ -670,10 +662,8 @@ const MasterDataImport: React.FC = () => {
   const handleClear = () => {
     setMpFile(null);
     setPpFile(null);
-    setPtFile(null);
     setMpResult(null);
     setPpResult(null);
-    setPtResult(null);
     setValidation(null);
     setCombinedData([]);
     setState('idle');
@@ -682,18 +672,15 @@ const MasterDataImport: React.FC = () => {
 
   const mpCount = mpResult?.data.length || 0;
   const ppCount = ppResult?.data.length || 0;
-  const ptCount = ptResult?.data.length || 0;
-  const totalCount = mpCount + ppCount + ptCount;
+  const totalCount = mpCount + ppCount;
   const typesInImport: MaterialType[] = [
     ...(mpCount > 0 ? (['MP'] as const) : []),
     ...(ppCount > 0 ? (['PP'] as const) : []),
-    ...(ptCount > 0 ? (['PT'] as const) : []),
   ];
 
   const allWarnings = [
     ...(mpResult?.warnings || []),
     ...(ppResult?.warnings || []),
-    ...(ptResult?.warnings || []),
     ...(validation?.warnings || []),
   ];
 
@@ -712,7 +699,7 @@ const MasterDataImport: React.FC = () => {
             Reemplaza familias de maestra en el inventario activo o crea un inventario nuevo
           </p>
         </div>
-        {(mpFile || ppFile || ptFile) && state !== 'importing' && (
+        {(mpFile || ppFile) && state !== 'importing' && (
           <Button variant="outline" onClick={handleClear}>
             <Trash2 className="w-4 h-4 mr-2" />
             Limpiar
@@ -740,7 +727,7 @@ const MasterDataImport: React.FC = () => {
             <Label htmlFor="mode-replace" className="font-normal cursor-pointer">
               <span className="font-medium">Reemplazar familias del inventario abierto</span>
               <span className="block text-sm text-muted-foreground">
-                Solo se borra y vuelve a cargar la familia que elijas (MP, PP o PT). Las demás familias y los inventarios históricos no se tocan.
+                Solo se borra y vuelve a cargar la familia que elijas (MP o PP). La otra familia, la maestra PT y los inventarios históricos no se tocan.
               </span>
             </Label>
           </div>
@@ -805,16 +792,23 @@ const MasterDataImport: React.FC = () => {
               onClear={() => handlePpFileSelect(null)}
               disabled={state === 'importing' || familyCountsLoading}
             />
-            <FamilyReplaceButton
-              type="PT"
-              count={familyCounts.PT}
-              isSelected={selectedFamily === 'PT'}
-              hasFile={!!ptFile}
-              fileName={ptFile?.name}
-              onSelect={() => setSelectedFamily('PT')}
-              onClear={() => handlePtFileSelect(null)}
-              disabled={state === 'importing' || familyCountsLoading}
-            />
+            {/* PT tiene su propio módulo y maestra independiente */}
+            <button
+              type="button"
+              onClick={() => navigate('/pt/maestra')}
+              className="relative flex flex-col items-center text-center rounded-xl border-2 p-6 transition-all bg-amber-500/5 border-amber-500/30 hover:scale-[1.01] hover:border-amber-500 cursor-pointer"
+            >
+              <div className="p-4 rounded-full bg-amber-500/10 mb-4">
+                <Boxes className="w-8 h-8 text-amber-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-1">Producto Terminado (PT)</h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                {familyCounts.PT} referencia{familyCounts.PT !== 1 ? 's' : ''} cargada{familyCounts.PT !== 1 ? 's' : ''}
+              </p>
+              <span className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                Ir a Maestra PT
+              </span>
+            </button>
           </div>
 
           {selectedFamily && (
@@ -851,20 +845,11 @@ const MasterDataImport: React.FC = () => {
                   parseResult={ppResult}
                 />
               )}
-              {selectedFamily === 'PT' && (
-                <FileUploadZone
-                  type="PT"
-                  file={ptFile}
-                  onFileSelect={handlePtFileSelect}
-                  disabled={state === 'importing'}
-                  parseResult={ptResult}
-                />
-              )}
             </div>
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FileUploadZone
             type="MP"
             file={mpFile}
@@ -878,13 +863,6 @@ const MasterDataImport: React.FC = () => {
             onFileSelect={handlePpFileSelect}
             disabled={state === 'importing'}
             parseResult={ppResult}
-          />
-          <FileUploadZone
-            type="PT"
-            file={ptFile}
-            onFileSelect={handlePtFileSelect}
-            disabled={state === 'importing'}
-            parseResult={ptResult}
           />
         </div>
       )}
@@ -936,10 +914,6 @@ const MasterDataImport: React.FC = () => {
               <span className="text-muted-foreground">+</span>
               <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600">
                 {ppCount} PP
-              </Badge>
-              <span className="text-muted-foreground">+</span>
-              <Badge variant="secondary" className="bg-amber-500/10 text-amber-600">
-                {ptCount} PT
               </Badge>
               <span className="text-muted-foreground">=</span>
               <Badge variant="default">
