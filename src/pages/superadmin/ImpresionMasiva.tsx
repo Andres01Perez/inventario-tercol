@@ -17,9 +17,11 @@ import {
 } from '@/components/ui/select';
 import { Loader2, Printer, MapPin } from 'lucide-react';
 import BulkPrintableSheets, {
+  printBulkSheets,
   BulkLocationItem,
   BulkPrintGroup,
 } from '@/components/supervisor/BulkPrintableSheets';
+
 
 const BATCH = 1000;
 
@@ -224,14 +226,23 @@ const ImpresionMasiva: React.FC = () => {
                 Limpiar
               </Button>
               <Button
+                variant="outline"
                 size="sm"
                 onClick={() => setPrintOpen(true)}
+                disabled={!selectedGroups.length}
+              >
+                Vista previa
+              </Button>
+              <Button
+                size="sm"
+                onClick={printBulkSheets}
                 disabled={!selectedGroups.length}
               >
                 <Printer className="w-4 h-4 mr-2" />
                 Imprimir seleccionadas
               </Button>
             </div>
+
           </CardHeader>
           <CardContent>
             {isLoading ? (

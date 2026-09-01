@@ -363,9 +363,46 @@
     page-break-before: always;
   }
 
+  /* Bulk print root: única fuente de verdad al imprimir masivamente */
+  body:has(#bulk-print-root) > *:not(#bulk-print-root) {
+    display: none !important;
+  }
+
+  #bulk-print-root {
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  #bulk-print-root * {
+    visibility: visible !important;
+  }
+
+  .print-sheet {
+    break-after: page;
+    page-break-after: always;
+    break-inside: auto;
+  }
+
+  .print-sheet.print-sheet-last {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
   /* Page configuration */
   @page {
     size: letter landscape;
     margin: 1cm;
   }
 }
+
+/* El contenedor de impresión masiva no se muestra en pantalla */
+#bulk-print-root {
+  display: none;
+}
+

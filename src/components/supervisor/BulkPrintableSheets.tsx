@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import {
   Dialog,
   DialogContent,
@@ -47,115 +48,143 @@ const getRoundLabel = (roundNumber?: number) => {
   }
 };
 
+interface SheetsProps {
+  groups: BulkPrintGroup[];
+  roundLabel: string;
+  today: string;
+  isLast: (index: number) => boolean;
+}
+
+const Sheets: React.FC<SheetsProps> = ({ groups, roundLabel, today, isLast }) => (
+  <>
+    {groups.map((group, groupIndex) => (
+      <div
+        key={group.key}
+        className={`print-sheet ${isLast(groupIndex) ? 'print-sheet-last' : ''} ${groupIndex > 0 ? 'mt-10 print:mt-0' : ''}`}
+      >
+        <table className="w-full border-collapse text-xs print:text-[10px]">
+          <thead className="print:table-header-group">
+            <tr>
+              <th colSpan={11} className="pb-4 border-b-0 text-left font-normal">
+                <div className="text-center mb-4">
+                  <h1 className="text-xl font-bold">PLANILLA DE CONTEO FÍSICO</h1>
+                  <p className="text-base font-medium text-primary">{roundLabel}</p>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span><strong>Zona:</strong> {group.zoneName}</span>
+                  <span><strong>Fecha:</strong> {today}</span>
+                  <span><strong>Supervisor:</strong> {group.supervisorName}</span>
+                  <span><strong>Total:</strong> {group.locations.length} items</span>
+                </div>
+              </th>
+            </tr>
+            <tr className="border-b-2 border-t border-foreground">
+              <th className="text-left py-2 px-1 w-8">#</th>
+              <th className="text-left py-2 px-1">Tipo</th>
+              <th className="text-left py-2 px-1">Referencia</th>
+              <th className="text-left py-2 px-1">Subcat.</th>
+              <th className="text-left py-2 px-1">Observaciones</th>
+              <th className="text-left py-2 px-1">Ubicación</th>
+              <th className="text-left py-2 px-1">Ubic. Det.</th>
+              <th className="text-left py-2 px-1">Método</th>
+              <th className="text-center py-2 px-1 w-10">Activo</th>
+              <th className="text-center py-2 px-1 w-10">Term.</th>
+              <th className="text-center py-2 px-1 w-20">Cantidad</th>
+            </tr>
+          </thead>
+
+          <tfoot className="print:table-footer-group">
+            <tr>
+              <td colSpan={11} className="pt-8">
+                <div className="grid grid-cols-2 gap-8">
+                  <div className="text-center">
+                    <div className="border-b border-foreground mb-2 h-6"></div>
+                    <p className="text-xs text-muted-foreground">Firma Responsable</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="border-b border-foreground mb-2 h-6"></div>
+                    <p className="text-xs text-muted-foreground">Firma Supervisor</p>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </tfoot>
+
+          <tbody>
+            {group.locations.map((loc, index) => (
+              <tr key={loc.id} className="border-b border-muted print:break-inside-avoid">
+                <td className="py-2 px-1">{index + 1}</td>
+                <td className="py-2 px-1">{loc.inventory_master?.material_type || '-'}</td>
+                <td className="py-2 px-1 font-medium">{loc.master_reference}</td>
+                <td className="py-2 px-1">{loc.subcategoria || '-'}</td>
+                <td className="py-2 px-1 text-xs max-w-[100px] truncate">{loc.observaciones || '-'}</td>
+                <td className="py-2 px-1">{loc.location_name || '-'}</td>
+                <td className="py-2 px-1">{loc.location_detail || '-'}</td>
+                <td className="py-2 px-1">{loc.metodo_conteo || '-'}</td>
+                <td className="py-2 px-1 text-center">{loc.activo === false ? 'NO' : 'SI'}</td>
+                <td className="py-2 px-1 text-center">{loc.terminado ? 'SI' : 'NO'}</td>
+                <td className="py-2 px-1">
+                  <div className="border-b border-dashed border-foreground h-5 w-full"></div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ))}
+  </>
+);
+
+export const printBulkSheets = () => {
+  // Espera un frame para asegurar que el contenedor de impresión está montado
+  requestAnimationFrame(() => {
+    setTimeout(() => window.print(), 50);
+  });
+};
+
 const BulkPrintableSheets: React.FC<BulkPrintableSheetsProps> = ({
   open,
   onOpenChange,
   groups,
   roundNumber,
 }) => {
-  const handlePrint = () => {
-    window.print();
-  };
-
   const today = new Date().toLocaleDateString('es-CO');
   const roundLabel = getRoundLabel(roundNumber);
   const totalItems = groups.reduce((acc, g) => acc + g.locations.length, 0);
+  const isLast = (i: number) => i === groups.length - 1;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto print:fixed print:inset-0 print:max-w-none print:max-h-none print:overflow-visible print:h-auto print:w-full print:shadow-none print:border-none print:bg-white">
-        <DialogHeader className="print:hidden">
-          <DialogTitle>
-            Impresión masiva — {roundLabel} · {groups.length} zona(s) · {totalItems} ubicaciones
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      {/* Contenedor real de impresión: oculto en pantalla, en flujo normal al imprimir */}
+      {groups.length > 0 &&
+        createPortal(
+          <div id="bulk-print-root" aria-hidden="true">
+            <Sheets groups={groups} roundLabel={roundLabel} today={today} isLast={isLast} />
+          </div>,
+          document.body
+        )}
 
-        <div className="print:p-4 print:block" id="printable-sheet">
-          {groups.map((group, groupIndex) => (
-            <div
-              key={group.key}
-              className={groupIndex > 0 ? 'print-page-break mt-10 print:mt-0' : undefined}
-            >
-              <table className="w-full border-collapse text-xs print:text-[10px]">
-                <thead className="print:table-header-group">
-                  <tr>
-                    <th colSpan={11} className="pb-4 border-b-0 text-left font-normal">
-                      <div className="text-center mb-4">
-                        <h1 className="text-xl font-bold">PLANILLA DE CONTEO FÍSICO</h1>
-                        <p className="text-base font-medium text-primary">{roundLabel}</p>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span><strong>Zona:</strong> {group.zoneName}</span>
-                        <span><strong>Fecha:</strong> {today}</span>
-                        <span><strong>Supervisor:</strong> {group.supervisorName}</span>
-                        <span><strong>Total:</strong> {group.locations.length} items</span>
-                      </div>
-                    </th>
-                  </tr>
-                  <tr className="border-b-2 border-t border-foreground">
-                    <th className="text-left py-2 px-1 w-8">#</th>
-                    <th className="text-left py-2 px-1">Tipo</th>
-                    <th className="text-left py-2 px-1">Referencia</th>
-                    <th className="text-left py-2 px-1">Subcat.</th>
-                    <th className="text-left py-2 px-1">Observaciones</th>
-                    <th className="text-left py-2 px-1">Ubicación</th>
-                    <th className="text-left py-2 px-1">Ubic. Det.</th>
-                    <th className="text-left py-2 px-1">Método</th>
-                    <th className="text-center py-2 px-1 w-10">Activo</th>
-                    <th className="text-center py-2 px-1 w-10">Term.</th>
-                    <th className="text-center py-2 px-1 w-20">Cantidad</th>
-                  </tr>
-                </thead>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Impresión masiva — {roundLabel} · {groups.length} zona(s) · {totalItems} ubicaciones
+            </DialogTitle>
+          </DialogHeader>
 
-                <tfoot className="print:table-footer-group">
-                  <tr>
-                    <td colSpan={11} className="pt-8">
-                      <div className="grid grid-cols-2 gap-8">
-                        <div className="text-center">
-                          <div className="border-b border-foreground mb-2 h-6"></div>
-                          <p className="text-xs text-muted-foreground">Firma Responsable</p>
-                        </div>
-                        <div className="text-center">
-                          <div className="border-b border-foreground mb-2 h-6"></div>
-                          <p className="text-xs text-muted-foreground">Firma Supervisor</p>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                </tfoot>
+          <div>
+            <Sheets groups={groups} roundLabel={roundLabel} today={today} isLast={isLast} />
+          </div>
 
-                <tbody>
-                  {group.locations.map((loc, index) => (
-                    <tr key={loc.id} className="border-b border-muted print:break-inside-avoid">
-                      <td className="py-2 px-1">{index + 1}</td>
-                      <td className="py-2 px-1">{loc.inventory_master?.material_type || '-'}</td>
-                      <td className="py-2 px-1 font-medium">{loc.master_reference}</td>
-                      <td className="py-2 px-1">{loc.subcategoria || '-'}</td>
-                      <td className="py-2 px-1 text-xs max-w-[100px] truncate">{loc.observaciones || '-'}</td>
-                      <td className="py-2 px-1">{loc.location_name || '-'}</td>
-                      <td className="py-2 px-1">{loc.location_detail || '-'}</td>
-                      <td className="py-2 px-1">{loc.metodo_conteo || '-'}</td>
-                      <td className="py-2 px-1 text-center">{loc.activo === false ? 'NO' : 'SI'}</td>
-                      <td className="py-2 px-1 text-center">{loc.terminado ? 'SI' : 'NO'}</td>
-                      <td className="py-2 px-1">
-                        <div className="border-b border-dashed border-foreground h-5 w-full"></div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex justify-end mt-4 print:hidden">
-          <Button onClick={handlePrint} disabled={groups.length === 0}>
-            <Printer className="w-4 h-4 mr-2" />
-            Imprimir {groups.length} zona(s)
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+          <div className="flex justify-end mt-4">
+            <Button onClick={printBulkSheets} disabled={groups.length === 0}>
+              <Printer className="w-4 h-4 mr-2" />
+              Imprimir {groups.length} zona(s)
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
