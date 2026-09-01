@@ -287,6 +287,15 @@ const UnifiedDashboard: React.FC = () => {
       bgColor: 'bg-indigo-500/10',
       hoverBg: 'group-hover:bg-indigo-500',
     },
+    dashboardAuditoria: {
+      label: 'Dashboard Auditoría',
+      icon: LayoutDashboard,
+      description: 'KPIs en vivo de conteo y descuadre (Almacén / Planta)',
+      onClick: () => navigate('/superadmin/auditoria/dashboard'),
+      iconColor: 'text-emerald-500',
+      bgColor: 'bg-emerald-500/10',
+      hoverBg: 'group-hover:bg-emerald-500',
+    },
     auditoriaAlmacen: {
       label: 'Auditoría Almacén',
       icon: FileSearch,
