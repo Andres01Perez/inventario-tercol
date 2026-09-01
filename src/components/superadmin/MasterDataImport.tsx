@@ -810,12 +810,46 @@ const MasterDataImport: React.FC = () => {
               </span>
             </button>
           </div>
-...
+
+          {selectedFamily && (
+            <div className="max-w-2xl mx-auto">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-foreground">
+                  Subir archivo para reemplazar <strong>{selectedFamily}</strong>
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedFamily(null)}
+                  disabled={state === 'importing'}
+                >
+                  <X className="w-4 h-4 mr-1" />
+                  Cerrar
+                </Button>
+              </div>
+              {selectedFamily === 'MP' && (
+                <FileUploadZone
+                  type="MP"
+                  file={mpFile}
+                  onFileSelect={handleMpFileSelect}
+                  disabled={state === 'importing'}
+                  parseResult={mpResult}
+                />
+              )}
+              {selectedFamily === 'PP' && (
+                <FileUploadZone
+                  type="PP"
+                  file={ppFile}
+                  onFileSelect={handlePpFileSelect}
+                  disabled={state === 'importing'}
+                  parseResult={ppResult}
+                />
+              )}
             </div>
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FileUploadZone
             type="MP"
             file={mpFile}
@@ -829,13 +863,6 @@ const MasterDataImport: React.FC = () => {
             onFileSelect={handlePpFileSelect}
             disabled={state === 'importing'}
             parseResult={ppResult}
-          />
-          <FileUploadZone
-            type="PT"
-            file={ptFile}
-            onFileSelect={handlePtFileSelect}
-            disabled={state === 'importing'}
-            parseResult={ptResult}
           />
         </div>
       )}
