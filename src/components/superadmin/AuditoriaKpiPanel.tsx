@@ -420,14 +420,19 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
     );
   }
 
-  const avance = data.activeLocations + data.countedLocations === 0
+  const avance = data.requiredCounts === 0
     ? 100
-    : Math.round((data.countedLocations / Math.max(data.activeLocations, 1)) * 100);
+    : Math.round((data.doneCounts / data.requiredCounts) * 100);
   const pctAuditadas = data.totalRefs ? Math.round((data.auditadas / data.totalRefs) * 100) : 0;
 
   const kpis = [
     { label: 'Referencias', value: nf.format(data.totalRefs), hint: `${nf.format(data.activeLocations)} ubic. abiertas` },
-    { label: 'Avance de conteo', value: `${avance}%`, hint: `${nf.format(data.countedLocations)} de ${nf.format(data.activeLocations)} ubic.` },
+    {
+      label: 'Avance de conteo',
+      value: `${avance}%`,
+      hint: `${nf.format(data.doneCounts)} de ${nf.format(data.requiredCounts)} conteos · C1 ${nf.format(data.c1Done)}/${nf.format(data.c1Required)} · C2 ${nf.format(data.c2Done)}/${nf.format(data.c2Required)}`,
+    },
+
     { label: 'Auditadas', value: nf.format(data.auditadas), hint: `${pctAuditadas}% del total` },
     {
       label: 'Descuadre (und)',
