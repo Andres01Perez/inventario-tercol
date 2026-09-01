@@ -311,11 +311,9 @@ const MasterDataImport: React.FC = () => {
   
   const [mpFile, setMpFile] = useState<File | null>(null);
   const [ppFile, setPpFile] = useState<File | null>(null);
-  const [ptFile, setPtFile] = useState<File | null>(null);
-  
+
   const [mpResult, setMpResult] = useState<ParseResult | null>(null);
   const [ppResult, setPpResult] = useState<ParseResult | null>(null);
-  const [ptResult, setPtResult] = useState<ParseResult | null>(null);
   
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [combinedData, setCombinedData] = useState<ParsedRow[]>([]);
@@ -336,21 +334,27 @@ const MasterDataImport: React.FC = () => {
     const fetchCounts = async () => {
       setFamilyCountsLoading(true);
       try {
-        const families: MaterialType[] = ['MP', 'PP', 'PT'];
-        const results = await Promise.all(
-          families.map((family) =>
+        const families: Array<'MP' | 'PP'> = ['MP', 'PP'];
+        const results = await Promise.all([
+          ...families.map((family) =>
             supabase
               .from('inventory_master')
               .select('*', { count: 'exact', head: true })
               .eq('inventory_id', inventoryId)
               .eq('material_type', family)
-          )
-        );
+          ),
+          // PT vive en su propia tabla (pt_master), fuera de inventory_master
+          supabase
+            .from('pt_master')
+            .select('*', { count: 'exact', head: true })
+            .eq('inventory_id', inventoryId),
+        ]);
 
         const counts = { MP: 0, PP: 0, PT: 0 };
         results.forEach((res, i) => {
           if (res.error) throw res.error;
-          counts[families[i]] = res.count ?? 0;
+          if (i < 2) counts[families[i]] = res.count ?? 0;
+          else counts.PT = res.count ?? 0;
         });
 
         if (!cancelled) setFamilyCounts(counts);
