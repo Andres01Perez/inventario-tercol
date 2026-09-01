@@ -232,6 +232,8 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
             location_detail: loc.location_detail,
             punto_referencia: loc.punto_referencia,
             metodo_conteo: loc.metodo_conteo,
+            activo: loc.activo,
+            terminado: loc.terminado,
             assigned_admin_id: loc.bodega === 'almacen' ? bodegaAdmins.almacen! : bodegaAdmins.planta!,
           })));
 
@@ -314,9 +316,12 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
               <code className="bg-background px-2 py-1 rounded text-xs">Ubicación Detallada</code>
               <code className="bg-background px-2 py-1 rounded text-xs">Punto Referencia</code>
               <code className="bg-background px-2 py-1 rounded text-xs">Método Conteo</code>
+              <code className="bg-background px-2 py-1 rounded text-xs">Activo</code>
+              <code className="bg-background px-2 py-1 rounded text-xs">Terminado</code>
             </div>
             <p className="text-xs text-muted-foreground mt-2">* Campo obligatorio. Una referencia puede tener múltiples ubicaciones.</p>
             <p className="text-xs text-muted-foreground mt-1">Bodega acepta solo <strong>Almacén</strong> o <strong>Planta</strong>. Almacén se asigna al Admin MP y Planta al Admin PP configurados en Gestión de Usuarios.</p>
+            <p className="text-xs text-muted-foreground mt-1"><strong>Activo</strong> y <strong>Terminado</strong> son opcionales (SI / NO). Si faltan, se asume Activo = SI y Terminado = NO.</p>
           </div>
         </>
       )}
