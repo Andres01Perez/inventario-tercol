@@ -650,7 +650,7 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
                     <TableCell className="text-right">{nf.format(r.validado)}</TableCell>
                     <TableCell className="text-right text-destructive font-medium">{signed(r.descuadre)}</TableCell>
                     <TableCell className="text-right text-destructive font-medium">
-                      {r.sinCosto ? 'Sin costo' : money(r.descuadreValor)}
+                      {r.sinCosto ? 'Sin costo' : money(r.descuadreValor ?? 0)}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={meta.badge}>{meta.label}</Badge>
