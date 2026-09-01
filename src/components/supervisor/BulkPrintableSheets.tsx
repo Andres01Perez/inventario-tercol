@@ -17,6 +17,8 @@ export interface BulkLocationItem {
   observaciones: string | null;
   punto_referencia: string | null;
   metodo_conteo: string | null;
+  activo?: boolean | null;
+  terminado?: boolean | null;
   inventory_master?: { referencia: string; material_type: string } | null;
 }
 
