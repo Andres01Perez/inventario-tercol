@@ -342,6 +342,7 @@ const GestionResponsables: React.FC = () => {
         }
 
         visibleLocations.forEach((loc: any) => {
+          const adminId = (loc.assigned_admin_id as string | null) ?? null;
           rows.push({
             kind: 'location',
             id: loc.id,
@@ -353,6 +354,8 @@ const GestionResponsables: React.FC = () => {
             punto_referencia: loc.punto_referencia,
             metodo_conteo: loc.metodo_conteo,
             assigned_supervisor_id: loc.assigned_supervisor_id,
+            assigned_admin_id: adminId,
+            bodega: adminId ? adminBodega?.byUser.get(adminId) ?? null : null,
             material_type,
             control,
           });
@@ -448,7 +451,7 @@ const GestionResponsables: React.FC = () => {
       if (!inventoryId) throw new Error('No hay inventario activo');
       const targetRole = materialType === 'MP' ? 'admin_mp' : 'admin_pp';
       const assignedAdminId = isSuperadmin
-        ? adminMap?.get(targetRole)
+        ? adminBodega?.byRole.get(targetRole)
         : profile?.id;
       if (!assignedAdminId) throw new Error(`No hay un admin configurado para ${targetRole}`);
 
