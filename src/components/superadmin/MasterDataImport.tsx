@@ -424,15 +424,10 @@ const MasterDataImport: React.FC = () => {
     };
   };
 
-  const recomputeCombined = (
-    mp: ParseResult | null,
-    pp: ParseResult | null,
-    pt: ParseResult | null
-  ) => {
+  const recomputeCombined = (mp: ParseResult | null, pp: ParseResult | null) => {
     const mpData = mp?.data || [];
     const ppData = pp?.data || [];
-    const ptData = pt?.data || [];
-    const total = mpData.length + ppData.length + ptData.length;
+    const total = mpData.length + ppData.length;
 
     if (total === 0) {
       setValidation(null);
@@ -441,14 +436,14 @@ const MasterDataImport: React.FC = () => {
       return;
     }
 
-    setValidation(validateCombinedData(mpData, ppData, ptData));
-    setCombinedData([...mpData, ...ppData, ...ptData]);
+    setValidation(validateCombinedData(mpData, ppData, []));
+    setCombinedData([...mpData, ...ppData]);
     setState('preview');
   };
 
-  const handleFileSelect = async (type: MaterialType, file: File | null) => {
-    const setFile = type === 'MP' ? setMpFile : type === 'PP' ? setPpFile : setPtFile;
-    const setResult = type === 'MP' ? setMpResult : type === 'PP' ? setPpResult : setPtResult;
+  const handleFileSelect = async (type: 'MP' | 'PP', file: File | null) => {
+    const setFile = type === 'MP' ? setMpFile : setPpFile;
+    const setResult = type === 'MP' ? setMpResult : setPpResult;
 
     setFile(file);
     setResult(null);
@@ -458,10 +453,7 @@ const MasterDataImport: React.FC = () => {
 
     if (!file) {
       // Recompute using remaining files
-      const nextMp = type === 'MP' ? null : mpResult;
-      const nextPp = type === 'PP' ? null : ppResult;
-      const nextPt = type === 'PT' ? null : ptResult;
-      recomputeCombined(nextMp, nextPp, nextPt);
+      recomputeCombined(type === 'MP' ? null : mpResult, type === 'PP' ? null : ppResult);
       return;
     }
 
@@ -469,15 +461,11 @@ const MasterDataImport: React.FC = () => {
     const result = await parseExcelFile(file, type);
     setResult(result);
 
-    const nextMp = type === 'MP' ? result : mpResult;
-    const nextPp = type === 'PP' ? result : ppResult;
-    const nextPt = type === 'PT' ? result : ptResult;
-    recomputeCombined(nextMp, nextPp, nextPt);
+    recomputeCombined(type === 'MP' ? result : mpResult, type === 'PP' ? result : ppResult);
   };
 
   const handleMpFileSelect = (file: File | null) => handleFileSelect('MP', file);
   const handlePpFileSelect = (file: File | null) => handleFileSelect('PP', file);
-  const handlePtFileSelect = (file: File | null) => handleFileSelect('PT', file);
 
   const handleImportClick = async () => {
     if (combinedData.length === 0) return;
