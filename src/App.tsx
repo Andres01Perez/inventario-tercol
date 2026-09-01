@@ -27,6 +27,8 @@ import GestionResponsables from "./pages/admin/GestionResponsables";
 import MaestraPT from "./pages/pt/MaestraPT";
 import UbicacionesPT from "./pages/pt/UbicacionesPT";
 import ResponsablesPT from "./pages/pt/ResponsablesPT";
+import ConteoRoundPT from "./pages/pt/ConteoRoundPT";
+
 
 // Configure QueryClient with proper defaults for multi-user isolation
 const queryClient = new QueryClient({
