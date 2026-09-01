@@ -46,7 +46,7 @@ const ImpresionMasiva: React.FC = () => {
         const { data: page, error } = await supabase
           .from('locations')
           .select(
-            'id, master_reference, location_name, location_detail, subcategoria, observaciones, punto_referencia, metodo_conteo, assigned_supervisor_id, inventory_master:inventory_master(referencia, material_type)'
+            'id, master_reference, location_name, location_detail, subcategoria, observaciones, punto_referencia, metodo_conteo, activo, terminado, assigned_supervisor_id, inventory_master:inventory_master(referencia, material_type)'
           )
           .eq('inventory_id', inventoryId!)
           .order('punto_referencia', { ascending: true })
