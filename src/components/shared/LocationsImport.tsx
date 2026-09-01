@@ -419,6 +419,8 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
                   <TableHead>Bodega</TableHead>
                   <TableHead>Ubicación</TableHead>
                   <TableHead>Subcategoría</TableHead>
+                  <TableHead>Activo</TableHead>
+                  <TableHead>Terminado</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -430,6 +432,8 @@ const LocationsImport: React.FC<LocationsImportProps> = ({ onSuccess, onClose })
                     </TableCell>
                     <TableCell>{loc.location_name || '-'}</TableCell>
                     <TableCell>{loc.subcategoria || '-'}</TableCell>
+                    <TableCell>{loc.activo ? 'SI' : 'NO'}</TableCell>
+                    <TableCell>{loc.terminado ? 'SI' : 'NO'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
