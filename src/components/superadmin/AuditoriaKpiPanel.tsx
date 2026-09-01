@@ -25,6 +25,9 @@ const PAGE = 1000;
 const STATUS_META: Record<string, { label: string; bar: string; badge: string }> = {
   auditado: { label: 'Auditado', bar: 'bg-green-500', badge: 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700' },
   pendiente: { label: 'Pendiente', bar: 'bg-yellow-500', badge: 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-700' },
+  pendiente_en_progreso: { label: 'Pendiente — en progreso', bar: 'bg-yellow-500', badge: 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-700' },
+  pendiente_sin_iniciar: { label: 'Pendiente — sin iniciar', bar: 'bg-yellow-300', badge: 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800' },
+
   conflicto: { label: 'Conflicto', bar: 'bg-orange-500', badge: 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-700' },
   critico: { label: 'Crítico', bar: 'bg-red-500', badge: 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700' },
   cerrado_forzado: { label: 'Cerrado forzado', bar: 'bg-purple-500', badge: 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-700' },
