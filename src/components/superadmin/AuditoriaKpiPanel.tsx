@@ -490,11 +490,12 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
             {data.byStatus.map((s) => {
               const meta = STATUS_META[s.key] || STATUS_META['n/a'];
               const pct = data.totalRefs ? Math.round((s.count / data.totalRefs) * 100) : 0;
+              const statusParam = s.key.startsWith('pendiente') ? 'pendiente' : s.key;
               return (
                 <button
                   key={s.key}
                   type="button"
-                  onClick={() => navigate(`${auditPath}?status=${s.key}`)}
+                  onClick={() => navigate(`${auditPath}?status=${statusParam}`)}
                   className="w-full text-left group"
                 >
                   <div className="flex items-center justify-between text-sm mb-1">
@@ -508,6 +509,10 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
               );
             })}
             {data.byStatus.length === 0 && <p className="text-sm text-muted-foreground">Sin datos.</p>}
+            <p className="text-[11px] text-muted-foreground pt-1">
+              Una referencia solo cambia de estado cuando todas sus ubicaciones de la bodega completan los
+              conteos de la ronda (C1 y C2 en la ronda 1).
+            </p>
           </CardContent>
         </Card>
 
@@ -517,12 +522,16 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
           </CardHeader>
           <CardContent className="space-y-3">
             {data.byRound.map((r) => {
-              const pct = data.totalRefs ? Math.round((r.count / data.totalRefs) * 100) : 0;
+              const pct = r.required ? Math.round((r.done / r.required) * 100) : 0;
               return (
                 <div key={r.key}>
                   <div className="flex items-center justify-between text-sm mb-1">
-                    <span>{r.label}</span>
-                    <span className="text-muted-foreground">{nf.format(r.count)} · {pct}%</span>
+                    <span>
+                      {r.label} <span className="text-muted-foreground">· {nf.format(r.count)} refs</span>
+                    </span>
+                    <span className="text-muted-foreground">
+                      {r.required ? `${nf.format(r.done)} / ${nf.format(r.required)} conteos · ${pct}%` : '—'}
+                    </span>
                   </div>
                   <div className="h-2 rounded-full bg-muted overflow-hidden">
                     <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
@@ -531,9 +540,13 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
               );
             })}
             {data.byRound.length === 0 && <p className="text-sm text-muted-foreground">Sin datos.</p>}
+            <p className="text-[11px] text-muted-foreground pt-1">
+              En la ronda 1 cada ubicación requiere dos conteos (C1 y C2); en C3, C4 y C5 requiere uno.
+            </p>
           </CardContent>
         </Card>
       </div>
+
 
       <Card className="glass-card">
         <CardHeader className="pb-2">
