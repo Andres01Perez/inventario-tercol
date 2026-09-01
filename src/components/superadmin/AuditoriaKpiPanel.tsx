@@ -47,6 +47,16 @@ interface RefAgg {
   descuadre: number;
   descuadreValor: number;
   sinCosto: boolean;
+  conteosHechos: number;
+  conteosRequeridos: number;
+}
+
+interface RoundProgress {
+  key: string;
+  label: string;
+  count: number;
+  done: number;
+  required: number;
 }
 
 interface Aggregates {
@@ -54,8 +64,14 @@ interface Aggregates {
   totalRefs: number;
   activeLocations: number;
   countedLocations: number;
+  requiredCounts: number;
+  doneCounts: number;
+  c1Done: number;
+  c1Required: number;
+  c2Done: number;
+  c2Required: number;
   byStatus: { key: string; count: number }[];
-  byRound: { key: string; label: string; count: number }[];
+  byRound: RoundProgress[];
   byFamily: { familia: string; erp: number; validado: number; descuadre: number; valor: number }[];
   descuadreUnd: number;
   descuadreValor: number;
@@ -64,6 +80,7 @@ interface Aggregates {
   auditadas: number;
   refsSinCosto: number;
 }
+
 
 async function fetchAllPages<T>(
   build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
