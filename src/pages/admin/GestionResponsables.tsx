@@ -223,7 +223,7 @@ const GestionResponsables: React.FC = () => {
 
   // Query from inventory_master so references without locations are visible.
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['locations-responsables', role, debouncedSearchTerm, currentPage, pageSize, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, filterPuntoReferencia, filterBodega, inventoryId],
+    queryKey: ['locations-responsables', role, debouncedSearchTerm, currentPage, pageSize, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, filterPuntoReferencia, filterBodega, inventoryId, adminBodega?.mpIds.join(','), adminBodega?.ppIds.join(',')],
     queryFn: async () => {
       const hasLocationFilter = filterSubcategoria || filterUbicacion || filterObservacion || filterSupervisor !== 'all' || filterPuntoReferencia !== 'all' || filterBodega !== 'all';
       const locationRelation = hasLocationFilter ? 'locations!inner' : 'locations';
