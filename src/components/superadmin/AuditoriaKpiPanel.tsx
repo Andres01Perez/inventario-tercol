@@ -425,12 +425,27 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
     : Math.round((data.doneCounts / data.requiredCounts) * 100);
   const pctAuditadas = data.totalRefs ? Math.round((data.auditadas / data.totalRefs) * 100) : 0;
 
-  const kpis = [
+  const kpis: { label: string; value: string; hint: React.ReactNode; danger?: boolean }[] = [
     { label: 'Referencias', value: nf.format(data.totalRefs), hint: `${nf.format(data.activeLocations)} ubic. abiertas` },
     {
       label: 'Avance de conteo',
       value: `${avance}%`,
-      hint: `${nf.format(data.doneCounts)} de ${nf.format(data.requiredCounts)} conteos · C1 ${nf.format(data.c1Done)}/${nf.format(data.c1Required)} · C2 ${nf.format(data.c2Done)}/${nf.format(data.c2Required)}`,
+      hint: (
+        <div className="space-y-0.5">
+          <div className="flex justify-between gap-2">
+            <span>Total</span>
+            <span>{nf.format(data.doneCounts)} / {nf.format(data.requiredCounts)}</span>
+          </div>
+          <div className="flex justify-between gap-2">
+            <span>C1</span>
+            <span>{nf.format(data.c1Done)} / {nf.format(data.c1Required)}</span>
+          </div>
+          <div className="flex justify-between gap-2">
+            <span>C2</span>
+            <span>{nf.format(data.c2Done)} / {nf.format(data.c2Required)}</span>
+          </div>
+        </div>
+      ),
     },
 
     { label: 'Auditadas', value: nf.format(data.auditadas), hint: `${pctAuditadas}% del total` },
