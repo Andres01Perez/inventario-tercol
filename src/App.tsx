@@ -23,6 +23,9 @@ import ExportarConteos from "./pages/superadmin/ExportarConteos";
 import ImpresionMasiva from "./pages/superadmin/ImpresionMasiva";
 import GestionUbicacion from "./pages/admin/GestionUbicacion";
 import GestionResponsables from "./pages/admin/GestionResponsables";
+import MaestraPT from "./pages/pt/MaestraPT";
+import UbicacionesPT from "./pages/pt/UbicacionesPT";
+import ResponsablesPT from "./pages/pt/ResponsablesPT";
 
 // Configure QueryClient with proper defaults for multi-user isolation
 const queryClient = new QueryClient({
@@ -159,6 +162,31 @@ const App: React.FC = () => (
               element={
                 <ProtectedRoute allowedRoles={['superadmin', 'admin_mp', 'admin_pp']}>
                   <GestionResponsables />
+                </ProtectedRoute>
+              }
+            />
+            {/* Producto Terminado (PT) */}
+            <Route
+              path="/pt/maestra"
+              element={
+                <ProtectedRoute allowedRoles={['superadmin']}>
+                  <MaestraPT />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/pt/ubicaciones"
+              element={
+                <ProtectedRoute allowedRoles={['superadmin']}>
+                  <UbicacionesPT />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/pt/responsables"
+              element={
+                <ProtectedRoute allowedRoles={['superadmin']}>
+                  <ResponsablesPT />
                 </ProtectedRoute>
               }
             />

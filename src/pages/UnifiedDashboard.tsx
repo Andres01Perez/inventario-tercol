@@ -322,6 +322,33 @@ const UnifiedDashboard: React.FC = () => {
       bgColor: 'bg-amber-500/10',
       hoverBg: 'group-hover:bg-amber-500',
     },
+    ptMaestra: {
+      label: 'Maestra PT',
+      icon: Package,
+      description: 'Importar saldos ERP de Producto Terminado',
+      onClick: () => navigate('/pt/maestra'),
+      iconColor: 'text-teal-500',
+      bgColor: 'bg-teal-500/10',
+      hoverBg: 'group-hover:bg-teal-500',
+    },
+    ptUbicaciones: {
+      label: 'Ubicaciones PT',
+      icon: MapPin,
+      description: 'Importar y consultar pisos y ubicaciones de PT',
+      onClick: () => navigate('/pt/ubicaciones'),
+      iconColor: 'text-cyan-500',
+      bgColor: 'bg-cyan-500/10',
+      hoverBg: 'group-hover:bg-cyan-500',
+    },
+    ptResponsables: {
+      label: 'Responsables PT',
+      icon: Users,
+      description: 'Asignar líderes de conteo por piso',
+      onClick: () => navigate('/pt/responsables'),
+      iconColor: 'text-indigo-500',
+      bgColor: 'bg-indigo-500/10',
+      hoverBg: 'group-hover:bg-indigo-500',
+    },
   }), [navigate]);
 
   // Action categories based on role
@@ -364,6 +391,19 @@ const UnifiedDashboard: React.FC = () => {
           baseActions.ubicaciones,
           baseActions.responsables,
           baseActions.impresionMasiva,
+        ]
+      });
+    }
+
+    // 4. PRODUCTO TERMINADO (solo superadmin)
+    if (role === 'superadmin') {
+      categories.push({
+        name: 'Producto Terminado',
+        icon: Package,
+        actions: [
+          baseActions.ptMaestra,
+          baseActions.ptUbicaciones,
+          baseActions.ptResponsables,
         ]
       });
     }

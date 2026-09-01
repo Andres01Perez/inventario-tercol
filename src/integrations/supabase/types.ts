@@ -374,6 +374,298 @@ export type Database = {
         }
         Relationships: []
       }
+      pt_counts: {
+        Row: {
+          audit_round: number
+          created_at: string
+          id: string
+          inventory_id: string
+          location_id: string
+          quantity_counted: number
+          supervisor_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          audit_round?: number
+          created_at?: string
+          id?: string
+          inventory_id?: string
+          location_id: string
+          quantity_counted: number
+          supervisor_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          audit_round?: number
+          created_at?: string
+          id?: string
+          inventory_id?: string
+          location_id?: string
+          quantity_counted?: number
+          supervisor_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pt_counts_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_counts_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "pt_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_counts_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pt_floor_assignments: {
+        Row: {
+          created_at: string
+          id: string
+          inventory_id: string
+          piso: string
+          supervisor_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          inventory_id?: string
+          piso: string
+          supervisor_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          inventory_id?: string
+          piso?: string
+          supervisor_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pt_floor_assignments_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_floor_assignments_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pt_locations: {
+        Row: {
+          activo: boolean
+          assigned_supervisor_id: string | null
+          created_at: string
+          discovered_at_round: number
+          id: string
+          inventory_id: string
+          linea: string | null
+          orden: number | null
+          piso: string
+          prodc: string | null
+          referencia: string
+          status_c1: string
+          status_c2: string
+          status_c3: string
+          status_c4: string
+          terminado: boolean
+          ubic: string | null
+          ue: number | null
+          updated_at: string
+          validated_at_round: number | null
+          validated_quantity: number | null
+        }
+        Insert: {
+          activo?: boolean
+          assigned_supervisor_id?: string | null
+          created_at?: string
+          discovered_at_round?: number
+          id?: string
+          inventory_id?: string
+          linea?: string | null
+          orden?: number | null
+          piso: string
+          prodc?: string | null
+          referencia: string
+          status_c1?: string
+          status_c2?: string
+          status_c3?: string
+          status_c4?: string
+          terminado?: boolean
+          ubic?: string | null
+          ue?: number | null
+          updated_at?: string
+          validated_at_round?: number | null
+          validated_quantity?: number | null
+        }
+        Update: {
+          activo?: boolean
+          assigned_supervisor_id?: string | null
+          created_at?: string
+          discovered_at_round?: number
+          id?: string
+          inventory_id?: string
+          linea?: string | null
+          orden?: number | null
+          piso?: string
+          prodc?: string | null
+          referencia?: string
+          status_c1?: string
+          status_c2?: string
+          status_c3?: string
+          status_c4?: string
+          terminado?: boolean
+          ubic?: string | null
+          ue?: number | null
+          updated_at?: string
+          validated_at_round?: number | null
+          validated_quantity?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pt_locations_assigned_supervisor_id_fkey"
+            columns: ["assigned_supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_locations_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_locations_master_fk"
+            columns: ["inventory_id", "referencia"]
+            isOneToOne: false
+            referencedRelation: "pt_master"
+            referencedColumns: ["inventory_id", "referencia"]
+          },
+        ]
+      }
+      pt_master: {
+        Row: {
+          audit_round: number
+          cant_erp: number
+          count_history: Json
+          created_at: string
+          descripcion: string | null
+          id: string
+          inventory_id: string
+          referencia: string
+          status_slug: string
+          updated_at: string
+        }
+        Insert: {
+          audit_round?: number
+          cant_erp?: number
+          count_history?: Json
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          inventory_id?: string
+          referencia: string
+          status_slug?: string
+          updated_at?: string
+        }
+        Update: {
+          audit_round?: number
+          cant_erp?: number
+          count_history?: Json
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          inventory_id?: string
+          referencia?: string
+          status_slug?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pt_master_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pt_validated_counts: {
+        Row: {
+          audit_round: number
+          created_at: string
+          id: string
+          inventory_id: string
+          location_id: string
+          reason: string
+          referencia: string
+          updated_at: string
+          validated_by: string | null
+          validated_quantity: number
+        }
+        Insert: {
+          audit_round: number
+          created_at?: string
+          id?: string
+          inventory_id: string
+          location_id: string
+          reason: string
+          referencia: string
+          updated_at?: string
+          validated_by?: string | null
+          validated_quantity?: number
+        }
+        Update: {
+          audit_round?: number
+          created_at?: string
+          id?: string
+          inventory_id?: string
+          location_id?: string
+          reason?: string
+          referencia?: string
+          updated_at?: string
+          validated_by?: string | null
+          validated_quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pt_validated_counts_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_validated_counts_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "pt_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_statuses: {
         Row: {
           is_final: boolean | null
