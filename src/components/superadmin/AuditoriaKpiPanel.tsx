@@ -48,7 +48,8 @@ interface RefAgg {
   round: number;
   costo: number | null;
   descuadre: number;
-  descuadreValor: number;
+  descuadreValor: number | null;
+  hasValidation: boolean;
   sinCosto: boolean;
   conteosHechos: number;
   conteosRequeridos: number;
@@ -78,6 +79,7 @@ interface Aggregates {
   byFamily: { familia: string; erp: number; validado: number; descuadre: number; valor: number }[];
   descuadreUnd: number;
   descuadreValor: number;
+  hasAnyValidation: boolean;
   faltante: number;
   sobrante: number;
   auditadas: number;
