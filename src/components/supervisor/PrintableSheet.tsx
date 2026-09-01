@@ -17,6 +17,8 @@ interface LocationItem {
   observaciones: string | null;
   punto_referencia: string | null;
   metodo_conteo: string | null;
+  activo?: boolean | null;
+  terminado?: boolean | null;
   inventory_master?: { referencia: string; material_type: string } | null;
 }
 
@@ -69,7 +71,7 @@ const PrintableSheet: React.FC<PrintableSheetProps> = ({
             <thead className="print:table-header-group">
               {/* Header info row - repeats on each page */}
               <tr>
-                <th colSpan={9} className="pb-4 border-b-0 text-left font-normal">
+                <th colSpan={11} className="pb-4 border-b-0 text-left font-normal">
                   <div className="text-center mb-4">
                     <h1 className="text-xl font-bold">PLANILLA DE CONTEO FÍSICO</h1>
                     <p className="text-base font-medium text-primary">{roundLabel}</p>
@@ -92,14 +94,17 @@ const PrintableSheet: React.FC<PrintableSheetProps> = ({
                 <th className="text-left py-2 px-1">Ubicación</th>
                 <th className="text-left py-2 px-1">Ubic. Det.</th>
                 <th className="text-left py-2 px-1">Método</th>
+                <th className="text-center py-2 px-1 w-10">Activo</th>
+                <th className="text-center py-2 px-1 w-10">Term.</th>
                 <th className="text-center py-2 px-1 w-20">Cantidad</th>
               </tr>
             </thead>
+
             
             {/* Signatures footer - repeats on each page */}
             <tfoot className="print:table-footer-group">
               <tr>
-                <td colSpan={9} className="pt-8">
+                <td colSpan={11} className="pt-8">
                   <div className="grid grid-cols-2 gap-8">
                     <div className="text-center">
                       <div className="border-b border-foreground mb-2 h-6"></div>
@@ -125,6 +130,8 @@ const PrintableSheet: React.FC<PrintableSheetProps> = ({
                   <td className="py-2 px-1">{loc.location_name || '-'}</td>
                   <td className="py-2 px-1">{loc.location_detail || '-'}</td>
                   <td className="py-2 px-1">{loc.metodo_conteo || '-'}</td>
+                  <td className="py-2 px-1 text-center">{loc.activo === false ? 'NO' : 'SI'}</td>
+                  <td className="py-2 px-1 text-center">{loc.terminado ? 'SI' : 'NO'}</td>
                   <td className="py-2 px-1">
                     <div className="border-b border-dashed border-foreground h-5 w-full"></div>
                   </td>

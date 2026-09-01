@@ -11,6 +11,8 @@ export interface ParsedLocation {
   location_detail: string | null;
   punto_referencia: string | null;
   metodo_conteo: string | null;
+  activo: boolean;
+  terminado: boolean;
   rowNumber: number;
 }
 
@@ -44,6 +46,18 @@ const findColumnValue = (row: Record<string, unknown>, possibleNames: string[]):
   }
   return undefined;
 };
+
+/**
+ * Interpreta un valor SI/NO. Devuelve null si no se reconoce.
+ */
+const parseBooleanFlag = (raw: string | undefined): boolean | null => {
+  if (raw === undefined || raw === '') return null;
+  const v = normalizeColumnName(raw);
+  if (['si', 'sí', 's', 'true', '1', 'x', 'verdadero'].includes(v)) return true;
+  if (['no', 'n', 'false', '0', 'falso'].includes(v)) return false;
+  return null;
+};
+
 
 /**
  * Parsea un archivo Excel de ubicaciones
@@ -101,6 +115,8 @@ export const parseLocationsExcel = async (file: File): Promise<LocationsParseRes
       const ubicacionDetallada = findColumnValue(row, ['ubicacion detallada', 'ubicación detallada', 'location_detail', 'detalle']);
       const puntoReferencia = findColumnValue(row, ['punto referencia', 'punto_referencia', 'punto ref', 'referencia punto']);
       const metodoConteo = findColumnValue(row, ['metodo conteo', 'método conteo', 'metodo_conteo', 'metodo']);
+      const activoRaw = findColumnValue(row, ['activo']);
+      const terminadoRaw = findColumnValue(row, ['terminado']);
 
       // Validar referencia (campo obligatorio)
       if (!referencia) {
@@ -127,6 +143,16 @@ export const parseLocationsExcel = async (file: File): Promise<LocationsParseRes
         seenCombos.add(comboKey);
       }
 
+      // Activo / Terminado (opcionales)
+      const activoParsed = parseBooleanFlag(activoRaw);
+      if (activoRaw && activoParsed === null) {
+        warnings.push(`Fila ${rowNumber}: Valor de "Activo" no reconocido (${activoRaw}); se usa SI`);
+      }
+      const terminadoParsed = parseBooleanFlag(terminadoRaw);
+      if (terminadoRaw && terminadoParsed === null) {
+        warnings.push(`Fila ${rowNumber}: Valor de "Terminado" no reconocido (${terminadoRaw}); se usa NO`);
+      }
+
       data.push({
         master_reference: referencia,
         bodega,
@@ -136,6 +162,8 @@ export const parseLocationsExcel = async (file: File): Promise<LocationsParseRes
         location_detail: ubicacionDetallada || null,
         punto_referencia: puntoReferencia || null,
         metodo_conteo: metodoConteo || null,
+        activo: activoParsed === null ? true : activoParsed,
+        terminado: terminadoParsed === null ? false : terminadoParsed,
         rowNumber,
       });
     });
@@ -161,7 +189,9 @@ export const generateLocationsTemplate = (): void => {
       Ubicación: 'ESTANTE-1',
       'Ubicación Detallada': 'Nivel 3',
       'Punto Referencia': 'Puerta principal',
-      'Método Conteo': 'Manual'
+      'Método Conteo': 'Manual',
+      Activo: 'SI',
+      Terminado: 'NO'
     },
     {
       Referencia: 'REF-001',
@@ -171,7 +201,9 @@ export const generateLocationsTemplate = (): void => {
       Ubicación: 'ESTANTE-2',
       'Ubicación Detallada': 'Nivel 1',
       'Punto Referencia': 'Pasillo 2',
-      'Método Conteo': 'Conteo rápido'
+      'Método Conteo': 'Conteo rápido',
+      Activo: 'SI',
+      Terminado: 'SI'
     },
     {
       Referencia: 'REF-002',
@@ -181,7 +213,9 @@ export const generateLocationsTemplate = (): void => {
       Ubicación: 'BODEGA-3',
       'Ubicación Detallada': '',
       'Punto Referencia': '',
-      'Método Conteo': 'Báscula'
+      'Método Conteo': 'Báscula',
+      Activo: 'NO',
+      Terminado: 'NO'
     },
   ];
 
@@ -197,6 +231,8 @@ export const generateLocationsTemplate = (): void => {
     { wch: 20 }, // Ubicación Detallada
     { wch: 18 }, // Punto Referencia
     { wch: 15 }, // Método Conteo
+    { wch: 8 },  // Activo
+    { wch: 10 }, // Terminado
   ];
   
   const workbook = XLSX.utils.book_new();
