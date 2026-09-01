@@ -141,6 +141,8 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
           assigned_supervisor_id: user!.id,
           // Set discovered_at_round if adding location after round 1
           discovered_at_round: currentAuditRound > 1 ? currentAuditRound : null,
+          activo: true,
+          terminado: false,
         })
         .select('id')
         .single();
