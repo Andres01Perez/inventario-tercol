@@ -699,7 +699,7 @@ const MasterDataImport: React.FC = () => {
             Reemplaza familias de maestra en el inventario activo o crea un inventario nuevo
           </p>
         </div>
-        {(mpFile || ppFile || ptFile) && state !== 'importing' && (
+        {(mpFile || ppFile) && state !== 'importing' && (
           <Button variant="outline" onClick={handleClear}>
             <Trash2 className="w-4 h-4 mr-2" />
             Limpiar
@@ -792,61 +792,25 @@ const MasterDataImport: React.FC = () => {
               onClear={() => handlePpFileSelect(null)}
               disabled={state === 'importing' || familyCountsLoading}
             />
-            <FamilyReplaceButton
-              type="PT"
-              count={familyCounts.PT}
-              isSelected={selectedFamily === 'PT'}
-              hasFile={!!ptFile}
-              fileName={ptFile?.name}
-              onSelect={() => setSelectedFamily('PT')}
-              onClear={() => handlePtFileSelect(null)}
-              disabled={state === 'importing' || familyCountsLoading}
-            />
-          </div>
-
-          {selectedFamily && (
-            <div className="max-w-2xl mx-auto">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-foreground">
-                  Subir archivo para reemplazar <strong>{selectedFamily}</strong>
-                </p>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSelectedFamily(null)}
-                  disabled={state === 'importing'}
-                >
-                  <X className="w-4 h-4 mr-1" />
-                  Cerrar
-                </Button>
+            {/* PT tiene su propio módulo y maestra independiente */}
+            <button
+              type="button"
+              onClick={() => navigate('/pt/maestra')}
+              className="relative flex flex-col items-center text-center rounded-xl border-2 p-6 transition-all bg-amber-500/5 border-amber-500/30 hover:scale-[1.01] hover:border-amber-500 cursor-pointer"
+            >
+              <div className="p-4 rounded-full bg-amber-500/10 mb-4">
+                <Boxes className="w-8 h-8 text-amber-500" />
               </div>
-              {selectedFamily === 'MP' && (
-                <FileUploadZone
-                  type="MP"
-                  file={mpFile}
-                  onFileSelect={handleMpFileSelect}
-                  disabled={state === 'importing'}
-                  parseResult={mpResult}
-                />
-              )}
-              {selectedFamily === 'PP' && (
-                <FileUploadZone
-                  type="PP"
-                  file={ppFile}
-                  onFileSelect={handlePpFileSelect}
-                  disabled={state === 'importing'}
-                  parseResult={ppResult}
-                />
-              )}
-              {selectedFamily === 'PT' && (
-                <FileUploadZone
-                  type="PT"
-                  file={ptFile}
-                  onFileSelect={handlePtFileSelect}
-                  disabled={state === 'importing'}
-                  parseResult={ptResult}
-                />
-              )}
+              <h3 className="text-lg font-semibold text-foreground mb-1">Producto Terminado (PT)</h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                {familyCounts.PT} referencia{familyCounts.PT !== 1 ? 's' : ''} cargada{familyCounts.PT !== 1 ? 's' : ''}
+              </p>
+              <span className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                Ir a Maestra PT
+              </span>
+            </button>
+          </div>
+...
             </div>
           )}
         </div>
