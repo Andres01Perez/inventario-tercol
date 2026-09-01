@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Upload, 
   FileSpreadsheet, 
@@ -290,6 +291,7 @@ const formatNumber = (value: number | null | undefined): string => {
 
 const MasterDataImport: React.FC = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { inventoryId, inventory, isReadOnly, refetchInventories, setSelectedInventoryId } = useInventory();
 
   // Modo de importación: reemplazar dentro del inventario abierto o crear uno nuevo
