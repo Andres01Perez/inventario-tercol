@@ -915,10 +915,6 @@ const MasterDataImport: React.FC = () => {
               <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600">
                 {ppCount} PP
               </Badge>
-              <span className="text-muted-foreground">+</span>
-              <Badge variant="secondary" className="bg-amber-500/10 text-amber-600">
-                {ptCount} PT
-              </Badge>
               <span className="text-muted-foreground">=</span>
               <Badge variant="default">
                 {totalCount} Total
