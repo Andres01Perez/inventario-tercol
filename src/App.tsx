@@ -78,6 +78,15 @@ const App: React.FC = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/gestion-operativa/pt/conteo/:round"
+              element={
+                <ProtectedRoute allowedRoles={['superadmin', 'admin_mp', 'admin_pp', 'supervisor']}>
+                  <ConteoRoundPT />
+                </ProtectedRoute>
+              }
+            />
+
             {/* Superadmin Routes */}
             <Route
               path="/superadmin/inventario-mp"
