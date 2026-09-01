@@ -135,6 +135,8 @@ const BulkPrintableSheets: React.FC<BulkPrintableSheetsProps> = ({
                       <td className="py-2 px-1">{loc.location_name || '-'}</td>
                       <td className="py-2 px-1">{loc.location_detail || '-'}</td>
                       <td className="py-2 px-1">{loc.metodo_conteo || '-'}</td>
+                      <td className="py-2 px-1 text-center">{loc.activo === false ? 'NO' : 'SI'}</td>
+                      <td className="py-2 px-1 text-center">{loc.terminado ? 'SI' : 'NO'}</td>
                       <td className="py-2 px-1">
                         <div className="border-b border-dashed border-foreground h-5 w-full"></div>
                       </td>
