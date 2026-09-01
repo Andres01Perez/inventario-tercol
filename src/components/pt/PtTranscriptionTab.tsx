@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from 'sonner';
 import { Check, Loader2, RefreshCw, Save, Search, CheckCircle2 } from 'lucide-react';
+import CountCalculator from '@/components/pt/CountCalculator';
 
 const PAGE_SIZE = 1000;
 
@@ -360,6 +361,14 @@ const PtTranscriptionTab: React.FC<Props> = ({ roundNumber, isAdminMode = false 
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') handleSave(loc);
                           }}
+                        />
+                        <CountCalculator
+                          ue={loc.ue}
+                          referencia={loc.referencia}
+                          disabled={isReadOnly || savingIds.has(loc.id)}
+                          onApply={(total) =>
+                            setQuantities((prev) => ({ ...prev, [loc.id]: String(total) }))
+                          }
                         />
                         <Button
                           size={isMobile ? 'icon' : 'sm'}
