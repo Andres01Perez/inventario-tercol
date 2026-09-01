@@ -25,6 +25,9 @@ const PAGE = 1000;
 const STATUS_META: Record<string, { label: string; bar: string; badge: string }> = {
   auditado: { label: 'Auditado', bar: 'bg-green-500', badge: 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700' },
   pendiente: { label: 'Pendiente', bar: 'bg-yellow-500', badge: 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-700' },
+  pendiente_en_progreso: { label: 'Pendiente — en progreso', bar: 'bg-yellow-500', badge: 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-700' },
+  pendiente_sin_iniciar: { label: 'Pendiente — sin iniciar', bar: 'bg-yellow-300', badge: 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800' },
+
   conflicto: { label: 'Conflicto', bar: 'bg-orange-500', badge: 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-700' },
   critico: { label: 'Crítico', bar: 'bg-red-500', badge: 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700' },
   cerrado_forzado: { label: 'Cerrado forzado', bar: 'bg-purple-500', badge: 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-700' },
@@ -47,6 +50,16 @@ interface RefAgg {
   descuadre: number;
   descuadreValor: number;
   sinCosto: boolean;
+  conteosHechos: number;
+  conteosRequeridos: number;
+}
+
+interface RoundProgress {
+  key: string;
+  label: string;
+  count: number;
+  done: number;
+  required: number;
 }
 
 interface Aggregates {
@@ -54,8 +67,14 @@ interface Aggregates {
   totalRefs: number;
   activeLocations: number;
   countedLocations: number;
+  requiredCounts: number;
+  doneCounts: number;
+  c1Done: number;
+  c1Required: number;
+  c2Done: number;
+  c2Required: number;
   byStatus: { key: string; count: number }[];
-  byRound: { key: string; label: string; count: number }[];
+  byRound: RoundProgress[];
   byFamily: { familia: string; erp: number; validado: number; descuadre: number; valor: number }[];
   descuadreUnd: number;
   descuadreValor: number;
@@ -64,6 +83,7 @@ interface Aggregates {
   auditadas: number;
   refsSinCosto: number;
 }
+
 
 async function fetchAllPages<T>(
   build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
@@ -109,10 +129,12 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
         bodega_status: string | null;
         bodega_round: number | null;
         activo: boolean | null;
+        discovered_at_round: number | null;
       }>((from, to) => {
         let q = supabase
           .from('locations_bodega_view')
-          .select('id, master_reference, material_type, bodega_erp, bodega_status, bodega_round, activo')
+          .select('id, master_reference, material_type, bodega_erp, bodega_status, bodega_round, activo, discovered_at_round')
+
           .eq('inventory_id', inventoryId!)
           .eq('bodega', bodega)
           .order('id')
@@ -172,14 +194,54 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
       const byRef = new Map<string, RefAgg>();
       let activeLocations = 0;
       let countedLocations = 0;
+      let requiredCounts = 0;
+      let doneCounts = 0;
+      let c1Done = 0;
+      let c1Required = 0;
+      let c2Done = 0;
+      let c2Required = 0;
+      const roundProgress = new Map<string, { done: number; required: number }>();
 
       locs.forEach((l) => {
         const status = l.bodega_status || 'pendiente';
         const round = l.bodega_round || 1;
         const isClosed = status === 'auditado' || status === 'cerrado_forzado';
+        const rounds = countRounds.get(l.id);
+
+        // Conteos requeridos/hechos de esta ubicación en su ronda vigente
+        let req = 0;
+        let done = 0;
         if (l.activo !== false && !isClosed) {
+          if (round === 1) {
+            const discoveredAtC2 = l.discovered_at_round === 2;
+            if (discoveredAtC2) {
+              req = 1;
+              done = rounds?.has(2) ? 1 : 0;
+              c2Required += 1;
+              if (rounds?.has(2)) c2Done += 1;
+            } else {
+              req = 2;
+              done = (rounds?.has(1) ? 1 : 0) + (rounds?.has(2) ? 1 : 0);
+              c1Required += 1;
+              c2Required += 1;
+              if (rounds?.has(1)) c1Done += 1;
+              if (rounds?.has(2)) c2Done += 1;
+            }
+          } else {
+            req = 1;
+            done = rounds?.has(round) ? 1 : 0;
+          }
+
           activeLocations += 1;
-          if (countRounds.get(l.id)?.has(round)) countedLocations += 1;
+          requiredCounts += req;
+          doneCounts += done;
+          if (done >= req) countedLocations += 1;
+
+          const rk = `C${round}`;
+          const rp = roundProgress.get(rk) || { done: 0, required: 0 };
+          rp.done += done;
+          rp.required += req;
+          roundProgress.set(rk, rp);
         }
 
         let agg = byRef.get(l.master_reference);
@@ -196,10 +258,14 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
             descuadre: 0,
             descuadreValor: 0,
             sinCosto: !costo,
+            conteosHechos: 0,
+            conteosRequeridos: 0,
           };
           byRef.set(l.master_reference, agg);
         }
         agg.validado += validatedMap.get(l.id) ?? 0;
+        agg.conteosHechos += done;
+        agg.conteosRequeridos += req;
       });
 
       const refs = [...byRef.values()].map((r) => {
@@ -223,8 +289,14 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
       let refsSinCosto = 0;
 
       refs.forEach((r) => {
-        statusCounts.set(r.status, (statusCounts.get(r.status) || 0) + 1);
         const closed = r.status === 'auditado' || r.status === 'cerrado_forzado';
+        const statusKey =
+          r.status === 'pendiente'
+            ? r.conteosHechos > 0
+              ? 'pendiente_en_progreso'
+              : 'pendiente_sin_iniciar'
+            : r.status;
+        statusCounts.set(statusKey, (statusCounts.get(statusKey) || 0) + 1);
         const roundKey = closed ? 'cerrada' : `C${r.round}`;
         roundCounts.set(roundKey, (roundCounts.get(roundKey) || 0) + 1);
         if (closed) auditadas += 1;
@@ -243,7 +315,15 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
         familyMap.set(fam, f);
       });
 
-      const statusOrder = ['auditado', 'pendiente', 'conflicto', 'critico', 'cerrado_forzado', 'n/a'];
+      const statusOrder = [
+        'auditado',
+        'cerrado_forzado',
+        'conflicto',
+        'critico',
+        'pendiente_en_progreso',
+        'pendiente_sin_iniciar',
+        'n/a',
+      ];
       const byStatus = statusOrder
         .filter((s) => statusCounts.has(s))
         .map((s) => ({ key: s, count: statusCounts.get(s)! }));
@@ -252,15 +332,27 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
         .forEach((s) => byStatus.push({ key: s, count: statusCounts.get(s)! }));
 
       const roundOrder = ['C1', 'C2', 'C3', 'C4', 'C5', 'cerrada'];
-      const byRound = roundOrder
+      const byRound: RoundProgress[] = roundOrder
         .filter((r) => roundCounts.has(r))
-        .map((r) => ({ key: r, label: r === 'cerrada' ? 'Cerrada' : r, count: roundCounts.get(r)! }));
+        .map((r) => ({
+          key: r,
+          label: r === 'cerrada' ? 'Cerrada' : r,
+          count: roundCounts.get(r)!,
+          done: roundProgress.get(r)?.done ?? 0,
+          required: roundProgress.get(r)?.required ?? 0,
+        }));
 
       return {
         refs,
         totalRefs: refs.length,
         activeLocations,
         countedLocations,
+        requiredCounts,
+        doneCounts,
+        c1Done,
+        c1Required,
+        c2Done,
+        c2Required,
         byStatus,
         byRound,
         byFamily: [...familyMap.entries()]
@@ -273,6 +365,7 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
         auditadas,
         refsSinCosto,
       };
+
     },
   });
 
@@ -327,14 +420,19 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
     );
   }
 
-  const avance = data.activeLocations + data.countedLocations === 0
+  const avance = data.requiredCounts === 0
     ? 100
-    : Math.round((data.countedLocations / Math.max(data.activeLocations, 1)) * 100);
+    : Math.round((data.doneCounts / data.requiredCounts) * 100);
   const pctAuditadas = data.totalRefs ? Math.round((data.auditadas / data.totalRefs) * 100) : 0;
 
   const kpis = [
     { label: 'Referencias', value: nf.format(data.totalRefs), hint: `${nf.format(data.activeLocations)} ubic. abiertas` },
-    { label: 'Avance de conteo', value: `${avance}%`, hint: `${nf.format(data.countedLocations)} de ${nf.format(data.activeLocations)} ubic.` },
+    {
+      label: 'Avance de conteo',
+      value: `${avance}%`,
+      hint: `${nf.format(data.doneCounts)} de ${nf.format(data.requiredCounts)} conteos · C1 ${nf.format(data.c1Done)}/${nf.format(data.c1Required)} · C2 ${nf.format(data.c2Done)}/${nf.format(data.c2Required)}`,
+    },
+
     { label: 'Auditadas', value: nf.format(data.auditadas), hint: `${pctAuditadas}% del total` },
     {
       label: 'Descuadre (und)',
@@ -392,11 +490,12 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
             {data.byStatus.map((s) => {
               const meta = STATUS_META[s.key] || STATUS_META['n/a'];
               const pct = data.totalRefs ? Math.round((s.count / data.totalRefs) * 100) : 0;
+              const statusParam = s.key.startsWith('pendiente') ? 'pendiente' : s.key;
               return (
                 <button
                   key={s.key}
                   type="button"
-                  onClick={() => navigate(`${auditPath}?status=${s.key}`)}
+                  onClick={() => navigate(`${auditPath}?status=${statusParam}`)}
                   className="w-full text-left group"
                 >
                   <div className="flex items-center justify-between text-sm mb-1">
@@ -410,6 +509,10 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
               );
             })}
             {data.byStatus.length === 0 && <p className="text-sm text-muted-foreground">Sin datos.</p>}
+            <p className="text-[11px] text-muted-foreground pt-1">
+              Una referencia solo cambia de estado cuando todas sus ubicaciones de la bodega completan los
+              conteos de la ronda (C1 y C2 en la ronda 1).
+            </p>
           </CardContent>
         </Card>
 
@@ -419,12 +522,16 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
           </CardHeader>
           <CardContent className="space-y-3">
             {data.byRound.map((r) => {
-              const pct = data.totalRefs ? Math.round((r.count / data.totalRefs) * 100) : 0;
+              const pct = r.required ? Math.round((r.done / r.required) * 100) : 0;
               return (
                 <div key={r.key}>
                   <div className="flex items-center justify-between text-sm mb-1">
-                    <span>{r.label}</span>
-                    <span className="text-muted-foreground">{nf.format(r.count)} · {pct}%</span>
+                    <span>
+                      {r.label} <span className="text-muted-foreground">· {nf.format(r.count)} refs</span>
+                    </span>
+                    <span className="text-muted-foreground">
+                      {r.required ? `${nf.format(r.done)} / ${nf.format(r.required)} conteos · ${pct}%` : '—'}
+                    </span>
                   </div>
                   <div className="h-2 rounded-full bg-muted overflow-hidden">
                     <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
@@ -433,9 +540,13 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
               );
             })}
             {data.byRound.length === 0 && <p className="text-sm text-muted-foreground">Sin datos.</p>}
+            <p className="text-[11px] text-muted-foreground pt-1">
+              En la ronda 1 cada ubicación requiere dos conteos (C1 y C2); en C3, C4 y C5 requiere uno.
+            </p>
           </CardContent>
         </Card>
       </div>
+
 
       <Card className="glass-card">
         <CardHeader className="pb-2">
