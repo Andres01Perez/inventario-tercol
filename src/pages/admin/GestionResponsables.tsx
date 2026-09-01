@@ -118,13 +118,14 @@ const GestionResponsables: React.FC = () => {
   // Clear selection when filters change
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [debouncedSearchTerm, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, filterPuntoReferencia, currentPage, pageSize]);
+  }, [debouncedSearchTerm, filterTipo, filterSubcategoria, filterUbicacion, filterObservacion, filterSupervisor, filterPuntoReferencia, filterBodega, currentPage, pageSize]);
 
   // Use cached supervisors hook
   const { data: supervisors } = useSupervisors();
 
   // Map material type to the admin that owns the bucket (MP → admin_mp, PP → admin_pp)
-  const { data: adminMap } = useQuery({
+  // and resolve the bodega of every location from its assigned_admin_id.
+  const { data: adminBodega } = useQuery({
     queryKey: ['admin-bodega-map'],
     queryFn: async () => {
       const { data: roles, error } = await supabase
@@ -132,15 +133,23 @@ const GestionResponsables: React.FC = () => {
         .select('user_id, role')
         .in('role', ['admin_mp', 'admin_pp']);
       if (error) throw error;
-      const map = new Map<string, string>();
-      roles?.forEach((r) => map.set(r.role, r.user_id));
-      return map;
+      const byRole = new Map<string, string>();
+      const byUser = new Map<string, Bodega>();
+      const mpIds: string[] = [];
+      const ppIds: string[] = [];
+      roles?.forEach((r) => {
+        if (!byRole.has(r.role)) byRole.set(r.role, r.user_id);
+        const bodega: Bodega = r.role === 'admin_mp' ? 'almacen' : 'planta';
+        byUser.set(r.user_id, bodega);
+        (r.role === 'admin_mp' ? mpIds : ppIds).push(r.user_id);
+      });
+      return { byRole, byUser, mpIds, ppIds };
     },
     staleTime: 5 * 60 * 1000,
     enabled: !!role,
   });
 
-  const hasActiveFilters = filterTipo !== 'all' || filterSubcategoria || filterUbicacion || filterObservacion || filterSupervisor !== 'all' || filterPuntoReferencia !== 'all';
+  const hasActiveFilters = filterTipo !== 'all' || filterSubcategoria || filterUbicacion || filterObservacion || filterSupervisor !== 'all' || filterPuntoReferencia !== 'all' || filterBodega !== 'all';
 
   const clearFilters = () => {
     setFilterTipo('all');
@@ -149,6 +158,7 @@ const GestionResponsables: React.FC = () => {
     setFilterObservacion('');
     setFilterSupervisor('all');
     setFilterPuntoReferencia('all');
+    setFilterBodega('all');
     setCurrentPage(1);
   };
 
