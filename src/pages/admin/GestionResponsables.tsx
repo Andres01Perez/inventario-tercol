@@ -49,6 +49,8 @@ import {
 
 const PAGE_SIZE_OPTIONS = [50, 100, 250, 500];
 
+type Bodega = 'almacen' | 'planta';
+
 interface LocationWithReference {
   kind: 'location';
   id: string;
@@ -60,6 +62,8 @@ interface LocationWithReference {
   punto_referencia: string | null;
   metodo_conteo: string | null;
   assigned_supervisor_id: string | null;
+  assigned_admin_id: string | null;
+  bodega: Bodega | null;
   material_type: 'MP' | 'PP';
   control: string | null;
 }
@@ -93,6 +97,7 @@ const GestionResponsables: React.FC = () => {
   const [filterObservacion, setFilterObservacion] = useState('');
   const [filterSupervisor, setFilterSupervisor] = useState<string>('all');
   const [filterPuntoReferencia, setFilterPuntoReferencia] = useState<string>('all');
+  const [filterBodega, setFilterBodega] = useState<string>('all');
   const [pageSize, setPageSize] = useState(500);
 
   const isSuperadmin = role === 'superadmin';
