@@ -115,6 +115,8 @@ export const parseLocationsExcel = async (file: File): Promise<LocationsParseRes
       const ubicacionDetallada = findColumnValue(row, ['ubicacion detallada', 'ubicación detallada', 'location_detail', 'detalle']);
       const puntoReferencia = findColumnValue(row, ['punto referencia', 'punto_referencia', 'punto ref', 'referencia punto']);
       const metodoConteo = findColumnValue(row, ['metodo conteo', 'método conteo', 'metodo_conteo', 'metodo']);
+      const activoRaw = findColumnValue(row, ['activo']);
+      const terminadoRaw = findColumnValue(row, ['terminado']);
 
       // Validar referencia (campo obligatorio)
       if (!referencia) {
@@ -141,6 +143,16 @@ export const parseLocationsExcel = async (file: File): Promise<LocationsParseRes
         seenCombos.add(comboKey);
       }
 
+      // Activo / Terminado (opcionales)
+      const activoParsed = parseBooleanFlag(activoRaw);
+      if (activoRaw && activoParsed === null) {
+        warnings.push(`Fila ${rowNumber}: Valor de "Activo" no reconocido (${activoRaw}); se usa SI`);
+      }
+      const terminadoParsed = parseBooleanFlag(terminadoRaw);
+      if (terminadoRaw && terminadoParsed === null) {
+        warnings.push(`Fila ${rowNumber}: Valor de "Terminado" no reconocido (${terminadoRaw}); se usa NO`);
+      }
+
       data.push({
         master_reference: referencia,
         bodega,
@@ -150,6 +162,8 @@ export const parseLocationsExcel = async (file: File): Promise<LocationsParseRes
         location_detail: ubicacionDetallada || null,
         punto_referencia: puntoReferencia || null,
         metodo_conteo: metodoConteo || null,
+        activo: activoParsed === null ? true : activoParsed,
+        terminado: terminadoParsed === null ? false : terminadoParsed,
         rowNumber,
       });
     });
