@@ -294,6 +294,26 @@ const GestionResponsables: React.FC = () => {
         query = query.ilike('locations.punto_referencia', `%${filterPuntoReferencia}%`);
       }
 
+      // Filter by bodega (derived from the location's admin role)
+      if (filterBodega !== 'all') {
+        const mpIds = adminBodega?.mpIds ?? [];
+        const ppIds = adminBodega?.ppIds ?? [];
+        if (filterBodega === 'almacen') {
+          query = mpIds.length > 0
+            ? query.in('locations.assigned_admin_id', mpIds)
+            : query.is('locations.assigned_admin_id', null).eq('locations.assigned_admin_id', '00000000-0000-0000-0000-000000000000');
+        } else if (filterBodega === 'planta') {
+          query = ppIds.length > 0
+            ? query.in('locations.assigned_admin_id', ppIds)
+            : query.is('locations.assigned_admin_id', null).eq('locations.assigned_admin_id', '00000000-0000-0000-0000-000000000000');
+        } else if (filterBodega === 'sin-bodega') {
+          const allIds = [...mpIds, ...ppIds];
+          query = allIds.length > 0
+            ? query.or(`assigned_admin_id.is.null,assigned_admin_id.not.in.(${allIds.join(',')})`, { referencedTable: 'locations' })
+            : query;
+        }
+      }
+
       // Pagination
       const from = (currentPage - 1) * pageSize;
       query = query
