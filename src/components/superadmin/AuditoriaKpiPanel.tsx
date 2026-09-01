@@ -463,9 +463,11 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
     },
     {
       label: 'Descuadre ($)',
-      value: money(data.descuadreValor),
-      hint: data.refsSinCosto > 0 ? `${data.refsSinCosto} refs sin costo cargado` : 'Costos cargados',
-      danger: data.descuadreValor !== 0,
+      value: data.hasAnyValidation ? money(data.descuadreValor) : '—',
+      hint: data.hasAnyValidation
+        ? (data.refsSinCosto > 0 ? `${data.refsSinCosto} refs sin costo cargado` : 'Costos cargados')
+        : 'Sin validaciones consolidadas',
+      danger: data.hasAnyValidation && data.descuadreValor !== 0,
     },
   ];
 
