@@ -9,12 +9,20 @@ const roundConfigs = [
   { round: 4, label: 'Conteo 4' },
 ];
 
-const RoundSelectorCards: React.FC = () => {
+interface RoundSelectorCardsProps {
+  /** Base de la ruta de conteo. Por defecto MP/PP. */
+  basePath?: string;
+}
+
+const RoundSelectorCards: React.FC<RoundSelectorCardsProps> = ({
+  basePath = '/gestion-operativa/conteo',
+}) => {
   const navigate = useNavigate();
 
   const handleCardClick = (round: number) => {
-    navigate(`/gestion-operativa/conteo/${round}`);
+    navigate(`${basePath}/${round}`);
   };
+
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
