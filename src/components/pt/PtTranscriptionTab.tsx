@@ -13,8 +13,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from 'sonner';
-import { Loader2, RefreshCw, Save, Search, CheckCircle2 } from 'lucide-react';
+import { Check, Loader2, RefreshCw, Save, Search, CheckCircle2 } from 'lucide-react';
 
 const PAGE_SIZE = 1000;
 
@@ -39,6 +40,7 @@ const PtTranscriptionTab: React.FC<Props> = ({ roundNumber, isAdminMode = false 
   const { user } = useAuth();
   const { inventoryId, isReadOnly } = useInventory();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
 
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
@@ -276,22 +278,29 @@ const PtTranscriptionTab: React.FC<Props> = ({ roundNumber, isAdminMode = false 
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
-        <div className="relative flex-1 max-w-sm">
+    <div className="space-y-3 sm:space-y-4">
+      <div className="sticky top-0 z-20 -mx-1 px-1 py-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+        <div className="relative flex-1 sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            className="pl-9"
+            className="pl-9 h-11 text-base sm:h-10 sm:text-sm"
             placeholder="Buscar referencia o ubicación..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary">{locations.length} ubicaciones pendientes</Badge>
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Actualizar
+        <div className="flex items-center justify-between sm:justify-end gap-2">
+          <Badge variant="secondary">{locations.length} pendientes</Badge>
+          <Button
+            variant="outline"
+            size={isMobile ? 'icon' : 'sm'}
+            className={isMobile ? 'h-11 w-11' : undefined}
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            aria-label="Actualizar"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''} ${isMobile ? '' : 'mr-2'}`} />
+            {!isMobile && 'Actualizar'}
           </Button>
         </div>
       </div>
@@ -303,10 +312,15 @@ const PtTranscriptionTab: React.FC<Props> = ({ roundNumber, isAdminMode = false 
           <p className="text-sm">Todo lo asignado para este conteo ya fue transcrito.</p>
         </div>
       ) : (
-        <Accordion type="multiple" defaultValue={grouped.map(([piso]) => piso)} className="space-y-2">
+        <Accordion
+          type="multiple"
+          key={isMobile ? 'mobile' : 'desktop'}
+          defaultValue={isMobile ? grouped.slice(0, 1).map(([piso]) => piso) : grouped.map(([piso]) => piso)}
+          className="space-y-2"
+        >
           {grouped.map(([piso, rows]) => (
             <AccordionItem key={piso} value={piso} className="border rounded-lg px-3">
-              <AccordionTrigger className="hover:no-underline">
+              <AccordionTrigger className="hover:no-underline min-h-[44px] py-3">
                 <div className="flex items-center gap-3">
                   <span className="font-semibold">Piso {piso}</span>
                   <Badge variant="outline">{rows.length} ubicaciones</Badge>
@@ -317,14 +331,14 @@ const PtTranscriptionTab: React.FC<Props> = ({ roundNumber, isAdminMode = false 
                   {rows.map((loc) => (
                     <div
                       key={loc.id}
-                      className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 border rounded-md p-3 bg-card"
+                      className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 border rounded-md p-3 bg-card"
                     >
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{loc.referencia}</div>
-                        <div className="text-sm text-muted-foreground truncate">
+                        <div className="font-medium break-words md:truncate">{loc.referencia}</div>
+                        <div className="text-sm text-muted-foreground break-words md:truncate">
                           {loc.descripcion || 'Sin descripción'}
                         </div>
-                        <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-3">
+                        <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
                           {loc.prodc && <span>PRODC: {loc.prodc}</span>}
                           {loc.ubic && <span>UBIC: {loc.ubic}</span>}
                           {loc.linea && <span>Línea: {loc.linea}</span>}
@@ -335,7 +349,8 @@ const PtTranscriptionTab: React.FC<Props> = ({ roundNumber, isAdminMode = false 
                         <Input
                           type="number"
                           inputMode="decimal"
-                          className="w-32"
+                          enterKeyHint="done"
+                          className="flex-1 md:flex-none md:w-32 h-12 text-base md:h-10 md:text-sm"
                           placeholder="Cantidad"
                           value={quantities[loc.id] ?? ''}
                           disabled={isReadOnly || savingIds.has(loc.id)}
@@ -347,12 +362,16 @@ const PtTranscriptionTab: React.FC<Props> = ({ roundNumber, isAdminMode = false 
                           }}
                         />
                         <Button
-                          size="sm"
+                          size={isMobile ? 'icon' : 'sm'}
+                          className={isMobile ? 'h-12 w-16 shrink-0' : undefined}
                           onClick={() => handleSave(loc)}
                           disabled={isReadOnly || savingIds.has(loc.id)}
+                          aria-label="Guardar conteo"
                         >
                           {savingIds.has(loc.id) ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                          ) : isMobile ? (
+                            <Check className="h-6 w-6" />
                           ) : (
                             <>
                               <Save className="h-4 w-4 mr-2" />
