@@ -82,6 +82,8 @@ interface Location {
   observaciones: string | null;
   punto_referencia: string | null;
   metodo_conteo: string | null;
+  activo?: boolean | null;
+  terminado?: boolean | null;
   inventory_master: { referencia: string; material_type: string; control: string | null; audit_round: number | null } | null;
 }
 
@@ -145,6 +147,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
         .select(`
           id, master_reference, location_name, location_detail,
           subcategoria, observaciones, punto_referencia, metodo_conteo,
+          activo, terminado,
           assigned_supervisor_id, material_type, control, bodega, bodega_round, bodega_status
         `)
         .eq('inventory_id', inventoryId!)

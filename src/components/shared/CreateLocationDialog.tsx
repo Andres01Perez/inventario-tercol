@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import SupervisorSelect from '@/components/shared/SupervisorSelect';
+import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -34,6 +35,8 @@ export interface NewLocationPayload {
   observaciones: string | null;
   assigned_supervisor_id: string | null;
   assigned_admin_id: string;
+  activo: boolean;
+  terminado: boolean;
 }
 
 interface AdminOption {
@@ -75,6 +78,8 @@ const CreateLocationDialog: React.FC<CreateLocationDialogProps> = ({
   const [subcategoria, setSubcategoria] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [supervisorId, setSupervisorId] = useState<string | null>(null);
+  const [activo, setActivo] = useState(true);
+  const [terminado, setTerminado] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const { data: adminOptions } = useQuery<AdminOption[]>({
@@ -166,6 +171,8 @@ const CreateLocationDialog: React.FC<CreateLocationDialogProps> = ({
       observaciones: observaciones.trim() || null,
       assigned_supervisor_id: supervisorId,
       assigned_admin_id: assignedAdminId,
+      activo,
+      terminado,
     };
 
     const { error } = await supabase.from('locations').insert(payload);
@@ -274,6 +281,17 @@ const CreateLocationDialog: React.FC<CreateLocationDialogProps> = ({
                 onChange={(e) => setObservaciones(e.target.value)}
                 placeholder="Notas adicionales"
               />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center justify-between rounded-md border p-3">
+              <Label htmlFor="activo">Activo</Label>
+              <Switch id="activo" checked={activo} onCheckedChange={setActivo} />
+            </div>
+            <div className="flex items-center justify-between rounded-md border p-3">
+              <Label htmlFor="terminado">Terminado</Label>
+              <Switch id="terminado" checked={terminado} onCheckedChange={setTerminado} />
             </div>
           </div>
 

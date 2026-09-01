@@ -69,6 +69,8 @@ interface LocationData {
   location_detail: string | null;
   punto_referencia: string | null;
   metodo_conteo: string | null;
+  activo: boolean | null;
+  terminado: boolean | null;
   assigned_supervisor_id: string | null;
   assigned_admin_id: string | null;
 }
@@ -150,6 +152,8 @@ const GestionUbicacion: React.FC = () => {
             location_detail,
             punto_referencia,
             metodo_conteo,
+            activo,
+            terminado,
             assigned_supervisor_id,
             assigned_admin_id
           )
@@ -254,7 +258,7 @@ const GestionUbicacion: React.FC = () => {
     }: { 
       locationId: string; 
       field: string; 
-      value: string | null; 
+      value: string | boolean | null; 
     }) => {
       const { error } = await supabase
         .from('locations')
@@ -292,7 +296,7 @@ const GestionUbicacion: React.FC = () => {
     }
   });
 
-  const handleSave = async (locationId: string, field: string, value: string | null) => {
+  const handleSave = async (locationId: string, field: string, value: string | boolean | null) => {
     await updateLocationMutation.mutateAsync({ locationId, field, value });
   };
 
@@ -478,7 +482,9 @@ const GestionUbicacion: React.FC = () => {
                     <TableHead>Ubicación Detallada</TableHead>
                     <TableHead>Punto Referencia</TableHead>
                     <TableHead>Método Conteo</TableHead>
-                    <TableHead className="w-[180px]">Líder Conteo</TableHead>
+                    <TableHead className="w-[80px]">Activo</TableHead>
+                   <TableHead className="w-[90px]">Terminado</TableHead>
+                   <TableHead className="w-[180px]">Líder Conteo</TableHead>
                     <TableHead className="w-[100px]">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -505,7 +511,7 @@ const GestionUbicacion: React.FC = () => {
                             </Badge>
                           </TableCell>
                           <TableCell className="font-medium">{row.referencia}</TableCell>
-                          <TableCell colSpan={7} className="text-muted-foreground text-sm italic">
+                          <TableCell colSpan={9} className="text-muted-foreground text-sm italic">
                             Sin ubicaciones asignadas
                           </TableCell>
                           <TableCell>
@@ -580,6 +586,26 @@ const GestionUbicacion: React.FC = () => {
                             onSave={(value) => handleSave(row.location!.id, 'metodo_conteo', value)}
                             placeholder="Ingresar..."
                           />
+                        </TableCell>
+                        <TableCell>
+                          <button
+                            type="button"
+                            onClick={() => handleSave(row.location!.id, 'activo', !(row.location?.activo ?? true))}
+                          >
+                            <Badge variant={row.location?.activo === false ? 'outline' : 'default'}>
+                              {row.location?.activo === false ? 'NO' : 'SI'}
+                            </Badge>
+                          </button>
+                        </TableCell>
+                        <TableCell>
+                          <button
+                            type="button"
+                            onClick={() => handleSave(row.location!.id, 'terminado', !(row.location?.terminado ?? false))}
+                          >
+                            <Badge variant={row.location?.terminado ? 'default' : 'outline'}>
+                              {row.location?.terminado ? 'SI' : 'NO'}
+                            </Badge>
+                          </button>
                         </TableCell>
                         <TableCell>
                           <SupervisorSelect
