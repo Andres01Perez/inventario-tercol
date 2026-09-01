@@ -79,7 +79,7 @@ const BulkPrintableSheets: React.FC<BulkPrintableSheetsProps> = ({
               <table className="w-full border-collapse text-xs print:text-[10px]">
                 <thead className="print:table-header-group">
                   <tr>
-                    <th colSpan={9} className="pb-4 border-b-0 text-left font-normal">
+                    <th colSpan={11} className="pb-4 border-b-0 text-left font-normal">
                       <div className="text-center mb-4">
                         <h1 className="text-xl font-bold">PLANILLA DE CONTEO FÍSICO</h1>
                         <p className="text-base font-medium text-primary">{roundLabel}</p>
@@ -101,13 +101,15 @@ const BulkPrintableSheets: React.FC<BulkPrintableSheetsProps> = ({
                     <th className="text-left py-2 px-1">Ubicación</th>
                     <th className="text-left py-2 px-1">Ubic. Det.</th>
                     <th className="text-left py-2 px-1">Método</th>
+                    <th className="text-center py-2 px-1 w-10">Activo</th>
+                    <th className="text-center py-2 px-1 w-10">Term.</th>
                     <th className="text-center py-2 px-1 w-20">Cantidad</th>
                   </tr>
                 </thead>
 
                 <tfoot className="print:table-footer-group">
                   <tr>
-                    <td colSpan={9} className="pt-8">
+                    <td colSpan={11} className="pt-8">
                       <div className="grid grid-cols-2 gap-8">
                         <div className="text-center">
                           <div className="border-b border-foreground mb-2 h-6"></div>

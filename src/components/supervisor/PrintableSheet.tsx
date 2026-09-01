@@ -104,7 +104,7 @@ const PrintableSheet: React.FC<PrintableSheetProps> = ({
             {/* Signatures footer - repeats on each page */}
             <tfoot className="print:table-footer-group">
               <tr>
-                <td colSpan={9} className="pt-8">
+                <td colSpan={11} className="pt-8">
                   <div className="grid grid-cols-2 gap-8">
                     <div className="text-center">
                       <div className="border-b border-foreground mb-2 h-6"></div>
@@ -130,6 +130,8 @@ const PrintableSheet: React.FC<PrintableSheetProps> = ({
                   <td className="py-2 px-1">{loc.location_name || '-'}</td>
                   <td className="py-2 px-1">{loc.location_detail || '-'}</td>
                   <td className="py-2 px-1">{loc.metodo_conteo || '-'}</td>
+                  <td className="py-2 px-1 text-center">{loc.activo === false ? 'NO' : 'SI'}</td>
+                  <td className="py-2 px-1 text-center">{loc.terminado ? 'SI' : 'NO'}</td>
                   <td className="py-2 px-1">
                     <div className="border-b border-dashed border-foreground h-5 w-full"></div>
                   </td>
