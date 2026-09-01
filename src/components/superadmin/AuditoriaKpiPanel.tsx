@@ -405,8 +405,8 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
   const topDescuadres = useMemo(
     () =>
       (data?.refs ?? [])
-        .filter((r) => r.descuadre !== 0)
-        .sort((a, b) => Math.abs(b.descuadreValor) - Math.abs(a.descuadreValor) || Math.abs(b.descuadre) - Math.abs(a.descuadre))
+        .filter((r) => r.hasValidation && r.descuadre !== 0)
+        .sort((a, b) => Math.abs(b.descuadreValor ?? 0) - Math.abs(a.descuadreValor ?? 0) || Math.abs(b.descuadre) - Math.abs(a.descuadre))
         .slice(0, 10),
     [data],
   );
