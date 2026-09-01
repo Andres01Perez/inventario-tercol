@@ -191,14 +191,54 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
       const byRef = new Map<string, RefAgg>();
       let activeLocations = 0;
       let countedLocations = 0;
+      let requiredCounts = 0;
+      let doneCounts = 0;
+      let c1Done = 0;
+      let c1Required = 0;
+      let c2Done = 0;
+      let c2Required = 0;
+      const roundProgress = new Map<string, { done: number; required: number }>();
 
       locs.forEach((l) => {
         const status = l.bodega_status || 'pendiente';
         const round = l.bodega_round || 1;
         const isClosed = status === 'auditado' || status === 'cerrado_forzado';
+        const rounds = countRounds.get(l.id);
+
+        // Conteos requeridos/hechos de esta ubicación en su ronda vigente
+        let req = 0;
+        let done = 0;
         if (l.activo !== false && !isClosed) {
+          if (round === 1) {
+            const discoveredAtC2 = l.discovered_at_round === 2;
+            if (discoveredAtC2) {
+              req = 1;
+              done = rounds?.has(2) ? 1 : 0;
+              c2Required += 1;
+              if (rounds?.has(2)) c2Done += 1;
+            } else {
+              req = 2;
+              done = (rounds?.has(1) ? 1 : 0) + (rounds?.has(2) ? 1 : 0);
+              c1Required += 1;
+              c2Required += 1;
+              if (rounds?.has(1)) c1Done += 1;
+              if (rounds?.has(2)) c2Done += 1;
+            }
+          } else {
+            req = 1;
+            done = rounds?.has(round) ? 1 : 0;
+          }
+
           activeLocations += 1;
-          if (countRounds.get(l.id)?.has(round)) countedLocations += 1;
+          requiredCounts += req;
+          doneCounts += done;
+          if (done >= req) countedLocations += 1;
+
+          const rk = `C${round}`;
+          const rp = roundProgress.get(rk) || { done: 0, required: 0 };
+          rp.done += done;
+          rp.required += req;
+          roundProgress.set(rk, rp);
         }
 
         let agg = byRef.get(l.master_reference);
@@ -215,10 +255,14 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
             descuadre: 0,
             descuadreValor: 0,
             sinCosto: !costo,
+            conteosHechos: 0,
+            conteosRequeridos: 0,
           };
           byRef.set(l.master_reference, agg);
         }
         agg.validado += validatedMap.get(l.id) ?? 0;
+        agg.conteosHechos += done;
+        agg.conteosRequeridos += req;
       });
 
       const refs = [...byRef.values()].map((r) => {
@@ -242,8 +286,14 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
       let refsSinCosto = 0;
 
       refs.forEach((r) => {
-        statusCounts.set(r.status, (statusCounts.get(r.status) || 0) + 1);
         const closed = r.status === 'auditado' || r.status === 'cerrado_forzado';
+        const statusKey =
+          r.status === 'pendiente'
+            ? r.conteosHechos > 0
+              ? 'pendiente_en_progreso'
+              : 'pendiente_sin_iniciar'
+            : r.status;
+        statusCounts.set(statusKey, (statusCounts.get(statusKey) || 0) + 1);
         const roundKey = closed ? 'cerrada' : `C${r.round}`;
         roundCounts.set(roundKey, (roundCounts.get(roundKey) || 0) + 1);
         if (closed) auditadas += 1;
@@ -262,7 +312,15 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
         familyMap.set(fam, f);
       });
 
-      const statusOrder = ['auditado', 'pendiente', 'conflicto', 'critico', 'cerrado_forzado', 'n/a'];
+      const statusOrder = [
+        'auditado',
+        'cerrado_forzado',
+        'conflicto',
+        'critico',
+        'pendiente_en_progreso',
+        'pendiente_sin_iniciar',
+        'n/a',
+      ];
       const byStatus = statusOrder
         .filter((s) => statusCounts.has(s))
         .map((s) => ({ key: s, count: statusCounts.get(s)! }));
@@ -271,15 +329,27 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
         .forEach((s) => byStatus.push({ key: s, count: statusCounts.get(s)! }));
 
       const roundOrder = ['C1', 'C2', 'C3', 'C4', 'C5', 'cerrada'];
-      const byRound = roundOrder
+      const byRound: RoundProgress[] = roundOrder
         .filter((r) => roundCounts.has(r))
-        .map((r) => ({ key: r, label: r === 'cerrada' ? 'Cerrada' : r, count: roundCounts.get(r)! }));
+        .map((r) => ({
+          key: r,
+          label: r === 'cerrada' ? 'Cerrada' : r,
+          count: roundCounts.get(r)!,
+          done: roundProgress.get(r)?.done ?? 0,
+          required: roundProgress.get(r)?.required ?? 0,
+        }));
 
       return {
         refs,
         totalRefs: refs.length,
         activeLocations,
         countedLocations,
+        requiredCounts,
+        doneCounts,
+        c1Done,
+        c1Required,
+        c2Done,
+        c2Required,
         byStatus,
         byRound,
         byFamily: [...familyMap.entries()]
@@ -292,6 +362,7 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
         auditadas,
         refsSinCosto,
       };
+
     },
   });
 
