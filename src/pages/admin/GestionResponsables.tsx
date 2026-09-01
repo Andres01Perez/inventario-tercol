@@ -777,6 +777,11 @@ const GestionResponsables: React.FC = () => {
                               {row.material_type}
                             </Badge>
                           </TableCell>
+                          {isSuperadmin && (
+                            <TableCell>
+                              <span className="text-muted-foreground text-sm">—</span>
+                            </TableCell>
+                          )}
                           <TableCell className="font-mono text-sm">{row.master_reference}</TableCell>
                           <TableCell colSpan={6} className="text-muted-foreground text-sm italic">
                             Sin ubicaciones asignadas
@@ -813,6 +818,23 @@ const GestionResponsables: React.FC = () => {
                             {row.material_type}
                           </Badge>
                         </TableCell>
+                        {isSuperadmin && (
+                          <TableCell>
+                            {row.bodega === 'almacen' ? (
+                              <Badge variant="outline" className="border-orange-500 text-orange-500">Almacén</Badge>
+                            ) : row.bodega === 'planta' ? (
+                              <Badge variant="outline" className="border-emerald-500 text-emerald-500">Planta</Badge>
+                            ) : (
+                              <Badge
+                                variant="outline"
+                                className="text-muted-foreground"
+                                title="La ubicación no tiene admin de bodega asignado"
+                              >
+                                Sin bodega
+                              </Badge>
+                            )}
+                          </TableCell>
+                        )}
                         <TableCell className="font-mono text-sm">{row.master_reference}</TableCell>
                         <TableCell className="text-sm">{row.subcategoria || '-'}</TableCell>
                         <TableCell className="text-sm max-w-[200px] truncate" title={row.observaciones || ''}>
