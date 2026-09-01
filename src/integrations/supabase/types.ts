@@ -258,6 +258,7 @@ export type Database = {
       }
       locations: {
         Row: {
+          activo: boolean
           assigned_admin_id: string | null
           assigned_supervisor_id: string | null
           created_at: string | null
@@ -275,11 +276,13 @@ export type Database = {
           status_c3: string | null
           status_c4: string | null
           subcategoria: string | null
+          terminado: boolean
           updated_at: string | null
           validated_at_round: number | null
           validated_quantity: number | null
         }
         Insert: {
+          activo?: boolean
           assigned_admin_id?: string | null
           assigned_supervisor_id?: string | null
           created_at?: string | null
@@ -297,11 +300,13 @@ export type Database = {
           status_c3?: string | null
           status_c4?: string | null
           subcategoria?: string | null
+          terminado?: boolean
           updated_at?: string | null
           validated_at_round?: number | null
           validated_quantity?: number | null
         }
         Update: {
+          activo?: boolean
           assigned_admin_id?: string | null
           assigned_supervisor_id?: string | null
           created_at?: string | null
@@ -319,6 +324,7 @@ export type Database = {
           status_c3?: string | null
           status_c4?: string | null
           subcategoria?: string | null
+          terminado?: boolean
           updated_at?: string | null
           validated_at_round?: number | null
           validated_quantity?: number | null
