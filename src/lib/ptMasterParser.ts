@@ -65,28 +65,59 @@ export const parsePtMasterExcel = async (file: File): Promise<PtMasterParseResul
       return { data, errors, warnings };
     }
 
-    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[sheetName], {
+    // Lee la hoja como matriz cruda para detectar la fila de encabezados.
+    // El ERP suele exportar con membrete, por lo que CODIGO/CANT pueden estar
+    // varias filas más abajo de la primera.
+    const rawRows = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[sheetName], {
+      header: 1,
       defval: '',
+      raw: true,
     });
 
-    if (rows.length === 0) {
-      errors.push('El archivo no contiene datos');
+    const HEADER_SCAN_LIMIT = 20;
+    let headerIndex = -1;
+    for (let i = 0; i < Math.min(rawRows.length, HEADER_SCAN_LIMIT); i++) {
+      const cells = (rawRows[i] as unknown[]).map((c) => normalize(String(c ?? '')));
+      if (cells.some((c) => CODIGO_ALIASES.includes(c)) && cells.some((c) => CANTIDAD_ALIASES.includes(c))) {
+        headerIndex = i;
+        break;
+      }
+    }
+
+    if (headerIndex === -1) {
+      errors.push('No se encontraron las columnas "CODIGO" y "CANT." en las primeras filas del archivo');
       return { data, errors, warnings };
     }
 
-    const columns = Object.keys(rows[0]);
-    const codigoKey = findKey(columns, CODIGO_ALIASES);
-    const descKey = findKey(columns, DESCRIPCION_ALIASES);
-    const cantKey = findKey(columns, CANTIDAD_ALIASES);
+    const headers = (rawRows[headerIndex] as unknown[]).map((c) => String(c ?? '').trim());
+    const codigoIdx = headers.findIndex((h) => CODIGO_ALIASES.includes(normalize(h)));
+    const descIdx = headers.findIndex((h) => DESCRIPCION_ALIASES.includes(normalize(h)));
+    const cantIdx = headers.findIndex((h) => CANTIDAD_ALIASES.includes(normalize(h)));
 
-    if (!codigoKey) {
-      errors.push('No se encontró la columna "CODIGO"');
-    }
-    if (!cantKey) {
-      errors.push('No se encontró la columna "CANT."');
-    }
+    if (codigoIdx === -1) errors.push('No se encontró la columna "CODIGO"');
+    if (cantIdx === -1) errors.push('No se encontró la columna "CANT."');
     if (errors.length > 0) return { data, errors, warnings };
-    if (!descKey) warnings.push('No se encontró la columna "DESCRIPCION"; se importará vacía');
+    if (descIdx === -1) warnings.push('No se encontró la columna "DESCRIPCION"; se importará vacía');
+
+    // Convierte las filas posteriores al encabezado en objetos
+    const rows: Record<string, unknown>[] = [];
+    for (let r = headerIndex + 1; r < rawRows.length; r++) {
+      const cells = rawRows[r] as unknown[];
+      const row: Record<string, unknown> = {};
+      headers.forEach((h, c) => {
+        if (h) row[h] = cells[c];
+      });
+      rows.push(row);
+    }
+
+    if (rows.length === 0) {
+      errors.push('El archivo no contiene datos debajo del encabezado');
+      return { data, errors, warnings };
+    }
+
+    const codigoKey = headers[codigoIdx];
+    const descKey = descIdx >= 0 ? headers[descIdx] : undefined;
+    const cantKey = headers[cantIdx];
 
     const seen = new Map<string, number>();
 
