@@ -122,7 +122,7 @@ export const parsePtMasterExcel = async (file: File): Promise<PtMasterParseResul
     const seen = new Map<string, number>();
 
     rows.forEach((row, index) => {
-      const rowNumber = index + 2;
+      const rowNumber = headerIndex + index + 2;
       const referencia = String(row[codigoKey!] ?? '').trim();
       if (!referencia) return; // fila vacía: se omite en silencio
 
