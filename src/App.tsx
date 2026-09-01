@@ -165,6 +165,31 @@ const App: React.FC = () => (
                 </ProtectedRoute>
               }
             />
+            {/* Producto Terminado (PT) */}
+            <Route
+              path="/pt/maestra"
+              element={
+                <ProtectedRoute allowedRoles={['superadmin']}>
+                  <MaestraPT />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/pt/ubicaciones"
+              element={
+                <ProtectedRoute allowedRoles={['superadmin']}>
+                  <UbicacionesPT />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/pt/responsables"
+              element={
+                <ProtectedRoute allowedRoles={['superadmin']}>
+                  <ResponsablesPT />
+                </ProtectedRoute>
+              }
+            />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
