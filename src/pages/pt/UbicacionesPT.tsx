@@ -228,6 +228,7 @@ const UbicacionesPT: React.FC = () => {
                         <TableHead>Línea</TableHead>
                         <TableHead className="text-right">U.E</TableHead>
                         <TableHead>Líder de conteo</TableHead>
+                        <TableHead className="w-[70px] text-right">Editar</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -246,15 +247,28 @@ const UbicacionesPT: React.FC = () => {
                               <span className="text-muted-foreground">Sin asignar</span>
                             )}
                           </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              disabled={isReadOnly}
+                              onClick={() => openEdit(l)}
+                              aria-label="Editar ubicación"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                       {filtered.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                          <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                             No hay ubicaciones PT que coincidan.
                           </TableCell>
                         </TableRow>
                       )}
+
                     </TableBody>
                   </Table>
                 </div>
