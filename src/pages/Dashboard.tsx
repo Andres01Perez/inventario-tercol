@@ -26,7 +26,7 @@ const Dashboard: React.FC = () => {
   }
 
   // If user has a valid role, show unified dashboard
-  if (role === 'superadmin' || role === 'admin_mp' || role === 'admin_pp' || role === 'supervisor') {
+  if (role === 'superadmin' || role === 'admin_mp' || role === 'admin_pp' || role === 'supervisor' || role === 'visualizador') {
     return <UnifiedDashboard />;
   }
 

@@ -9,6 +9,7 @@ import {
   Boxes, 
   Shield, 
   Settings,
+  Eye,
   LucideIcon 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -45,6 +46,13 @@ const getRoleConfig = (role: string | null): RoleConfig => {
         icon: Boxes,
         colorClass: 'text-emerald-500',
         bgClass: 'bg-emerald-500/10',
+      };
+    case 'visualizador':
+      return {
+        label: 'Visualizador',
+        icon: Eye,
+        colorClass: 'text-sky-500',
+        bgClass: 'bg-sky-500/10',
       };
     case 'superadmin':
       return {

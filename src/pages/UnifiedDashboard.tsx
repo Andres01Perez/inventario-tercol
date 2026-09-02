@@ -52,6 +52,13 @@ const UnifiedDashboard: React.FC = () => {
           colorClass: 'text-emerald-500',
           bgClass: 'bg-emerald-500/10',
         };
+      case 'visualizador':
+        return {
+          label: 'Panel de Consulta',
+          icon: FileSearch,
+          colorClass: 'text-sky-500',
+          bgClass: 'bg-sky-500/10',
+        };
       case 'superadmin':
         return {
           label: 'Panel Superadmin',
@@ -131,6 +138,27 @@ const UnifiedDashboard: React.FC = () => {
         };
       }
 
+      if (role === 'visualizador') {
+        const { count: refCount } = await supabase
+          .from('inventory_master')
+          .select('referencia', { count: 'exact', head: true })
+          .eq('inventory_id', inventoryId!);
+        const { count: locCount } = await supabase
+          .from('locations')
+          .select('id', { count: 'exact', head: true })
+          .eq('inventory_id', inventoryId!);
+        const { count: critCount } = await supabase
+          .from('inventory_master')
+          .select('referencia', { count: 'exact', head: true })
+          .eq('inventory_id', inventoryId!)
+          .eq('audit_round', 5);
+        return {
+          referencias: refCount || 0,
+          ubicaciones: locCount || 0,
+          criticos: critCount || 0,
+        };
+      }
+
       // Superadmin stats
       const { count: usersCount } = await supabase
         .from('profiles')
@@ -180,6 +208,14 @@ const UnifiedDashboard: React.FC = () => {
         { label: 'Supervisores Asignados', value: stats?.supervisores || 0, icon: Users, color: 'bg-blue-500/10 text-blue-500' },
         { label: 'Ubicaciones Configuradas', value: stats?.ubicaciones || 0, icon: MapPin, color: 'bg-amber-500/10 text-amber-500' },
         { label: 'Diferencias', value: stats?.diferencias || 0, icon: BarChart3, color: 'bg-destructive/10 text-destructive' },
+      ];
+    }
+
+    if (role === 'visualizador') {
+      return [
+        { label: 'Referencias Totales', value: stats?.referencias || 0, icon: Package, color: 'bg-blue-500/10 text-blue-500' },
+        { label: 'Ubicaciones Configuradas', value: stats?.ubicaciones || 0, icon: MapPin, color: 'bg-amber-500/10 text-amber-500' },
+        { label: 'Referencias Críticas', value: stats?.criticos || 0, icon: AlertCircle, color: 'bg-destructive/10 text-destructive' },
       ];
     }
 
@@ -373,6 +409,20 @@ const UnifiedDashboard: React.FC = () => {
   // Action categories based on role
   const actionCategories: ActionCategory[] = useMemo(() => {
     const categories: ActionCategory[] = [];
+
+    // Visualizador: solo consulta de auditorías
+    if (role === 'visualizador') {
+      return [{
+        name: 'Auditoría',
+        icon: FileSearch,
+        actions: [
+          baseActions.dashboardAuditoria,
+          baseActions.auditoriaAlmacen,
+          baseActions.auditoriaPlanta,
+          baseActions.auditoriaPT,
+        ],
+      }];
+    }
 
     // 1. ADMINISTRACIÓN (solo superadmin)
     if (role === 'superadmin') {

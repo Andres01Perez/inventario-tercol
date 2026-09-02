@@ -142,7 +142,9 @@ interface Props {
 }
 
 const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const canEdit = role !== 'visualizador';
+
   const queryClient = useQueryClient();
   const { inventoryId, isReadOnly } = useInventory();
   const { isExporting, exportAuditoriaBodega } = useExportToExcel();
@@ -626,6 +628,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
         </div>
         <div className="w-[110px] min-w-[110px] px-2">{getStatusBadge(group.bodegaStatus)}</div>
         <div className="w-[60px] min-w-[60px] px-2 text-center text-sm text-muted-foreground">C{group.bodegaRound}</div>
+        {canEdit && (
         <div className="w-[50px] min-w-[50px] px-2" onClick={(e) => e.stopPropagation()}>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -667,6 +670,8 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+        )}
+
       </div>
     );
   };
@@ -699,7 +704,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
         <div className="w-[120px] min-w-[120px] px-2"></div>
         <div className="w-[110px] min-w-[110px] px-2"></div>
         <div className="w-[60px] min-w-[60px] px-2"></div>
-        <div className="w-[50px] min-w-[50px] px-2"></div>
+        {canEdit && <div className="w-[50px] min-w-[50px] px-2"></div>}
       </div>
     );
   };
@@ -789,7 +794,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
               <div className="w-[120px] min-w-[120px] px-2 py-3 text-right">Desc. ($)</div>
               <div className="w-[110px] min-w-[110px] px-2 py-3">Estado</div>
               <div className="w-[60px] min-w-[60px] px-2 py-3 text-center">Ronda</div>
-              <div className="w-[50px] min-w-[50px] px-2 py-3">Acción</div>
+              {canEdit && <div className="w-[50px] min-w-[50px] px-2 py-3">Acción</div>}
             </div>
 
             {isLoading ? (

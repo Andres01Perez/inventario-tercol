@@ -132,7 +132,7 @@ const App: React.FC = () => (
             <Route
               path="/superadmin/auditoria/dashboard"
               element={
-                <ProtectedRoute allowedRoles={['superadmin']}>
+                <ProtectedRoute allowedRoles={['superadmin', 'visualizador']}>
                   <DashboardAuditoria />
                 </ProtectedRoute>
               }
@@ -140,7 +140,7 @@ const App: React.FC = () => (
             <Route
               path="/superadmin/auditoria/almacen"
               element={
-                <ProtectedRoute allowedRoles={['superadmin']}>
+                <ProtectedRoute allowedRoles={['superadmin', 'visualizador']}>
                   <AuditoriaAlmacen />
                 </ProtectedRoute>
               }
@@ -148,7 +148,7 @@ const App: React.FC = () => (
             <Route
               path="/superadmin/auditoria/planta"
               element={
-                <ProtectedRoute allowedRoles={['superadmin']}>
+                <ProtectedRoute allowedRoles={['superadmin', 'visualizador']}>
                   <AuditoriaPlanta />
                 </ProtectedRoute>
               }
@@ -156,7 +156,7 @@ const App: React.FC = () => (
             <Route
               path="/superadmin/auditoria/pt"
               element={
-                <ProtectedRoute allowedRoles={['superadmin']}>
+                <ProtectedRoute allowedRoles={['superadmin', 'visualizador']}>
                   <AuditoriaPT />
                 </ProtectedRoute>
               }
