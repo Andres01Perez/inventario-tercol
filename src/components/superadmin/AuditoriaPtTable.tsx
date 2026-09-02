@@ -662,6 +662,9 @@ const AuditoriaPtTable: React.FC = () => {
               {isSuperadmin && !isReadOnly && (
                 <>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleRevalidate(group)}>
+                    <RefreshCw className="w-4 h-4 mr-2 text-blue-600" />Re-validar
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => { setSelectedReference(group); setReopenReason(''); setReopenDialogOpen(true); }}
                   >
