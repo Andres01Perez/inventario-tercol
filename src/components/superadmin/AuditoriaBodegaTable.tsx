@@ -142,7 +142,9 @@ interface Props {
 }
 
 const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const canEdit = role !== 'visualizador';
+
   const queryClient = useQueryClient();
   const { inventoryId, isReadOnly } = useInventory();
   const { isExporting, exportAuditoriaBodega } = useExportToExcel();
