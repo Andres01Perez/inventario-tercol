@@ -123,7 +123,9 @@ const LocationInfoPopover: React.FC<{ row: PtLocRow }> = ({ row }) => (
 );
 
 const AuditoriaPtTable: React.FC = () => {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const canEdit = role !== 'visualizador';
+
   const queryClient = useQueryClient();
   const { inventoryId, isReadOnly } = useInventory();
   const { isExporting, exportAuditoriaPT } = useExportToExcel();
