@@ -20,6 +20,7 @@ import Criticos from "./pages/superadmin/Criticos";
 import AuditoriaAlmacen from "./pages/superadmin/AuditoriaAlmacen";
 import AuditoriaPlanta from "./pages/superadmin/AuditoriaPlanta";
 import DashboardAuditoria from "./pages/superadmin/DashboardAuditoria";
+import AuditoriaPT from "./pages/superadmin/AuditoriaPT";
 import ExportarConteos from "./pages/superadmin/ExportarConteos";
 import ImpresionMasiva from "./pages/superadmin/ImpresionMasiva";
 import GestionUbicacion from "./pages/admin/GestionUbicacion";
@@ -152,6 +153,15 @@ const App: React.FC = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/superadmin/auditoria/pt"
+              element={
+                <ProtectedRoute allowedRoles={['superadmin']}>
+                  <AuditoriaPT />
+                </ProtectedRoute>
+              }
+            />
+
             <Route
               path="/superadmin/exportar-conteos"
               element={

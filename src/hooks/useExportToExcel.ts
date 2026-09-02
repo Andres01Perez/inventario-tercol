@@ -501,7 +501,186 @@ export function useExportToExcel() {
     }
   }, [inventoryId]);
 
-  return { isExporting, exportInventoryMP, exportInventoryPP, exportAuditoria, exportAuditoriaBodega };
+  const exportAuditoriaPT = useCallback(async (params?: {
+    searchTerm?: string;
+    status?: string;
+    piso?: string;
+  }) => {
+    setIsExporting(true);
+    try {
+      // 1. Maestra PT
+      const masters = await fetchAllData<{
+        referencia: string;
+        descripcion: string | null;
+        cant_erp: number | null;
+        status_slug: string | null;
+        audit_round: number | null;
+      }>(() => {
+        let query = supabase
+          .from('pt_master')
+          .select('referencia, descripcion, cant_erp, status_slug, audit_round')
+          .eq('inventory_id', inventoryId!)
+          .order('referencia');
+        if (params?.searchTerm) {
+          query = query.or(`referencia.ilike.%${params.searchTerm}%,descripcion.ilike.%${params.searchTerm}%`);
+        }
+        if (params?.status && params.status !== 'all') query = query.eq('status_slug', params.status);
+        return query;
+      });
+
+      if (masters.length === 0) {
+        toast.info('No hay datos para exportar');
+        setIsExporting(false);
+        return;
+      }
+
+      const masterMap = new Map(masters.map((m) => [m.referencia, m]));
+
+      // 2. Ubicaciones PT
+      const locations = await fetchAllData<{
+        id: string; referencia: string; piso: string; prodc: string | null;
+        ubic: string | null; linea: string | null; ue: number | null;
+      }>(() => {
+        let query = supabase
+          .from('pt_locations')
+          .select('id, referencia, piso, prodc, ubic, linea, ue')
+          .eq('inventory_id', inventoryId!)
+          .eq('activo', true)
+          .order('referencia');
+        if (params?.piso && params.piso !== 'all') query = query.eq('piso', params.piso);
+        return query;
+      });
+
+      const locationIds = locations.map((l) => l.id);
+      const batchSize = 100;
+
+      // 3. Conteos
+      const allCounts: { location_id: string; audit_round: number; quantity_counted: number }[] = [];
+      for (let i = 0; i < locationIds.length; i += batchSize) {
+        const { data, error } = await supabase
+          .from('pt_counts')
+          .select('location_id, audit_round, quantity_counted')
+          .eq('inventory_id', inventoryId!)
+          .in('location_id', locationIds.slice(i, i + batchSize));
+        if (error) throw error;
+        if (data) allCounts.push(...data);
+      }
+
+      // 4. Validaciones
+      const allValidated: { location_id: string; validated_quantity: number; audit_round: number; reason: string }[] = [];
+      for (let i = 0; i < locationIds.length; i += batchSize) {
+        const { data, error } = await supabase
+          .from('pt_validated_counts')
+          .select('location_id, validated_quantity, audit_round, reason')
+          .eq('inventory_id', inventoryId!)
+          .in('location_id', locationIds.slice(i, i + batchSize));
+        if (error) throw error;
+        if (data) allValidated.push(...data);
+      }
+      const validatedMap = new Map(allValidated.map((v) => [v.location_id, v]));
+
+      const countsMap = new Map<string, Record<string, number | null>>();
+      locationIds.forEach((id) => countsMap.set(id, { c1: null, c2: null, c3: null, c4: null }));
+      allCounts.forEach((c) => {
+        const entry = countsMap.get(c.location_id);
+        if (entry) entry[`c${c.audit_round}`] = c.quantity_counted;
+      });
+
+      const detalle = locations
+        .filter((loc) => masterMap.has(loc.referencia))
+        .map((loc) => {
+          const counts = countsMap.get(loc.id) || {};
+          const validated = validatedMap.get(loc.id);
+          return {
+            referencia: loc.referencia,
+            descripcion: masterMap.get(loc.referencia)?.descripcion || '',
+            piso: loc.piso,
+            prodc: loc.prodc || '',
+            ubic: loc.ubic || '',
+            linea: loc.linea || '',
+            ue: loc.ue ?? '',
+            conteo_1: counts.c1 ?? '',
+            conteo_2: counts.c2 ?? '',
+            conteo_3: counts.c3 ?? '',
+            conteo_4: counts.c4 ?? '',
+            validado: validated?.validated_quantity ?? '',
+            ronda_validacion: validated?.audit_round ?? '',
+            motivo: validated?.reason ?? '',
+          };
+        });
+
+      const validadoPorRef = new Map<string, { validado: number; ubicaciones: number }>();
+      locations.forEach((loc) => {
+        if (!masterMap.has(loc.referencia)) return;
+        const v = validatedMap.get(loc.id);
+        const acc = validadoPorRef.get(loc.referencia) || { validado: 0, ubicaciones: 0 };
+        acc.validado += Number(v?.validated_quantity ?? 0);
+        acc.ubicaciones += 1;
+        validadoPorRef.set(loc.referencia, acc);
+      });
+
+      const resumen = masters.map((m) => {
+        const agg = validadoPorRef.get(m.referencia) || { validado: 0, ubicaciones: 0 };
+        const erp = Number(m.cant_erp ?? 0);
+        return {
+          referencia: m.referencia,
+          descripcion: m.descripcion || '',
+          ubicaciones: agg.ubicaciones,
+          erp,
+          validado: agg.validado,
+          descuadre: agg.validado > 0 ? agg.validado - erp : '',
+          estado: m.status_slug || '',
+          ronda: m.audit_round || 1,
+        };
+      });
+
+      exportMultiSheet('auditoria_pt', [
+        {
+          sheetName: 'Detalle por ubicación',
+          data: detalle,
+          columns: [
+            { key: 'referencia', label: 'Referencia' },
+            { key: 'descripcion', label: 'Descripción' },
+            { key: 'piso', label: 'Piso' },
+            { key: 'prodc', label: 'Prodc' },
+            { key: 'ubic', label: 'Ubic' },
+            { key: 'linea', label: 'Línea' },
+            { key: 'ue', label: 'U.E' },
+            { key: 'conteo_1', label: 'C1' },
+            { key: 'conteo_2', label: 'C2' },
+            { key: 'conteo_3', label: 'C3' },
+            { key: 'conteo_4', label: 'C4' },
+            { key: 'validado', label: 'Validado' },
+            { key: 'ronda_validacion', label: 'Ronda Validación' },
+            { key: 'motivo', label: 'Motivo' },
+          ],
+        },
+        {
+          sheetName: 'Resumen por referencia',
+          data: resumen,
+          columns: [
+            { key: 'referencia', label: 'Referencia' },
+            { key: 'descripcion', label: 'Descripción' },
+            { key: 'ubicaciones', label: 'Ubicaciones' },
+            { key: 'erp', label: 'ERP' },
+            { key: 'validado', label: 'Total Validado' },
+            { key: 'descuadre', label: 'Descuadre (und)' },
+            { key: 'estado', label: 'Estado' },
+            { key: 'ronda', label: 'Ronda' },
+          ],
+        },
+      ]);
+
+      toast.success(`Exportadas ${resumen.length} referencias PT (${detalle.length} ubicaciones)`);
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Error al exportar');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [inventoryId]);
+
+  return { isExporting, exportInventoryMP, exportInventoryPP, exportAuditoria, exportAuditoriaBodega, exportAuditoriaPT };
 }
 
 function exportMultiSheet(

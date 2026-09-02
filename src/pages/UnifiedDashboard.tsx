@@ -314,6 +314,15 @@ const UnifiedDashboard: React.FC = () => {
       bgColor: 'bg-fuchsia-500/10',
       hoverBg: 'group-hover:bg-fuchsia-500',
     },
+    auditoriaPT: {
+      label: 'Auditoría PT',
+      icon: FileSearch,
+      description: 'Producto Terminado: conteos por piso y descuadre',
+      onClick: () => navigate('/superadmin/auditoria/pt'),
+      iconColor: 'text-teal-500',
+      bgColor: 'bg-teal-500/10',
+      hoverBg: 'group-hover:bg-teal-500',
+    },
     exportarConteos: { 
       label: 'Exportar Conteos', 
       icon: Download, 
@@ -388,6 +397,7 @@ const UnifiedDashboard: React.FC = () => {
           baseActions.dashboardAuditoria,
           baseActions.auditoriaAlmacen,
           baseActions.auditoriaPlanta,
+          baseActions.auditoriaPT,
           baseActions.exportarConteos,
         ]
       });
