@@ -641,7 +641,7 @@ const AuditoriaPtTable: React.FC = () => {
         <div className="w-[110px] min-w-[110px] px-2"></div>
         <div className="w-[110px] min-w-[110px] px-2"></div>
         <div className="w-[60px] min-w-[60px] px-2"></div>
-        <div className="w-[50px] min-w-[50px] px-2"></div>
+        {canEdit && <div className="w-[50px] min-w-[50px] px-2"></div>}
       </div>
     );
   };
@@ -724,7 +724,7 @@ const AuditoriaPtTable: React.FC = () => {
               <div className="w-[110px] min-w-[110px] px-2 py-3 text-right">Desc. ($)</div>
               <div className="w-[110px] min-w-[110px] px-2 py-3">Estado</div>
               <div className="w-[60px] min-w-[60px] px-2 py-3 text-center">Ronda</div>
-              <div className="w-[50px] min-w-[50px] px-2 py-3">Acción</div>
+              {canEdit && <div className="w-[50px] min-w-[50px] px-2 py-3">Acción</div>}
             </div>
 
             {isLoading ? (
