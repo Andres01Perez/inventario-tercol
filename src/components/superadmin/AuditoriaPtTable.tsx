@@ -20,6 +20,7 @@ import {
   Download,
 } from 'lucide-react';
 import { useExportToExcel } from '@/hooks/useExportToExcel';
+import { formatQty, formatSignedQty, descuadreColorClass } from '@/lib/format';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -516,7 +517,7 @@ const AuditoriaPtTable: React.FC = () => {
     const isCurrentRound = round <= currentRound;
     return (
       <span className={`font-medium ${matchesErp ? 'text-green-600 dark:text-green-400' : isCurrentRound ? 'text-foreground' : 'text-muted-foreground'}`}>
-        {value}
+        {formatQty(value)}
       </span>
     );
   };
@@ -545,16 +546,16 @@ const AuditoriaPtTable: React.FC = () => {
         <div className="w-[220px] min-w-[220px] px-2 text-sm text-muted-foreground truncate" title={group.descripcion || ''}>
           {group.descripcion || '-'}
         </div>
-        <div className="w-[100px] min-w-[100px] px-2 text-right font-bold">{group.erp}</div>
+        <div className="w-[100px] min-w-[100px] px-2 text-right font-bold">{formatQty(group.erp)}</div>
         <div className="w-[70px] min-w-[70px] px-2 text-right">{renderCountCell(group.totals.c1, group.erp, 1, group.round)}</div>
         <div className="w-[70px] min-w-[70px] px-2 text-right">{renderCountCell(group.totals.c2, group.erp, 2, group.round)}</div>
         <div className="w-[70px] min-w-[70px] px-2 text-right">{renderCountCell(group.totals.c3, group.erp, 3, group.round)}</div>
         <div className="w-[70px] min-w-[70px] px-2 text-right">{renderCountCell(group.totals.c4, group.erp, 4, group.round)}</div>
-        <div className="w-[90px] min-w-[90px] px-2 text-right font-medium">{hasValidation ? group.totalValidado : '-'}</div>
+        <div className="w-[90px] min-w-[90px] px-2 text-right font-medium">{hasValidation ? formatQty(group.totalValidado) : '-'}</div>
         <div className="w-[90px] min-w-[90px] px-2 text-right">
           {hasValidation ? (
-            <span className={`font-medium ${group.descuadre === 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-              {group.descuadre > 0 ? `+${group.descuadre}` : group.descuadre}
+            <span className={`font-medium ${descuadreColorClass(group.descuadre)}`}>
+              {formatSignedQty(group.descuadre)}
             </span>
           ) : (
             <span className="text-muted-foreground">—</span>
@@ -636,7 +637,7 @@ const AuditoriaPtTable: React.FC = () => {
         <div className="w-[70px] min-w-[70px] px-2 text-right">{renderCountCell(row.counts.c2, group.erp, 2, group.round, row.discoveredAtRound)}</div>
         <div className="w-[70px] min-w-[70px] px-2 text-right">{renderCountCell(row.counts.c3, group.erp, 3, group.round, row.discoveredAtRound)}</div>
         <div className="w-[70px] min-w-[70px] px-2 text-right">{renderCountCell(row.counts.c4, group.erp, 4, group.round, row.discoveredAtRound)}</div>
-        <div className="w-[90px] min-w-[90px] px-2 text-right">{row.validatedQuantity ?? '-'}</div>
+        <div className="w-[90px] min-w-[90px] px-2 text-right">{row.validatedQuantity !== null ? formatQty(row.validatedQuantity) : '-'}</div>
         <div className="w-[90px] min-w-[90px] px-2 text-right text-muted-foreground text-xs truncate" title={row.validationReason || ''}>{row.validationReason || '-'}</div>
         <div className="w-[110px] min-w-[110px] px-2"></div>
         <div className="w-[110px] min-w-[110px] px-2"></div>

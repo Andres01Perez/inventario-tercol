@@ -15,6 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { RefreshCw } from 'lucide-react';
+import { formatQty, formatSignedQty, descuadreColorClass } from '@/lib/format';
 
 const PAGE = 1000;
 
@@ -30,7 +31,7 @@ const STATUS_META: Record<string, { label: string; bar: string }> = {
 };
 
 const nf = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 });
-const signed = (v: number) => `${v > 0 ? '+' : ''}${nf.format(v)}`;
+const signed = formatSignedQty;
 
 interface RefAgg {
   referencia: string;
@@ -352,7 +353,7 @@ const AuditoriaPtKpiPanel: React.FC<Props> = ({ piso }) => {
   const avance = data.requiredCounts === 0 ? 100 : Math.round((data.doneCounts / data.requiredCounts) * 100);
   const pctAuditadas = data.totalRefs ? Math.round((data.auditadas / data.totalRefs) * 100) : 0;
 
-  const kpis: { label: string; value: string; hint: React.ReactNode; danger?: boolean }[] = [
+  const kpis: { label: string; value: string; hint: React.ReactNode; danger?: boolean; colorClass?: string }[] = [
     { label: 'Referencias PT', value: nf.format(data.totalRefs), hint: `${nf.format(data.activeLocations)} ubic. activas` },
     {
       label: 'Avance de conteo',
@@ -370,9 +371,9 @@ const AuditoriaPtKpiPanel: React.FC<Props> = ({ piso }) => {
       label: 'Descuadre (und)',
       value: data.hasAnyValidation ? signed(data.descuadreUnd) : '—',
       hint: data.hasAnyValidation
-        ? `Faltante ${nf.format(data.faltante)} · Sobrante ${signed(data.sobrante)}`
+        ? `Faltante ${formatQty(data.faltante)} · Sobrante ${signed(data.sobrante)}`
         : 'Sin validaciones consolidadas',
-      danger: data.hasAnyValidation && data.descuadreUnd !== 0,
+      colorClass: data.hasAnyValidation ? descuadreColorClass(data.descuadreUnd) : undefined,
     },
     { label: 'Descuadre ($)', value: '—', hint: 'PT sin costo unitario cargado' },
   ];
@@ -394,7 +395,7 @@ const AuditoriaPtKpiPanel: React.FC<Props> = ({ piso }) => {
           <Card key={k.label} className="glass-card">
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground">{k.label}</p>
-              <p className={`text-2xl font-bold mt-1 ${k.danger ? 'text-destructive' : 'text-foreground'}`}>{k.value}</p>
+              <p className={`text-2xl font-bold mt-1 ${k.colorClass ?? (k.danger ? 'text-destructive' : 'text-foreground')}`}>{k.value}</p>
               <div className="text-[11px] text-muted-foreground mt-1">{k.hint}</div>
             </CardContent>
           </Card>
@@ -515,9 +516,9 @@ const AuditoriaPtKpiPanel: React.FC<Props> = ({ piso }) => {
                 >
                   <TableCell className="font-medium">{r.referencia}</TableCell>
                   <TableCell className="text-muted-foreground truncate max-w-[240px]">{r.descripcion || '-'}</TableCell>
-                  <TableCell className="text-right">{nf.format(r.erp)}</TableCell>
-                  <TableCell className="text-right">{nf.format(r.validado)}</TableCell>
-                  <TableCell className="text-right text-destructive">{signed(r.descuadre)}</TableCell>
+                  <TableCell className="text-right">{formatQty(r.erp)}</TableCell>
+                  <TableCell className="text-right">{formatQty(r.validado)}</TableCell>
+                  <TableCell className={`text-right font-medium ${descuadreColorClass(r.descuadre)}`}>{signed(r.descuadre)}</TableCell>
                   <TableCell>{STATUS_META[r.status]?.label || r.status}</TableCell>
                   <TableCell className="text-center">C{r.round}</TableCell>
                 </TableRow>
