@@ -420,7 +420,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
       }
     },
     onError: (error: Error, variables) => {
-      toast.error(`Error: ${error.message}`);
+      toast.error(friendlyCountError(error));
       setSavingIds(prev => {
         const next = new Set(prev);
         next.delete(variables.locationId);

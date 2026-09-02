@@ -174,7 +174,7 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
       onOpenChange(false);
     },
     onError: (error: Error) => {
-      toast.error(`Error al agregar: ${error.message}`);
+      toast.error(`Error al agregar: ${friendlyCountError(error)}`);
     },
   });
 

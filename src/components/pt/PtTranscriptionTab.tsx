@@ -213,7 +213,7 @@ const PtTranscriptionTab: React.FC<Props> = ({ roundNumber, isAdminMode = false 
       runValidation(location.referencia).catch((e) => console.error(e));
     },
     onError: (error: Error, variables) => {
-      toast.error(`Error: ${error.message}`);
+      toast.error(friendlyCountError(error));
       setSavingIds((prev) => {
         const next = new Set(prev);
         next.delete(variables.location.id);
