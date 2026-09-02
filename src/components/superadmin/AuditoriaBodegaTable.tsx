@@ -452,7 +452,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
         action_type: 'validacion_manual',
         master_reference: selectedReference.referencia,
         new_data: { validated_quantity: qty, bodega },
-        round_number: round,
+        round_number: selectedReference.bodegaRound,
         user_id: user.id,
       });
 
