@@ -154,6 +154,15 @@ const App: React.FC = () => (
               }
             />
             <Route
+              path="/superadmin/auditoria/pt"
+              element={
+                <ProtectedRoute allowedRoles={['superadmin']}>
+                  <AuditoriaPT />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
               path="/superadmin/exportar-conteos"
               element={
                 <ProtectedRoute allowedRoles={['superadmin']}>
