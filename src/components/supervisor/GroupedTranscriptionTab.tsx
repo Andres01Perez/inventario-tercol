@@ -23,6 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import PrintableSheet from '@/components/supervisor/PrintableSheet';
 import AddLocationDialog from '@/components/supervisor/AddLocationDialog';
 import { toast } from 'sonner';
+import { friendlyCountError } from '@/lib/countErrorMessage';
 import { Loader2, CheckCircle2, RefreshCw, MapPin, Save, Printer, Plus, Info, Search, Bug, AlertTriangle } from 'lucide-react';
 
 // Popover component for location info on mobile
@@ -420,7 +421,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
       }
     },
     onError: (error: Error, variables) => {
-      toast.error(`Error: ${error.message}`);
+      toast.error(friendlyCountError(error));
       setSavingIds(prev => {
         const next = new Set(prev);
         next.delete(variables.locationId);
