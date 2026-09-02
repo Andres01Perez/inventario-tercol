@@ -405,25 +405,34 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
     if (isReadOnly) { toast.error('Inventario histórico: solo lectura'); return; }
     setIsSubmitting(true);
     try {
-      const locationIds = selectedReference.rows.map((r) => r.locationId);
       const qty = parseFloat(validateQuantity);
       if (isNaN(qty)) throw new Error('Cantidad inválida');
-      const perLocation = qty / locationIds.length;
-      const round = selectedReference.bodegaRound;
+      const rows = selectedReference.rows;
+      const perLocation = qty / rows.length;
 
-      const { error: locError } = await supabase
-        .from('locations')
-        .update({ validated_quantity: perLocation, validated_at_round: round })
-        .in('id', locationIds);
-      if (locError) throw locError;
+      // Usar la ronda real donde existe el último conteo de cada ubicación
+      // (no la ronda actual del bloque), para que la exportación sea coherente.
+      const roundOf = (r: (typeof rows)[number]): number => {
+        for (let round = 5; round >= 1; round--) {
+          if (r.counts[`c${round}` as keyof typeof r.counts] !== null) return round;
+        }
+        return selectedReference.bodegaRound;
+      };
 
-      for (const locationId of locationIds) {
+      for (const row of rows) {
+        const round = roundOf(row);
+        const { error: locError } = await supabase
+          .from('locations')
+          .update({ validated_quantity: perLocation, validated_at_round: round })
+          .eq('id', row.locationId);
+        if (locError) throw locError;
+
         const { error: vcError } = await supabase
           .from('validated_counts')
           .upsert({
             inventory_id: inventoryId!,
             master_reference: selectedReference.referencia,
-            location_id: locationId,
+            location_id: row.locationId,
             validated_quantity: perLocation,
             audit_round: round,
             reason: `${bodega === 'almacen' ? 'ALM' : 'PL'}:manual_edit`,
@@ -443,7 +452,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
         action_type: 'validacion_manual',
         master_reference: selectedReference.referencia,
         new_data: { validated_quantity: qty, bodega },
-        round_number: round,
+        round_number: selectedReference.bodegaRound,
         user_id: user.id,
       });
 
@@ -463,6 +472,37 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
     if (!forceCloseReason.trim()) { toast.error('Debes ingresar un motivo'); return; }
     setIsSubmitting(true);
     try {
+      // Persistir el valor físico por ubicación para que la exportación tenga datos:
+      // mejor conteo disponible (C5→C1) y su ronda real.
+      for (const row of selectedReference.rows) {
+        if (row.validatedAtRound !== null) continue;
+        const qty = row.counts.c5 ?? row.counts.c4 ?? row.counts.c3 ?? row.counts.c2 ?? row.counts.c1 ?? 0;
+        const round =
+          row.counts.c5 !== null ? 5 :
+          row.counts.c4 !== null ? 4 :
+          row.counts.c3 !== null ? 3 :
+          row.counts.c2 !== null ? 2 : 1;
+
+        const { error: locError } = await supabase
+          .from('locations')
+          .update({ validated_quantity: qty, validated_at_round: round })
+          .eq('id', row.locationId);
+        if (locError) throw locError;
+
+        const { error: vcError } = await supabase
+          .from('validated_counts')
+          .upsert({
+            inventory_id: inventoryId!,
+            master_reference: selectedReference.referencia,
+            location_id: row.locationId,
+            validated_quantity: qty,
+            audit_round: round,
+            reason: `${bodega === 'almacen' ? 'ALM' : 'PL'}:cierre_forzado: ${forceCloseReason.trim()}`,
+            validated_by: user.id,
+          }, { onConflict: 'inventory_id,location_id' });
+        if (vcError) throw vcError;
+      }
+
       const existingHistory = Array.isArray(selectedReference.countHistory) ? selectedReference.countHistory : [];
       const newHistory = [...existingHistory, {
         action: 'cierre_forzado',
