@@ -19,6 +19,7 @@ import {
   Loader2,
   Download,
   RotateCcw,
+  RefreshCw,
 } from 'lucide-react';
 import { useExportToExcel } from '@/hooks/useExportToExcel';
 import { formatQty, formatSignedQty, descuadreColorClass } from '@/lib/format';
@@ -483,6 +484,32 @@ const AuditoriaPtTable: React.FC = () => {
     }
   };
 
+  const handleRevalidate = async (group: PtGroupedRef) => {
+    if (!user || !inventoryId) return;
+    if (isReadOnly) { toast.error('Inventario histórico: solo lectura'); return; }
+    try {
+      const { data: res, error } = await supabase.rpc('pt_revalidate_reference', {
+        _inventory_id: inventoryId,
+        _referencia: group.referencia,
+        _user_id: user.id,
+      });
+      if (error) throw error;
+      const r = res as any;
+      if (r?.success === false) {
+        toast.error(r?.error || 'No fue posible re-validar');
+      } else if (r?.action === 'closed') {
+        toast.success(`Re-validada (${r.reason}) · total ${r.total} vs ERP ${r.erp}`);
+      } else if (r?.action === 'next_round') {
+        toast.info(`Re-validada: pasa a Conteo ${r.new_round}`);
+      } else {
+        toast.info('Re-validación aplicada');
+      }
+      await invalidate();
+    } catch (error: any) {
+      toast.error('Error al re-validar: ' + error.message);
+    }
+  };
+
   const handleSaveEditedCounts = async () => {
     if (!selectedReference || !user || !inventoryId) return;
     if (isReadOnly) { toast.error('Inventario histórico: solo lectura'); return; }
@@ -529,7 +556,11 @@ const AuditoriaPtTable: React.FC = () => {
 
       toast.success('Conteos actualizados');
       setEditCountDialogOpen(false);
-      await handleValidateNow(selectedReference);
+      if (isSuperadmin) {
+        await handleRevalidate(selectedReference);
+      } else {
+        await handleValidateNow(selectedReference);
+      }
       await invalidate();
     } catch (error: any) {
       toast.error('Error al guardar: ' + error.message);
@@ -632,6 +663,9 @@ const AuditoriaPtTable: React.FC = () => {
               {isSuperadmin && !isReadOnly && (
                 <>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleRevalidate(group)}>
+                    <RefreshCw className="w-4 h-4 mr-2 text-blue-600" />Re-validar
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => { setSelectedReference(group); setReopenReason(''); setReopenDialogOpen(true); }}
                   >

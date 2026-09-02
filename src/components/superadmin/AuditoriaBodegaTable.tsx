@@ -18,6 +18,7 @@ import {
   Loader2,
   Download,
   RotateCcw,
+  RefreshCw,
 } from 'lucide-react';
 import { useExportToExcel } from '@/hooks/useExportToExcel';
 import { formatQty, formatSignedQty, formatMoney, formatSignedMoney, descuadreColorClass } from '@/lib/format';
@@ -569,6 +570,33 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
     }
   };
 
+  const handleRevalidate = async (referencia: string) => {
+    if (!user || !inventoryId) return;
+    if (isReadOnly) { toast.error('Inventario histórico: solo lectura'); return; }
+    try {
+      const { data: res, error } = await supabase.rpc('revalidate_reference', {
+        _inventory_id: inventoryId,
+        _reference: referencia,
+        _bodega: bodega,
+        _user_id: user.id,
+      });
+      if (error) throw error;
+      const r = res as any;
+      if (r?.success === false) {
+        toast.error(r?.error || 'No fue posible re-validar');
+      } else if (r?.action === 'closed') {
+        toast.success(`Re-validada (${r.reason}) · total ${r.total} vs ERP ${r.erp}`);
+      } else if (r?.action === 'next_round') {
+        toast.info(`Re-validada: pasa a Conteo ${r.new_round}`);
+      } else {
+        toast.info('Re-validación aplicada');
+      }
+      await invalidate();
+    } catch (error: any) {
+      toast.error('Error al re-validar: ' + error.message);
+    }
+  };
+
   const handleSaveEditedCounts = async () => {
     if (!selectedReference || !user) return;
     if (isReadOnly) { toast.error('Inventario histórico: solo lectura'); return; }
@@ -630,12 +658,16 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
 
       // Revalidar la referencia con los conteos corregidos
       if (inventoryId) {
-        const { error: revalError } = await supabase.rpc('validate_and_close_round', {
-          _reference: selectedReference.referencia,
-          _admin_id: user.id,
-          _inventory_id: inventoryId,
-        });
-        if (revalError) toast.warning('Conteos guardados, pero no se pudo revalidar: ' + revalError.message);
+        if (isSuperadmin) {
+          await handleRevalidate(selectedReference.referencia);
+        } else {
+          const { error: revalError } = await supabase.rpc('validate_and_close_round', {
+            _reference: selectedReference.referencia,
+            _admin_id: user.id,
+            _inventory_id: inventoryId,
+          });
+          if (revalError) toast.warning('Conteos guardados, pero no se pudo revalidar: ' + revalError.message);
+        }
       }
 
       await invalidate();
@@ -751,6 +783,9 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
               {isSuperadmin && !isReadOnly && (
                 <>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleRevalidate(group.referencia)}>
+                    <RefreshCw className="w-4 h-4 mr-2 text-blue-600" />Re-validar
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => { setSelectedReference(group); setReopenReason(''); setReopenDialogOpen(true); }}>
                     <RotateCcw className="w-4 h-4 mr-2 text-amber-600" />Reabrir conteo
                   </DropdownMenuItem>
