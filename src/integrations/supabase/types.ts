@@ -871,6 +871,7 @@ export type Database = {
         Returns: boolean
       }
       is_superadmin: { Args: { _user_id: string }; Returns: boolean }
+      is_viewer: { Args: { _user_id: string }; Returns: boolean }
       location_bodega: { Args: { _assigned_admin_id: string }; Returns: string }
       pt_upsert_validated_count: {
         Args: {
