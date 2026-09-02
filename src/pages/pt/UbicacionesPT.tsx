@@ -5,12 +5,23 @@ import AppLayout from '@/components/layout/AppLayout';
 import ReadOnlyBanner from '@/components/shared/ReadOnlyBanner';
 import InventorySelector from '@/components/shared/InventorySelector';
 import PtLocationsImport from '@/components/pt/PtLocationsImport';
+import SupervisorSelect from '@/components/shared/SupervisorSelect';
 import { useInventory } from '@/contexts/InventoryContext';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Table,
@@ -20,7 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Loader2, Search, Upload } from 'lucide-react';
+import { Loader2, Pencil, Search, Upload } from 'lucide-react';
 
 interface PtLocationRow {
   id: string;
@@ -36,10 +47,16 @@ interface PtLocationRow {
 const PAGE_SIZE = 1000;
 
 const UbicacionesPT: React.FC = () => {
-  const { inventoryId } = useInventory();
+  const { inventoryId, isReadOnly } = useInventory();
+  const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [piso, setPiso] = useState<string>('all');
   const [importOpen, setImportOpen] = useState(false);
+  const [editing, setEditing] = useState<PtLocationRow | null>(null);
+  const [editUe, setEditUe] = useState('');
+  const [editSupervisor, setEditSupervisor] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
 
   const { data: locations = [], isLoading, refetch } = useQuery({
     queryKey: ['pt-locations', inventoryId],
