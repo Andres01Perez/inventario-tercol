@@ -1,32 +1,40 @@
 # Corrección de bloques que no cierran
 
-## Por qué RESORTE sale Pendiente
+## Por qué RESORTE aparece "sin responsable"
 
-RESORTE no está esperando un reconteo. Tiene tres ubicaciones registradas:
+Son dos cosas distintas y por eso en Gestión de Responsables se ve todo asignado:
 
-| Ubicación | Bodega | Conteos | Estado |
-|---|---|---|---|
-| ALMACEN – PRIMER PISO | Almacén | C1 = 22.637, C2 = 22.637 | sin validar |
-| Bodega 7 – AV | Planta | C1 = 91.700, C2 = 91.700 | ya auditada |
-| BODEGA 1 – interiores | sin responsable | C1 = 2.000 (sin C2) | sobra |
+- **Responsable (supervisor)**: quién cuenta. La ubicación "BODEGA 1 – interiores" **sí tiene** supervisor: Santiago Díaz (interiores@tercol.com.co).
+- **Bodega (admin dueño)**: si la ubicación pertenece a Almacén o a Planta. Eso lo define el admin asignado a la ubicación, y esa ubicación **no tiene ninguno**, por eso el sistema no sabe en qué comparación meterla.
 
-La tercera ubicación quedó sin responsable de bodega. La regla actual es: si **una sola** ubicación de la referencia no tiene bodega, el sistema se niega a validar la referencia completa. Por eso Almacén quedó en Pendiente aunque C1 y C2 coinciden.
+Las 87 ubicaciones restantes de Santiago Díaz sí están marcadas como **Planta**; solo estas 2 quedaron sin marcar:
+
+| Referencia | Ubicación | Supervisor | Bodega | Conteos |
+|---|---|---|---|---|
+| RESORTE | BODEGA 1 – interiores | Santiago Díaz | (falta) | C1 = 2.000, sin C2 |
+| NEUTRO12 | BODEGA 1 – interiores | Santiago Díaz | (falta) | ninguno |
+
+Mientras una sola ubicación de la referencia no tenga bodega, el sistema se niega a validar toda la referencia. Por eso RESORTE – Almacén quedó Pendiente aunque C1 = C2 = 22.637.
 
 ## Qué se va a hacer
 
-1. **RESORTE**: desactivar la ubicación sobrante "BODEGA 1 – interiores" (queda con las dos ubicaciones correctas), poner `AV` como punto de referencia en la ubicación de Planta, y revalidar la referencia para que Almacén cierre auditado en 22.637 (Planta ya está auditada en 91.700). No se recuenta nada.
+1. **RESORTE**: como confirmaste que solo tiene dos ubicaciones reales (Almacén – Sección B Picking y Planta – Bodega 7), se desactiva la ubicación sobrante "BODEGA 1 – interiores" y se pone `AV` como punto de referencia en la de Planta. Luego se revalida: Almacén cierra auditado en 22.637 y Planta queda auditada en 91.700. No se recuenta nada.
 
-2. **Bloques en cero**: ajustar la regla para que, cuando C1 = C2 = 0 y el ERP también es 0, el bloque cierre auditado en cero en vez de quedarse pendiente. Luego revalidar NEUTRO12RALE, NEUTRO30RALE, PPESPLG24.v2, PPESPLG30.v2 y PPESPLG42.v2.
+2. **NEUTRO12**: su ubicación "BODEGA 1 – interiores" (sin conteos) se marca como **Planta**, igual que las otras 87 ubicaciones del mismo supervisor, para que no bloquee esa referencia.
 
-3. **NEUTRO4 (Planta)**: tiene 2 ubicaciones y solo una fue contada; se deja pendiente y se reporta para que se cuente la que falta (esta sí requiere conteo real).
+3. **Bloques en cero**: cuando C1 = C2 = 0 y el ERP también es 0, el bloque cerrará auditado en cero en lugar de quedarse pendiente. Se revalidan NEUTRO12RALE, NEUTRO30RALE, PPESPLG24.v2, PPESPLG30.v2 y PPESPLG42.v2.
 
-4. **Protección contra el caso TIERRA6RT**: impedir que se guarden conteos nuevos en ubicaciones ya validadas/cerradas. Hoy se puede seguir digitando después del cierre y ese dato queda "colgado" sin efecto. Se bloqueará en la base de datos y se mostrará un aviso claro en pantalla en vez de guardar en silencio.
+4. **NEUTRO4 (Planta)**: tiene 2 ubicaciones y solo una fue contada; se deja pendiente y se reporta, porque esta sí requiere conteo real.
 
-5. **Pendiente de tu confirmación física**: TIERRA6RT (validada en 440, con un 46 digitado después del cierre) y TE0675P-COVER (validada en 0). Cuando confirmes el valor correcto, reabro y revalido.
+5. **Prevención**: al importar o crear ubicaciones se exigirá la bodega (Almacén/Planta), y se avisará en pantalla cuando una referencia no pueda validarse por tener ubicaciones sin bodega, en vez de quedarse en Pendiente sin explicación.
+
+6. **Protección tipo TIERRA6RT**: bloquear el guardado de conteos en ubicaciones ya validadas, mostrando un aviso en vez de guardar un dato que no se usará.
+
+7. **Pendiente de tu confirmación física**: TIERRA6RT (validada en 440, con un 46 digitado después del cierre) y TE0675P-COVER (validada en 0).
 
 ## Detalle técnico
 
-- Datos: `UPDATE locations SET activo = false` en la ubicación `7aaaccb1…` (BODEGA 1 – interiores) y `punto_referencia = 'AV'` en la ubicación de Planta `df48c3e0…`; luego ejecutar `validate_and_close_round('RESORTE', <superadmin>, <inventario>)`.
-- Lógica: en `validate_bucket`, las condiciones de match de ronda 1/3/4 exigen `sum > 0`. Se cambia a permitir el match en cero cuando el ERP del bloque también es 0 (`v_erp = 0`), manteniendo el resto igual.
-- Protección: trigger `BEFORE INSERT OR UPDATE` en `inventory_counts` que rechaza la operación si `locations.validated_at_round IS NOT NULL`, más manejo del error en los puntos de guardado del frontend (transcripción, alta de ubicación, edición desde auditoría, referencias críticas) para mostrar un toast explicativo.
-- La ubicación restante sin bodega (NEUTRO12 – BODEGA 1, sin conteos) se asigna a Almacén para que no vuelva a bloquear esa referencia.
+- Datos: `activo = false` en la ubicación `7aaaccb1…` (RESORTE interiores); `punto_referencia = 'AV'` en `df48c3e0…` (RESORTE Planta); `assigned_admin_id = <admin_pp>` en `72a54af1…` (NEUTRO12 interiores). Después, `validate_and_close_round` para RESORTE y las referencias en cero.
+- Lógica: en `validate_bucket`, los match de ronda 1/3/4 exigen `sum > 0`; se permite el match en cero cuando el ERP del bloque también es 0.
+- Aviso de bodega faltante: `validate_and_close_round` ya devuelve el error "Hay N ubicación(es) sin bodega"; se mostrará ese mensaje en la vista de auditoría y en Gestión de Ubicaciones/Responsables (badge "Sin bodega" ya existente) en lugar de dejarlo silencioso.
+- Protección: trigger `BEFORE INSERT OR UPDATE` en `inventory_counts` que rechaza si `locations.validated_at_round IS NOT NULL`, con manejo del error en los puntos de guardado del frontend.
