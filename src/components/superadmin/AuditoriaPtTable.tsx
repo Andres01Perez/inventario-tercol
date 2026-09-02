@@ -628,6 +628,16 @@ const AuditoriaPtTable: React.FC = () => {
               >
                 <Edit3 className="w-4 h-4 mr-2" />Editar Conteo
               </DropdownMenuItem>
+              {isSuperadmin && !isReadOnly && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => { setSelectedReference(group); setReopenReason(''); setReopenDialogOpen(true); }}
+                  >
+                    <RotateCcw className="w-4 h-4 mr-2 text-amber-600" />Reabrir conteo
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
