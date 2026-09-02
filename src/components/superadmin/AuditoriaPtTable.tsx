@@ -563,6 +563,7 @@ const AuditoriaPtTable: React.FC = () => {
         <div className="w-[110px] min-w-[110px] px-2 text-right text-sm text-muted-foreground" title="PT aún no tiene costo unitario cargado">—</div>
         <div className="w-[110px] min-w-[110px] px-2">{getStatusBadge(group.status)}</div>
         <div className="w-[60px] min-w-[60px] px-2 text-center text-sm text-muted-foreground">C{group.round}</div>
+        {canEdit && (
         <div className="w-[50px] min-w-[50px] px-2" onClick={(e) => e.stopPropagation()}>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
