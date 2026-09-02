@@ -882,6 +882,10 @@ export type Database = {
         }
         Returns: Json
       }
+      pt_revalidate_reference: {
+        Args: { _inventory_id: string; _referencia: string; _user_id: string }
+        Returns: Json
+      }
       pt_upsert_validated_count: {
         Args: {
           _inventory_id: string
@@ -903,6 +907,15 @@ export type Database = {
           _bodega: string
           _inventory_id: string
           _reason: string
+          _reference: string
+          _user_id: string
+        }
+        Returns: Json
+      }
+      revalidate_reference: {
+        Args: {
+          _bodega: string
+          _inventory_id: string
           _reference: string
           _user_id: string
         }
