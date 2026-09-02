@@ -10,6 +10,9 @@ interface ExportConfig {
   columns: { key: string; label: string }[];
 }
 
+// Redondea cantidades a 1 decimal para evitar decimales largos en Excel
+const q1 = (v: number): number => Math.round(v * 10) / 10;
+
 // Helper to fetch all data in batches
 type RangeableQuery = {
   range: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: unknown }>;
@@ -398,12 +401,12 @@ export function useExportToExcel() {
           ubicacion: loc.location_name || '',
           detalle: loc.location_detail || '',
           subcategoria: loc.subcategoria || '',
-          conteo_1: counts.c1 ?? '',
-          conteo_2: counts.c2 ?? '',
-          conteo_3: counts.c3 ?? '',
-          conteo_4: counts.c4 ?? '',
-          conteo_5: counts.c5 ?? '',
-          validado: validated?.validated_quantity ?? '',
+          conteo_1: counts.c1 != null ? q1(counts.c1) : '',
+          conteo_2: counts.c2 != null ? q1(counts.c2) : '',
+          conteo_3: counts.c3 != null ? q1(counts.c3) : '',
+          conteo_4: counts.c4 != null ? q1(counts.c4) : '',
+          conteo_5: counts.c5 != null ? q1(counts.c5) : '',
+          validado: validated?.validated_quantity != null ? q1(validated.validated_quantity) : '',
           ronda_validacion: validated?.audit_round ?? '',
           motivo: validated?.reason ?? '',
         };
@@ -442,11 +445,11 @@ export function useExportToExcel() {
           tipo: r.tipo,
           bodega: r.bodega,
           ubicaciones: r.ubicaciones,
-          erp: r.erp,
-          validado: r.validado,
-          descuadre,
+          erp: q1(r.erp),
+          validado: q1(r.validado),
+          descuadre: q1(descuadre),
           costo_unitario: costo ?? '',
-          descuadre_valor: costo !== null ? descuadre * costo : '',
+          descuadre_valor: costo !== null ? q1(descuadre * costo) : '',
           estado: r.estado,
           ronda: r.ronda,
         };
@@ -599,11 +602,11 @@ export function useExportToExcel() {
             ubic: loc.ubic || '',
             linea: loc.linea || '',
             ue: loc.ue ?? '',
-            conteo_1: counts.c1 ?? '',
-            conteo_2: counts.c2 ?? '',
-            conteo_3: counts.c3 ?? '',
-            conteo_4: counts.c4 ?? '',
-            validado: validated?.validated_quantity ?? '',
+            conteo_1: counts.c1 != null ? q1(counts.c1) : '',
+            conteo_2: counts.c2 != null ? q1(counts.c2) : '',
+            conteo_3: counts.c3 != null ? q1(counts.c3) : '',
+            conteo_4: counts.c4 != null ? q1(counts.c4) : '',
+            validado: validated?.validated_quantity != null ? q1(validated.validated_quantity) : '',
             ronda_validacion: validated?.audit_round ?? '',
             motivo: validated?.reason ?? '',
           };
@@ -626,9 +629,9 @@ export function useExportToExcel() {
           referencia: m.referencia,
           descripcion: m.descripcion || '',
           ubicaciones: agg.ubicaciones,
-          erp,
-          validado: agg.validado,
-          descuadre: agg.validado > 0 ? agg.validado - erp : '',
+          erp: q1(erp),
+          validado: q1(agg.validado),
+          descuadre: agg.validado > 0 ? q1(agg.validado - erp) : '',
           estado: m.status_slug || '',
           ronda: m.audit_round || 1,
         };
