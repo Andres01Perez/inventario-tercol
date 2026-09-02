@@ -1,35 +1,57 @@
-# Verificación pre-inicio del conteo PT
+# Auditoría de datos del inventario en curso
 
-## Estado real verificado en la base de datos
+Revisé los datos reales del inventario activo (2.903 ubicaciones, 606 conteos, 31 validaciones consolidadas). El motor de validación está funcionando bien; hay **un solo problema real** y afecta a 15 referencias del lado Planta.
 
-| Elemento | Estado |
+## Lo que está correcto (verificado)
+
+| Verificación | Resultado |
 |---|---|
-| Maestra PT | 414 referencias cargadas |
-| Ubicaciones PT activas | 381, en 5 pisos |
-| Ubicaciones sin supervisor | 0 (todas asignadas vía pisos) |
-| Ubicaciones huérfanas (referencia no existe en maestra) | 0 |
-| Conteos registrados | 0 (limpio para empezar) |
-| Función de validación `pt_validate_and_close_round` | Creada y operativa |
-| Trigger que marca ubicación como "contado" al guardar | Activo |
-| Trigger que propaga supervisor de piso a ubicaciones | Activo |
-| Realtime en `pt_counts` (para que la fila desaparezca en todos los dispositivos) | Habilitado |
+| Almacén y Planta se comparan por separado | Correcto: ERP Almacén usa `Cant.Alm`; ERP Planta usa `Cant.PLd + Cant.PLr` |
+| Referencias cerradas sin fila en `validated_counts` | 0 |
+| Cantidad validada de la ubicación vs. la persistida | 0 desalineadas |
+| Conteos duplicados en la misma ronda/ubicación | 0 |
+| Ubicaciones sin bodega (bloquearían la validación) | 0 |
+| Referencias con C1 y C2 completos que quedaron sin evaluar | 0 |
+| Escalamiento a C3 | Correcto en los 4 casos existentes |
 
-## Conclusión: sí, puedes iniciar el conteo
+Ejemplos de escalamiento verificados (Almacén, pasaron a Conteo 3 como debe ser):
 
-No falta nada. El flujo funciona así:
+| Referencia | ERP | C1 | C2 | Resultado |
+|---|---|---|---|---|
+| ABS | 0 | 0 | 3 | → C3 (conflicto) |
+| ALE8DE | 1.214 | 1.220 | 1.210 | → C3 (conflicto) |
+| ALE8IE | 1.234 | 1.241 | 1.239 | → C3 (conflicto) |
+| BISAGRAG | 27.925 | 25.122 | 25.120 | → C3 (conflicto) |
 
-1. Cada supervisor de piso entra a Gestión Operativa → bloque Producto Terminado → Conteo 1.
-2. Ve solo sus pisos, escribe la cantidad (puede usar la calculadora: cajas × U.E. + sueltas) y guarda.
-3. Conteo 2 lo hace el segundo turno sobre las mismas ubicaciones.
-4. Solo cuando TODAS las ubicaciones de una referencia tienen C1 y C2, la validación automática compara: C1=C2, C1=ERP o C2=ERP → se cierra; si nada coincide → pasa a Conteo 3.
-5. C3 igual: si coincide con C1, C2 o ERP cierra; si no, pasa a C4 (final). Si C4 tampoco coincide → la referencia queda en estado crítico para superadmin.
-6. Todo queda persistido en `pt_validated_counts` (cantidad, ronda, motivo) para exportaciones y auditoría.
+También es correcto que varias referencias cerraran por `C1=C2` con diferencia frente al ERP (ej. ALE12DE: ERP 1.676, contado 1.806): ese es el descuadre que el inventario debe reportar, no un error.
 
-## Dos datos a tener en cuenta (no son bloqueo)
+## El problema encontrado: 15 bloques de Planta cerrados antes de tiempo
 
-- Hay 95 referencias con `cant_erp = 0`. Es válido: si además no tienen ubicaciones quedan como n/a automáticamente; si tienen ubicaciones, se cuentan normal.
-- Las rondas C3 y C4 solo aparecen para referencias que no cerraron en C1/C2 o C3; no se puede saltar una ronda.
+Cuando se validó por primera vez esas referencias, **todavía no tenían ubicaciones asignadas a Planta**. La función marcó el bloque como:
 
-## Recomendación de arranque
+- `n/a` (ERP planta = 0 y sin ubicaciones) → 3 referencias
+- `critico` (ERP planta > 0 y sin ubicaciones) → 12 referencias
 
-Empezar con 1–2 ubicaciones de prueba real en un piso: guardar C1, verificar que la fila desaparece de la lista y que en otro dispositivo también desaparece (realtime), y luego C2 con el mismo valor para ver el cierre automático "AUDITADO". Si ese ensayo funciona, soltar el conteo completo.
+Después se les asignaron ubicaciones de Planta, pero esos estados son "bloque cerrado": la validación los salta y **nunca volverá a evaluarlos**. Ya hay **8 ubicaciones con conteo cargado que nunca se van a validar ni a exportar**.
+
+Referencias afectadas: AESTRIADAT, ALTOIMPACTO, Antillama, Carbonato de Calcio, CCGRANDE, MBBLANCO, MBNEGRO, PC-ORIGINAL, PP-GRIS, PP-VERDE, R2TPEM-H, TTP04-G-BOX, R4TPEM-H, TE04-COVER, TTP04-BOX.
+
+Del lado Almacén el mismo chequeo dio 0 casos.
+
+## Corrección propuesta
+
+1. **Reabrir los 15 bloques de Planta**: poner `status_pl = 'pendiente'` y `audit_round_pl = 1` solo en las referencias que hoy están en `n/a`/`critico` en ronda 1 y que sí tienen ubicaciones de Planta activas sin validar. No se toca ninguna referencia auditada ni ningún conteo ya guardado.
+2. **Evitar que vuelva a pasar**: ajustar `validate_bucket` para que los estados `n/a` y `critico` en ronda 1 no se traten como bloque cerrado — si al validar aparecen ubicaciones activas sin validar, el bloque se reevalúa normalmente. Los cierres reales (`auditado`, `cerrado_forzado`) siguen intactos.
+3. **Reejecutar la validación** de esas 15 referencias para que los 8 conteos existentes entren al flujo normal (cierre si coinciden, o paso a C3).
+
+## Detalle técnico
+
+- Migración con un `UPDATE` acotado sobre `inventory_master` (filtrado por `inventory_id` activo, `status_pl in ('n/a','critico')`, `audit_round_pl = 1` y existencia de ubicación de Planta activa con `validated_at_round is null`).
+- `CREATE OR REPLACE FUNCTION public.validate_bucket(...)`: el early-return por bloque cerrado deja de incluir `n/a`/`critico` cuando quedan ubicaciones activas sin validar en ese bloque.
+- Sin cambios de frontend y sin tocar el flujo PT.
+
+## Verificación posterior
+
+- Contar de nuevo bloques cerrados con ubicaciones pendientes: debe dar 0 en Almacén y en Planta.
+- Confirmar que las 31 referencias auditadas y sus `validated_counts` quedan idénticas.
+- Confirmar que las 4 referencias en C3 siguen en C3.
