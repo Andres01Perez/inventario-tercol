@@ -17,6 +17,7 @@ import {
   Info,
   Loader2,
   Download,
+  RotateCcw,
 } from 'lucide-react';
 import { useExportToExcel } from '@/hooks/useExportToExcel';
 import { formatQty, formatSignedQty, formatMoney, formatSignedMoney, descuadreColorClass } from '@/lib/format';
@@ -143,6 +144,7 @@ interface Props {
 const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
   const { user, role } = useAuth();
   const canEdit = role !== 'visualizador';
+  const isSuperadmin = role === 'superadmin';
 
   const queryClient = useQueryClient();
   const { inventoryId, isReadOnly } = useInventory();
@@ -160,11 +162,14 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
   const [validateDialogOpen, setValidateDialogOpen] = useState(false);
   const [forceCloseDialogOpen, setForceCloseDialogOpen] = useState(false);
   const [editCountDialogOpen, setEditCountDialogOpen] = useState(false);
+  const [reopenDialogOpen, setReopenDialogOpen] = useState(false);
+  const [reopenReason, setReopenReason] = useState('');
   const [selectedReference, setSelectedReference] = useState<GroupedRef | null>(null);
   const [validateQuantity, setValidateQuantity] = useState('');
   const [forceCloseReason, setForceCloseReason] = useState('');
   const [editingCounts, setEditingCounts] = useState<Record<string, { c1?: string; c2?: string; c3?: string; c4?: string; c5?: string }>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
 
   React.useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
@@ -539,6 +544,31 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
     }
   };
 
+  const handleReopen = async () => {
+    if (!selectedReference || !user || !inventoryId) return;
+    if (isReadOnly) { toast.error('Inventario histórico: solo lectura'); return; }
+    if (!reopenReason.trim()) { toast.error('Debes ingresar un motivo'); return; }
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.rpc('reopen_reference', {
+        _inventory_id: inventoryId,
+        _reference: selectedReference.referencia,
+        _bodega: bodega,
+        _reason: reopenReason.trim(),
+        _user_id: user.id,
+      });
+      if (error) throw error;
+      toast.success(`${selectedReference.referencia} reabierta: vuelve a Conteo 1`);
+      setReopenDialogOpen(false);
+      setReopenReason('');
+      await invalidate();
+    } catch (error: any) {
+      toast.error('Error al reabrir: ' + error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSaveEditedCounts = async () => {
     if (!selectedReference || !user) return;
     if (isReadOnly) { toast.error('Inventario histórico: solo lectura'); return; }
@@ -597,6 +627,17 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
 
       toast.success('Conteos actualizados correctamente');
       setEditCountDialogOpen(false);
+
+      // Revalidar la referencia con los conteos corregidos
+      if (inventoryId) {
+        const { error: revalError } = await supabase.rpc('validate_and_close_round', {
+          _reference: selectedReference.referencia,
+          _admin_id: user.id,
+          _inventory_id: inventoryId,
+        });
+        if (revalError) toast.warning('Conteos guardados, pero no se pudo revalidar: ' + revalError.message);
+      }
+
       await invalidate();
     } catch (error: any) {
       toast.error('Error al guardar: ' + error.message);
@@ -707,6 +748,14 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
               }}>
                 <Edit3 className="w-4 h-4 mr-2" />Editar Conteo
               </DropdownMenuItem>
+              {isSuperadmin && !isReadOnly && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => { setSelectedReference(group); setReopenReason(''); setReopenDialogOpen(true); }}>
+                    <RotateCcw className="w-4 h-4 mr-2 text-amber-600" />Reabrir conteo
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -981,6 +1030,37 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Reabrir conteo */}
+      <Dialog open={reopenDialogOpen} onOpenChange={setReopenDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reabrir conteo: {selectedReference?.referencia}</DialogTitle>
+            <DialogDescription>
+              Se borrará la validación guardada de {bodega === 'almacen' ? 'Almacén' : 'Planta'}, las
+              ubicaciones quedarán disponibles para volver a contar y la referencia regresa a Conteo 1
+              en estado pendiente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="reopen-reason">Motivo *</Label>
+            <Textarea
+              id="reopen-reason"
+              placeholder="Describe por qué se reabre la referencia..."
+              value={reopenReason}
+              onChange={(e) => setReopenReason(e.target.value)}
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReopenDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleReopen} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Reabrir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       {/* Editar conteos */}
       <Dialog open={editCountDialogOpen} onOpenChange={setEditCountDialogOpen}>
