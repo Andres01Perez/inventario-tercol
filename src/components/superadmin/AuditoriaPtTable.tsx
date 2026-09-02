@@ -458,6 +458,30 @@ const AuditoriaPtTable: React.FC = () => {
     }
   };
 
+  const handleReopen = async () => {
+    if (!selectedReference || !user || !inventoryId) return;
+    if (isReadOnly) { toast.error('Inventario histórico: solo lectura'); return; }
+    if (!reopenReason.trim()) { toast.error('Debes ingresar un motivo'); return; }
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.rpc('pt_reopen_reference', {
+        _inventory_id: inventoryId,
+        _referencia: selectedReference.referencia,
+        _reason: reopenReason.trim(),
+        _user_id: user.id,
+      });
+      if (error) throw error;
+      toast.success(`${selectedReference.referencia} reabierta: vuelve a Conteo 1`);
+      setReopenDialogOpen(false);
+      setReopenReason('');
+      await invalidate();
+    } catch (error: any) {
+      toast.error('Error al reabrir: ' + error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSaveEditedCounts = async () => {
     if (!selectedReference || !user || !inventoryId) return;
     if (isReadOnly) { toast.error('Inventario histórico: solo lectura'); return; }
