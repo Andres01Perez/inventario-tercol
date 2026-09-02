@@ -626,6 +626,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
         </div>
         <div className="w-[110px] min-w-[110px] px-2">{getStatusBadge(group.bodegaStatus)}</div>
         <div className="w-[60px] min-w-[60px] px-2 text-center text-sm text-muted-foreground">C{group.bodegaRound}</div>
+        {canEdit && (
         <div className="w-[50px] min-w-[50px] px-2" onClick={(e) => e.stopPropagation()}>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -667,6 +668,8 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+        )}
+
       </div>
     );
   };
