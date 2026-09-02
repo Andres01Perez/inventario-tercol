@@ -144,6 +144,7 @@ interface Props {
 const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
   const { user, role } = useAuth();
   const canEdit = role !== 'visualizador';
+  const isSuperadmin = role === 'superadmin';
 
   const queryClient = useQueryClient();
   const { inventoryId, isReadOnly } = useInventory();
@@ -161,11 +162,14 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
   const [validateDialogOpen, setValidateDialogOpen] = useState(false);
   const [forceCloseDialogOpen, setForceCloseDialogOpen] = useState(false);
   const [editCountDialogOpen, setEditCountDialogOpen] = useState(false);
+  const [reopenDialogOpen, setReopenDialogOpen] = useState(false);
+  const [reopenReason, setReopenReason] = useState('');
   const [selectedReference, setSelectedReference] = useState<GroupedRef | null>(null);
   const [validateQuantity, setValidateQuantity] = useState('');
   const [forceCloseReason, setForceCloseReason] = useState('');
   const [editingCounts, setEditingCounts] = useState<Record<string, { c1?: string; c2?: string; c3?: string; c4?: string; c5?: string }>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
 
   React.useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
