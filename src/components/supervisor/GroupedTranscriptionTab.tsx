@@ -377,12 +377,12 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
     mutationFn: async ({ locationId, quantity }: { locationId: string; quantity: number }) => {
       const { error } = await supabase
         .from('inventory_counts')
-        .insert({
+        .upsert({
           location_id: locationId,
           supervisor_id: user!.id,
           audit_round: roundNumber,
           quantity_counted: quantity,
-        });
+        }, { onConflict: 'location_id,audit_round' });
       if (error) throw error;
 
       const { data: location } = await supabase

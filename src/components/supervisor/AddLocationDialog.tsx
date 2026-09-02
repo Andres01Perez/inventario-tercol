@@ -154,12 +154,12 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
       if (!isNaN(qty) && qty >= 0) {
         const { error: countError } = await supabase
           .from('inventory_counts')
-          .insert({
+          .upsert({
             location_id: newLocation.id,
             supervisor_id: user!.id,
             audit_round: currentAuditRound <= 2 ? currentAuditRound : currentAuditRound,
             quantity_counted: qty,
-          });
+          }, { onConflict: 'location_id,audit_round' });
 
         if (countError) throw countError;
       }

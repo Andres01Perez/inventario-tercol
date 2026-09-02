@@ -543,7 +543,9 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
       }
 
       if (inserts.length > 0) {
-        const { error } = await supabase.from('inventory_counts').insert(inserts);
+        const { error } = await supabase
+          .from('inventory_counts')
+          .upsert(inserts, { onConflict: 'location_id,audit_round' });
         if (error) throw error;
       }
 

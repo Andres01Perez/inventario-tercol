@@ -118,7 +118,7 @@ const CriticalReferenceCard: React.FC<CriticalReferenceCardProps> = ({ reference
 
       const { error: insertError } = await supabase
         .from('inventory_counts')
-        .insert(countsToInsert);
+        .upsert(countsToInsert, { onConflict: 'location_id,audit_round' });
 
       if (insertError) throw insertError;
 
