@@ -126,10 +126,13 @@ const AuditoriaPtTable: React.FC = () => {
   const queryClient = useQueryClient();
   const { inventoryId, isReadOnly } = useInventory();
   const { isExporting, exportAuditoriaPT } = useExportToExcel();
+  const [searchParams] = useSearchParams();
+  const initialStatus = searchParams.get('status') || 'all';
+  const initialRef = searchParams.get('ref') || '';
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState(initialRef);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialRef);
+  const [statusFilter, setStatusFilter] = useState(initialStatus);
   const [pisoFilter, setPisoFilter] = useState('all');
   const [multiFloorOnly, setMultiFloorOnly] = useState(false);
   const [expandedRefs, setExpandedRefs] = useState<Set<string>>(new Set());
