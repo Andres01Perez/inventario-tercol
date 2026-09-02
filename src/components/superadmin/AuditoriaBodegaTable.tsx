@@ -627,6 +627,17 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
 
       toast.success('Conteos actualizados correctamente');
       setEditCountDialogOpen(false);
+
+      // Revalidar la referencia con los conteos corregidos
+      if (inventoryId) {
+        const { error: revalError } = await supabase.rpc('validate_and_close_round', {
+          _reference: selectedReference.referencia,
+          _admin_id: user.id,
+          _inventory_id: inventoryId,
+        });
+        if (revalError) toast.warning('Conteos guardados, pero no se pudo revalidar: ' + revalError.message);
+      }
+
       await invalidate();
     } catch (error: any) {
       toast.error('Error al guardar: ' + error.message);
