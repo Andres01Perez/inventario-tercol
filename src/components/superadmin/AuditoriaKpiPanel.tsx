@@ -16,6 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { formatQty, formatSignedQty, formatMoney, formatSignedMoney, descuadreColorClass } from '@/lib/format';
 
 export type Bodega = 'almacen' | 'planta';
 type Familia = 'all' | 'MP' | 'PP';
@@ -35,9 +36,8 @@ const STATUS_META: Record<string, { label: string; bar: string; badge: string }>
 };
 
 const nf = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 });
-const money = (v: number) =>
-  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v);
-const signed = (v: number) => `${v > 0 ? '+' : ''}${nf.format(v)}`;
+const money = formatMoney;
+const signed = formatSignedQty;
 
 interface RefAgg {
   referencia: string;
@@ -431,7 +431,7 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
     : Math.round((data.doneCounts / data.requiredCounts) * 100);
   const pctAuditadas = data.totalRefs ? Math.round((data.auditadas / data.totalRefs) * 100) : 0;
 
-  const kpis: { label: string; value: string; hint: React.ReactNode; danger?: boolean }[] = [
+  const kpis: { label: string; value: string; hint: React.ReactNode; danger?: boolean; colorClass?: string }[] = [
     { label: 'Referencias', value: nf.format(data.totalRefs), hint: `${nf.format(data.activeLocations)} ubic. abiertas` },
     {
       label: 'Avance de conteo',
@@ -457,17 +457,17 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
     { label: 'Auditadas', value: nf.format(data.auditadas), hint: `${pctAuditadas}% del total` },
     {
       label: 'Descuadre (und)',
-      value: signed(data.descuadreUnd),
-      hint: `Faltante ${nf.format(data.faltante)} · Sobrante ${signed(data.sobrante)}`,
-      danger: data.descuadreUnd !== 0,
+      value: data.hasAnyValidation ? signed(data.descuadreUnd) : '—',
+      hint: `Faltante ${formatQty(data.faltante)} · Sobrante ${signed(data.sobrante)}`,
+      colorClass: data.hasAnyValidation ? descuadreColorClass(data.descuadreUnd) : undefined,
     },
     {
       label: 'Descuadre ($)',
-      value: data.hasAnyValidation ? money(data.descuadreValor) : '—',
+      value: data.hasAnyValidation ? formatSignedMoney(data.descuadreValor) : '—',
       hint: data.hasAnyValidation
         ? (data.refsSinCosto > 0 ? `${data.refsSinCosto} refs sin costo cargado` : 'Costos cargados')
         : 'Sin validaciones consolidadas',
-      danger: data.hasAnyValidation && data.descuadreValor !== 0,
+      colorClass: data.hasAnyValidation ? descuadreColorClass(data.descuadreValor) : undefined,
     },
   ];
 
@@ -497,7 +497,7 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
           <Card key={k.label} className="glass-card">
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground">{k.label}</p>
-              <p className={`text-2xl font-bold mt-1 ${k.danger ? 'text-destructive' : 'text-foreground'}`}>{k.value}</p>
+              <p className={`text-2xl font-bold mt-1 ${k.colorClass ?? (k.danger ? 'text-destructive' : 'text-foreground')}`}>{k.value}</p>
               <p className="text-[11px] text-muted-foreground mt-1">{k.hint}</p>
             </CardContent>
           </Card>
@@ -590,21 +590,21 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
               {data.byFamily.map((f) => (
                 <TableRow key={f.familia}>
                   <TableCell className="font-medium">{f.familia}</TableCell>
-                  <TableCell className="text-right">{nf.format(f.erp)}</TableCell>
-                  <TableCell className="text-right">{nf.format(f.validado)}</TableCell>
-                  <TableCell className={`text-right ${f.descuadre !== 0 ? 'text-destructive font-medium' : ''}`}>{signed(f.descuadre)}</TableCell>
-                  <TableCell className={`text-right ${f.validado !== 0 && f.valor !== 0 ? 'text-destructive font-medium' : ''}`}>
-                    {f.validado === 0 ? '—' : money(f.valor)}
+                  <TableCell className="text-right">{formatQty(f.erp)}</TableCell>
+                  <TableCell className="text-right">{formatQty(f.validado)}</TableCell>
+                  <TableCell className={`text-right font-medium ${descuadreColorClass(f.descuadre)}`}>{signed(f.descuadre)}</TableCell>
+                  <TableCell className={`text-right font-medium ${f.validado === 0 ? '' : descuadreColorClass(f.valor)}`}>
+                    {f.validado === 0 ? '—' : formatSignedMoney(f.valor)}
                   </TableCell>
                 </TableRow>
               ))}
               {data.byFamily.length > 0 && (
                 <TableRow className="bg-muted/40 font-semibold">
                   <TableCell>Total</TableCell>
-                  <TableCell className="text-right">{nf.format(data.byFamily.reduce((a, f) => a + f.erp, 0))}</TableCell>
-                  <TableCell className="text-right">{nf.format(data.byFamily.reduce((a, f) => a + f.validado, 0))}</TableCell>
-                  <TableCell className="text-right">{signed(data.descuadreUnd)}</TableCell>
-                  <TableCell className="text-right">{data.hasAnyValidation ? money(data.descuadreValor) : '—'}</TableCell>
+                  <TableCell className="text-right">{formatQty(data.byFamily.reduce((a, f) => a + f.erp, 0))}</TableCell>
+                  <TableCell className="text-right">{formatQty(data.byFamily.reduce((a, f) => a + f.validado, 0))}</TableCell>
+                  <TableCell className={`text-right ${descuadreColorClass(data.descuadreUnd)}`}>{signed(data.descuadreUnd)}</TableCell>
+                  <TableCell className={`text-right ${data.hasAnyValidation ? descuadreColorClass(data.descuadreValor) : ''}`}>{data.hasAnyValidation ? formatSignedMoney(data.descuadreValor) : '—'}</TableCell>
                 </TableRow>
               )}
               {data.byFamily.length === 0 && (
@@ -646,11 +646,11 @@ const AuditoriaKpiPanel: React.FC<Props> = ({ bodega, familia }) => {
                   >
                     <TableCell className="font-medium">{r.referencia}</TableCell>
                     <TableCell>{r.materialType}</TableCell>
-                    <TableCell className="text-right">{nf.format(r.erp)}</TableCell>
-                    <TableCell className="text-right">{nf.format(r.validado)}</TableCell>
-                    <TableCell className="text-right text-destructive font-medium">{signed(r.descuadre)}</TableCell>
-                    <TableCell className="text-right text-destructive font-medium">
-                      {r.sinCosto ? 'Sin costo' : money(r.descuadreValor ?? 0)}
+                    <TableCell className="text-right">{formatQty(r.erp)}</TableCell>
+                    <TableCell className="text-right">{formatQty(r.validado)}</TableCell>
+                    <TableCell className={`text-right font-medium ${descuadreColorClass(r.descuadre)}`}>{signed(r.descuadre)}</TableCell>
+                    <TableCell className={`text-right font-medium ${r.sinCosto ? 'text-muted-foreground' : descuadreColorClass(r.descuadreValor)}`}>
+                      {r.sinCosto ? 'Sin costo' : formatSignedMoney(r.descuadreValor ?? 0)}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={meta.badge}>{meta.label}</Badge>
