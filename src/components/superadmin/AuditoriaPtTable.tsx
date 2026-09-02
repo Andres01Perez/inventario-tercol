@@ -879,6 +879,36 @@ const AuditoriaPtTable: React.FC = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Reabrir conteo */}
+      <Dialog open={reopenDialogOpen} onOpenChange={setReopenDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reabrir conteo: {selectedReference?.referencia}</DialogTitle>
+            <DialogDescription>
+              Se borrará la validación guardada, las ubicaciones quedarán disponibles para volver a contar
+              y la referencia regresa a Conteo 1 en estado pendiente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="pt-reopen-reason">Motivo *</Label>
+            <Textarea
+              id="pt-reopen-reason"
+              placeholder="Describe por qué se reabre la referencia..."
+              value={reopenReason}
+              onChange={(e) => setReopenReason(e.target.value)}
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReopenDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleReopen} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Reabrir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
       {/* Editar conteos */}
       <Dialog open={editCountDialogOpen} onOpenChange={setEditCountDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[80vh]">
