@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from 'sonner';
+import { friendlyCountError } from '@/lib/countErrorMessage';
 import { Check, Loader2, RefreshCw, Save, Search, CheckCircle2 } from 'lucide-react';
 import CountCalculator from '@/components/pt/CountCalculator';
 
