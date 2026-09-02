@@ -42,6 +42,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const { user, role, roleLoading } = useAuth();
   const queryClient = useQueryClient();
   const isSuperadmin = role === 'superadmin';
+  const canSwitchInventory = isSuperadmin || role === 'visualizador';
 
   const [selectedId, setSelectedId] = useState<string | null>(() => {
     try {
@@ -73,10 +74,10 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Los roles operativos SIEMPRE trabajan sobre el inventario abierto.
   const inventoryId = useMemo(() => {
-    if (!isSuperadmin) return activeInventoryId;
+    if (!canSwitchInventory) return activeInventoryId;
     if (selectedId && inventories.some((i) => i.id === selectedId)) return selectedId;
     return activeInventoryId;
-  }, [isSuperadmin, selectedId, inventories, activeInventoryId]);
+  }, [canSwitchInventory, selectedId, inventories, activeInventoryId]);
 
   const inventory = useMemo(
     () => inventories.find((i) => i.id === inventoryId) ?? null,
@@ -84,7 +85,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   );
 
   const setSelectedInventoryId = (id: string) => {
-    if (!isSuperadmin) return;
+    if (!canSwitchInventory) return;
     setSelectedId(id);
     try {
       localStorage.setItem(STORAGE_KEY, id);
@@ -113,7 +114,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     inventory,
     inventories,
     isReadOnly: !!inventoryId && inventoryId !== activeInventoryId,
-    canSwitch: isSuperadmin,
+    canSwitch: canSwitchInventory,
     loading: isLoading || roleLoading,
     setSelectedInventoryId,
     refetchInventories: refetch,
