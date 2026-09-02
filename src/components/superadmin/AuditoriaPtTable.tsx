@@ -145,6 +145,8 @@ const AuditoriaPtTable: React.FC = () => {
   const [selectedHistory, setSelectedHistory] = useState<{ referencia: string; history: any[] } | null>(null);
   const [forceCloseDialogOpen, setForceCloseDialogOpen] = useState(false);
   const [editCountDialogOpen, setEditCountDialogOpen] = useState(false);
+  const [reopenDialogOpen, setReopenDialogOpen] = useState(false);
+  const [reopenReason, setReopenReason] = useState('');
   const [selectedReference, setSelectedReference] = useState<PtGroupedRef | null>(null);
   const [forceCloseReason, setForceCloseReason] = useState('');
   const [editingCounts, setEditingCounts] = useState<Record<string, { c1?: string; c2?: string; c3?: string; c4?: string }>>({});
