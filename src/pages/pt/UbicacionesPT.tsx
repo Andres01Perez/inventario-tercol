@@ -111,6 +111,40 @@ const UbicacionesPT: React.FC = () => {
     });
   }, [locations, search, piso]);
 
+  const openEdit = (l: PtLocationRow) => {
+    setEditing(l);
+    setEditUe(l.ue !== null && l.ue !== undefined ? String(l.ue) : '');
+    setEditSupervisor(l.assigned_supervisor_id);
+  };
+
+  const handleSave = async () => {
+    if (!editing) return;
+    const trimmed = editUe.trim();
+    let ueValue: number | null = null;
+    if (trimmed !== '') {
+      const parsed = Number(trimmed.replace(',', '.'));
+      if (Number.isNaN(parsed)) {
+        toast({ title: 'U.E inválida', description: 'Ingresa un número o deja el campo vacío.', variant: 'destructive' });
+        return;
+      }
+      ueValue = parsed;
+    }
+    setSaving(true);
+    const { error } = await supabase
+      .from('pt_locations')
+      .update({ ue: ueValue, assigned_supervisor_id: editSupervisor })
+      .eq('id', editing.id);
+    setSaving(false);
+    if (error) {
+      toast({ title: 'No se pudo guardar', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Ubicación actualizada' });
+    setEditing(null);
+    refetch();
+  };
+
+
   return (
     <AppLayout
       title="Ubicaciones PT"
