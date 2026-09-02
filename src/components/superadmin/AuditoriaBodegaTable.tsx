@@ -569,6 +569,33 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
     }
   };
 
+  const handleRevalidate = async (referencia: string) => {
+    if (!user || !inventoryId) return;
+    if (isReadOnly) { toast.error('Inventario histórico: solo lectura'); return; }
+    try {
+      const { data: res, error } = await supabase.rpc('revalidate_reference', {
+        _inventory_id: inventoryId,
+        _reference: referencia,
+        _bodega: bodega,
+        _user_id: user.id,
+      });
+      if (error) throw error;
+      const r = res as any;
+      if (r?.success === false) {
+        toast.error(r?.error || 'No fue posible re-validar');
+      } else if (r?.action === 'closed') {
+        toast.success(`Re-validada (${r.reason}) · total ${r.total} vs ERP ${r.erp}`);
+      } else if (r?.action === 'next_round') {
+        toast.info(`Re-validada: pasa a Conteo ${r.new_round}`);
+      } else {
+        toast.info('Re-validación aplicada');
+      }
+      await invalidate();
+    } catch (error: any) {
+      toast.error('Error al re-validar: ' + error.message);
+    }
+  };
+
   const handleSaveEditedCounts = async () => {
     if (!selectedReference || !user) return;
     if (isReadOnly) { toast.error('Inventario histórico: solo lectura'); return; }
