@@ -782,6 +782,9 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
               {isSuperadmin && !isReadOnly && (
                 <>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleRevalidate(group.referencia)}>
+                    <RefreshCw className="w-4 h-4 mr-2 text-blue-600" />Re-validar
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => { setSelectedReference(group); setReopenReason(''); setReopenDialogOpen(true); }}>
                     <RotateCcw className="w-4 h-4 mr-2 text-amber-600" />Reabrir conteo
                   </DropdownMenuItem>
