@@ -281,8 +281,53 @@ const UbicacionesPT: React.FC = () => {
             )}
           </CardContent>
         </Card>
+
+        <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Editar ubicación PT</DialogTitle>
+              <DialogDescription>
+                {editing ? `${editing.referencia} · Piso ${editing.piso}${editing.ubic ? ` · ${editing.ubic}` : ''}` : ''}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="pt-ue">Unidad de empaque (U.E)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="pt-ue"
+                    inputMode="decimal"
+                    placeholder="Sin U.E"
+                    value={editUe}
+                    onChange={(e) => setEditUe(e.target.value)}
+                  />
+                  <Button type="button" variant="outline" onClick={() => setEditUe('')}>
+                    Borrar
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Líder de conteo</Label>
+                <SupervisorSelect value={editSupervisor} onValueChange={setEditSupervisor} />
+                <p className="text-xs text-muted-foreground">
+                  Elige "Sin asignar" para quitar el líder de esta ubicación.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditing(null)} disabled={saving}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSave} disabled={saving}>
+                {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Guardar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
+
   );
 };
 
