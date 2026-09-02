@@ -3,7 +3,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 
-export type AppRole = 'superadmin' | 'admin_mp' | 'admin_pp' | 'supervisor' | null;
+export type AppRole = 'superadmin' | 'admin_mp' | 'admin_pp' | 'supervisor' | 'visualizador' | null;
 
 interface Profile {
   id: string;
