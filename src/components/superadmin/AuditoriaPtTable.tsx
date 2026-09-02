@@ -602,8 +602,8 @@ const AuditoriaPtTable: React.FC = () => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        </div>
         )}
-      </div>
       </div>
     );
   };
