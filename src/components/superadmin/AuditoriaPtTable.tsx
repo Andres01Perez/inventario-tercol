@@ -555,7 +555,11 @@ const AuditoriaPtTable: React.FC = () => {
 
       toast.success('Conteos actualizados');
       setEditCountDialogOpen(false);
-      await handleValidateNow(selectedReference);
+      if (isSuperadmin) {
+        await handleRevalidate(selectedReference);
+      } else {
+        await handleValidateNow(selectedReference);
+      }
       await invalidate();
     } catch (error: any) {
       toast.error('Error al guardar: ' + error.message);
