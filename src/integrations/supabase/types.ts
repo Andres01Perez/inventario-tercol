@@ -873,6 +873,15 @@ export type Database = {
       is_superadmin: { Args: { _user_id: string }; Returns: boolean }
       is_viewer: { Args: { _user_id: string }; Returns: boolean }
       location_bodega: { Args: { _assigned_admin_id: string }; Returns: string }
+      pt_reopen_reference: {
+        Args: {
+          _inventory_id: string
+          _reason: string
+          _referencia: string
+          _user_id: string
+        }
+        Returns: Json
+      }
       pt_upsert_validated_count: {
         Args: {
           _inventory_id: string
@@ -887,6 +896,16 @@ export type Database = {
       }
       pt_validate_and_close_round: {
         Args: { _inventory_id: string; _referencia: string; _user_id: string }
+        Returns: Json
+      }
+      reopen_reference: {
+        Args: {
+          _bodega: string
+          _inventory_id: string
+          _reason: string
+          _reference: string
+          _user_id: string
+        }
         Returns: Json
       }
       show_limit: { Args: never; Returns: number }
