@@ -36,7 +36,6 @@ const STATUS_META: Record<string, { label: string; bar: string; badge: string }>
 };
 
 const nf = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 });
-const money = formatMoney;
 const signed = formatSignedQty;
 
 interface RefAgg {

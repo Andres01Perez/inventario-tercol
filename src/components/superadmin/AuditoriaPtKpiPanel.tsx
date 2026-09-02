@@ -15,6 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { RefreshCw } from 'lucide-react';
+import { formatQty, formatSignedQty, descuadreColorClass } from '@/lib/format';
 
 const PAGE = 1000;
 
@@ -30,7 +31,7 @@ const STATUS_META: Record<string, { label: string; bar: string }> = {
 };
 
 const nf = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 });
-const signed = (v: number) => `${v > 0 ? '+' : ''}${nf.format(v)}`;
+const signed = formatSignedQty;
 
 interface RefAgg {
   referencia: string;
