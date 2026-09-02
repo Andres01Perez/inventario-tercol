@@ -126,6 +126,7 @@ const LocationInfoPopover: React.FC<{ row: PtLocRow }> = ({ row }) => (
 const AuditoriaPtTable: React.FC = () => {
   const { user, role } = useAuth();
   const canEdit = role !== 'visualizador';
+  const isSuperadmin = role === 'superadmin';
 
   const queryClient = useQueryClient();
   const { inventoryId, isReadOnly } = useInventory();
