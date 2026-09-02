@@ -610,9 +610,17 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
           {!hasMultipleLocations && <LocationInfoPopover row={row} />}
         </div>
         <div className="w-[90px] min-w-[90px] px-2 text-right font-bold">{formatQty(group.bodegaErp)}</div>
-...
+        <div className="w-[60px] min-w-[60px] px-2 text-right">{renderCountCell(group.totals.c1, group.bodegaErp, 1, group.bodegaRound)}</div>
+        <div className="w-[60px] min-w-[60px] px-2 text-right">{renderCountCell(group.totals.c2, group.bodegaErp, 2, group.bodegaRound)}</div>
+        <div className="w-[60px] min-w-[60px] px-2 text-right">{renderCountCell(group.totals.c3, group.bodegaErp, 3, group.bodegaRound)}</div>
+        <div className="w-[60px] min-w-[60px] px-2 text-right">{renderCountCell(group.totals.c4, group.bodegaErp, 4, group.bodegaRound)}</div>
+        <div className="w-[60px] min-w-[60px] px-2 text-right">{renderCountCell(group.totals.c5, group.bodegaErp, 5, group.bodegaRound)}</div>
         <div className="w-[90px] min-w-[90px] px-2 text-right font-medium">{group.totalValidado ? formatQty(group.totalValidado) : '-'}</div>
-...
+        <div className="w-[90px] min-w-[90px] px-2 text-right">{renderDescuadre(group)}</div>
+        <div className="w-[120px] min-w-[120px] px-2 text-right text-sm">
+          {group.costoUnitario === null || group.costoUnitario === 0 ? (
+            <span className="text-muted-foreground" title="Sin costo cargado en la maestra">sin costo</span>
+          ) : (
             <span className={descuadreColorClass(group.descuadreValor)}>
               {formatSignedMoney(group.descuadreValor || 0)}
             </span>
