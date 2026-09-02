@@ -397,6 +397,7 @@ const UnifiedDashboard: React.FC = () => {
           baseActions.dashboardAuditoria,
           baseActions.auditoriaAlmacen,
           baseActions.auditoriaPlanta,
+          baseActions.auditoriaPT,
           baseActions.exportarConteos,
         ]
       });
