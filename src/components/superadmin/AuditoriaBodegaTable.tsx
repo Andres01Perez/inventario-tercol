@@ -19,6 +19,7 @@ import {
   Download,
 } from 'lucide-react';
 import { useExportToExcel } from '@/hooks/useExportToExcel';
+import { formatQty, formatSignedQty, formatMoney, formatSignedMoney, descuadreColorClass } from '@/lib/format';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -108,8 +109,6 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   'n/a': { label: 'N/A', className: 'bg-muted text-muted-foreground border-border' },
 };
 
-const formatMoney = (value: number) =>
-  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value);
 
 const LocationInfoPopover: React.FC<{ row: LocRow }> = ({ row }) => (
   <Popover>
@@ -573,7 +572,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
     const isCurrentRound = round <= currentRound;
     return (
       <span className={`font-medium ${matchesErp ? 'text-green-600 dark:text-green-400' : isCurrentRound ? 'text-foreground' : 'text-muted-foreground'}`}>
-        {value}
+        {formatQty(value)}
       </span>
     );
   };
@@ -584,10 +583,9 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
   };
 
   const renderDescuadre = (group: GroupedRef) => {
-    const cero = group.descuadre === 0;
     return (
-      <span className={`font-medium ${cero ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-        {group.descuadre > 0 ? `+${group.descuadre}` : group.descuadre}
+      <span className={`font-medium ${descuadreColorClass(group.descuadre)}`}>
+        {formatSignedQty(group.descuadre)}
       </span>
     );
   };
@@ -611,20 +609,12 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
         <div className="w-[50px] min-w-[50px] px-2" onClick={(e) => e.stopPropagation()}>
           {!hasMultipleLocations && <LocationInfoPopover row={row} />}
         </div>
-        <div className="w-[90px] min-w-[90px] px-2 text-right font-bold">{group.bodegaErp}</div>
-        <div className="w-[60px] min-w-[60px] px-2 text-right">{renderCountCell(group.totals.c1, group.bodegaErp, 1, group.bodegaRound)}</div>
-        <div className="w-[60px] min-w-[60px] px-2 text-right">{renderCountCell(group.totals.c2, group.bodegaErp, 2, group.bodegaRound)}</div>
-        <div className="w-[60px] min-w-[60px] px-2 text-right">{renderCountCell(group.totals.c3, group.bodegaErp, 3, group.bodegaRound)}</div>
-        <div className="w-[60px] min-w-[60px] px-2 text-right">{renderCountCell(group.totals.c4, group.bodegaErp, 4, group.bodegaRound)}</div>
-        <div className="w-[60px] min-w-[60px] px-2 text-right">{renderCountCell(group.totals.c5, group.bodegaErp, 5, group.bodegaRound)}</div>
-        <div className="w-[90px] min-w-[90px] px-2 text-right font-medium">{group.totalValidado || '-'}</div>
-        <div className="w-[90px] min-w-[90px] px-2 text-right">{renderDescuadre(group)}</div>
-        <div className="w-[120px] min-w-[120px] px-2 text-right text-sm">
-          {group.costoUnitario === null || group.costoUnitario === 0 ? (
-            <span className="text-muted-foreground" title="Sin costo cargado en la maestra">sin costo</span>
-          ) : (
-            <span className={group.descuadre === 0 ? 'text-muted-foreground' : 'text-red-600 dark:text-red-400'}>
-              {formatMoney(group.descuadreValor || 0)}
+        <div className="w-[90px] min-w-[90px] px-2 text-right font-bold">{formatQty(group.bodegaErp)}</div>
+...
+        <div className="w-[90px] min-w-[90px] px-2 text-right font-medium">{group.totalValidado ? formatQty(group.totalValidado) : '-'}</div>
+...
+            <span className={descuadreColorClass(group.descuadreValor)}>
+              {formatSignedMoney(group.descuadreValor || 0)}
             </span>
           )}
         </div>
@@ -701,7 +691,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
         <div className="w-[60px] min-w-[60px] px-2 text-right">{renderCountCell(row.counts.c3, row.bodegaErp, 3, row.bodegaRound, row.discoveredAtRound)}</div>
         <div className="w-[60px] min-w-[60px] px-2 text-right">{renderCountCell(row.counts.c4, row.bodegaErp, 4, row.bodegaRound, row.discoveredAtRound)}</div>
         <div className="w-[60px] min-w-[60px] px-2 text-right">{renderCountCell(row.counts.c5, row.bodegaErp, 5, row.bodegaRound, row.discoveredAtRound)}</div>
-        <div className="w-[90px] min-w-[90px] px-2 text-right">{row.validatedQuantity ?? '-'}</div>
+        <div className="w-[90px] min-w-[90px] px-2 text-right">{row.validatedQuantity !== null ? formatQty(row.validatedQuantity) : '-'}</div>
         <div className="w-[90px] min-w-[90px] px-2 text-right text-muted-foreground text-xs truncate" title={row.validationReason || ''}>{row.validationReason || '-'}</div>
         <div className="w-[120px] min-w-[120px] px-2"></div>
         <div className="w-[110px] min-w-[110px] px-2"></div>
