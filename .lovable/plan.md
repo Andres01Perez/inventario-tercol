@@ -1,39 +1,36 @@
-# Revisión: por qué 20 referencias de almacén quedaron en Conteo 3
+# Dos ajustes: 20 referencias a crítico + mensaje de validación con bodega equivocada
 
-## Diagnóstico (verificado con datos reales)
+## 1. Las 20 referencias en conflicto pasan a crítico
 
-La validación **no** está fallando. Las referencias con C1=0 y C2=0 sí cerraron:
+Ya está diagnosticado: no hubo error de validación. Esas 20 tenían un Conteo 1 real y la siembra les completó el Conteo 2 faltante con 0, así que 0 no coincidió con el C1 y avanzaron a Conteo 3 (15 casos de una sola ubicación, 5 casos multi-ubicación como `BN08-75PG`, `CN08-75PG`, `DFGA70`, `CNCA90`, `DF18R-125-CMB`).
 
-- 1.920 referencias con ambos conteos en cero quedaron **auditadas en ronda 1**.
-- Total almacén hoy: 2.439 auditadas en C1, 66 auditadas en C3, 11 en C4, 20 en conflicto, 6 n/a, 6 críticas, 3 cerradas forzadas.
+Acción: marcar esas 20 referencias del bloque **Almacén** como `critico` en ronda 5, sin borrar ni alterar sus conteos, para que salgan de la lista de conteo pendiente y se resuelvan manualmente desde Auditoría Almacén / Críticos. No se toca Planta ni PT.
 
-Las 20 en conflicto no son casos de "cero contra cero". Son dos situaciones distintas:
+## 2. Por qué al guardar Conteo 1 en Planta salía "Pasó a Conteo 3 (Almacén)"
 
-**A. 15 referencias que ya tenían Conteo 1 real y sólo les faltaba el Conteo 2.**
-La siembra completó el C2 faltante con 0, y 0 no coincide con el C1 existente, así que la referencia pasó a C3. Ejemplos: `CamisaZ-Tooling1/2tipoA.` (C1=1, C2=0), `PI-KOD` (C1=4, C2=0), `SP-KOD-PU` (C1=6, C2=0), `SQ-15-56M-MA` (C1=1, C2=0).
+**La validación no está trocada.** Cada bloque se compara contra su propio ERP: Almacén contra `Cant.Alm`, Planta contra `Cant.PLd + Cant.PLr`. El problema es solo el **aviso en pantalla**.
 
-**B. 5 referencias con varias ubicaciones**, donde una ubicación tenía conteo real y otra recibió el cero.
-La suma de C1 no coincide con la suma de C2. Ejemplos: `BN08-75P` (C1 total 109 vs C2 total 0), `CN08-75PG` (57 vs 0), `DFGA70` (3 vs 0), `CNCA90` (1 vs 0), `DF18R-125-CMB` (C1 18 vs C2 18 pero con ubicaciones desalineadas).
+Al guardar cualquier conteo, la pantalla llama a `validate_and_close_round`, que evalúa la referencia completa y devuelve el resultado de los dos bloques. La vista de conteo muestra un toast por cada bloque devuelto, sin importar en cuál estaba trabajando el usuario.
 
-Causa raíz: la instrucción fue "almacén ya no tiene nada en conteo 1, 2, 3 ni 4", pero en G1 y en Sin Zona Asignada sí había 169 ubicaciones con C1 previo y algunas ubicaciones con conteo parcial. La siembra respetó lo existente (no sobrescribió) y por eso quedó C1 real + C2 en cero.
+En `CN08-75PG` el bloque de Almacén ya venía descuadrado por su cuenta (C1 sumaba 57 y C2 sumaba 0), así que al guardar el Conteo 1 de Planta el RPC reportó, correctamente, que Almacén pasaba a Conteo 3 — pero el mensaje apareció justo después de teclear en Planta y se leyó como si Planta hubiera avanzado.
 
-## Qué se puede hacer (elegir una opción)
+### Corrección
 
-### Opción 1 — Alinear el C2 al C1 existente y revalidar
-Para esas 20 referencias, reemplazar el C2 sembrado en cero por el valor del C1 de la misma ubicación, borrar los conteos C3/C4 si los hubiera, y ejecutar `revalidate_reference`. Resultado: quedan auditadas en C1 con la cantidad física realmente contada.
+En la vista de conteo (`GroupedTranscriptionTab.tsx`), notificar únicamente el bloque de la ubicación que se acaba de guardar:
 
-### Opción 2 — Poner también el C1 en cero y revalidar
-Sobrescribir C1=0 en las ubicaciones de almacén de G1 / Sin Zona que tenían conteo previo, dejando todo el bloque en 0/0. Resultado: 20 referencias más auditadas en cero, pero se pierde el conteo físico que ya existía.
-
-### Opción 3 — Dejarlas en conflicto
-No tocar nada; esas 20 se ajustan a mano desde Auditoría Almacén (editar conteo o cierre forzado) y el resto ya está listo para exportar.
+- La fila guardada ya trae su `bodega` (la vista `locations_bodega_view` la expone).
+- `runValidation` recibirá esa bodega y mostrará solo `res.almacen` o solo `res.planta`.
+- El resultado del otro bloque se sigue aplicando en la base de datos (el RPC no cambia), simplemente no genera un toast que confunda.
+- El texto del toast pasa a ser explícito: `⚠️ CN08-75PG (Planta) - Pasó a Conteo 3`, y si el bloque cierra, `✅ ... (Planta) - AUDITADO`.
 
 ## Detalles técnicos
 
-- La corrección previa de `validate_bucket` (permitir coincidencia en cero aunque el ERP sea positivo) está activa y funcionando: es lo que cerró las 1.920 referencias en cero.
-- Cualquier cambio se haría con `UPDATE`/`INSERT` sobre `inventory_counts` respetando la unicidad `(location_id, audit_round)`, seguido de `revalidate_reference(inventory_id, referencia, 'almacen', user_id)` referencia por referencia.
-- No se tocan Planta ni PT.
+- SQL de datos (no migración de esquema): `UPDATE inventory_master SET status_alm='critico', audit_round_alm=5` para las 20 referencias con `status_alm='conflicto'` del inventario activo, más entrada en `audit_logs`.
+- Frontend: `src/components/supervisor/GroupedTranscriptionTab.tsx` — la mutación de guardado devuelve también `bodega` junto a `masterReference`; `runValidation(masterReference, bodega)` filtra qué bucket notifica. Sin cambios en RPC, triggers ni en la lógica de comparación.
+- No se modifica `PtTranscriptionTab.tsx` (PT tiene un solo bloque y no presenta este problema).
 
-## Recomendación
+## Verificación
 
-Opción 1: conserva el conteo físico real, elimina los 20 conflictos y deja el export de almacén completo.
+- Consulta de control: 0 referencias de almacén en `conflicto`; las 20 quedan en `critico`.
+- Guardar un conteo de una ubicación de planta muestra un único toast, siempre etiquetado "(Planta)".
+- Typecheck y build.
