@@ -131,10 +131,42 @@ const UbicacionesPT: React.FC = () => {
       }
       ueValue = parsed;
     }
+
+    const newRef = editReferencia.trim();
+    if (newRef === '') {
+      toast({ title: 'Referencia vacía', description: 'La referencia no puede quedar vacía.', variant: 'destructive' });
+      return;
+    }
+
     setSaving(true);
+
+    // Si cambió la referencia, validar que exista en la maestra PT del inventario
+    if (newRef.toLowerCase() !== editing.referencia.toLowerCase()) {
+      const { data: masterRows, error: masterError } = await supabase
+        .from('pt_master')
+        .select('referencia')
+        .eq('inventory_id', inventoryId!)
+        .ilike('referencia', newRef)
+        .limit(1);
+      if (masterError) {
+        setSaving(false);
+        toast({ title: 'No se pudo validar la referencia', description: masterError.message, variant: 'destructive' });
+        return;
+      }
+      if (!masterRows || masterRows.length === 0) {
+        setSaving(false);
+        toast({
+          title: 'Referencia no existe en la maestra PT',
+          description: `"${newRef}" no está cargada en la maestra de este inventario.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     const { error } = await supabase
       .from('pt_locations')
-      .update({ ue: ueValue, assigned_supervisor_id: editSupervisor })
+      .update({ referencia: newRef, ue: ueValue, assigned_supervisor_id: editSupervisor })
       .eq('id', editing.id);
     setSaving(false);
     if (error) {
