@@ -33,11 +33,13 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { Download, Search, RefreshCw, CheckCircle2, MapPin } from 'lucide-react';
+import { Download, Search, RefreshCw, CheckCircle2, MapPin, Warehouse } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
 const ITEMS_PER_PAGE = 20;
+
+const round1 = (n: number) => Math.round((Number(n) || 0) * 10) / 10;
 
 interface AuditedReference {
   material_type: string;
@@ -45,6 +47,24 @@ interface AuditedReference {
   conteo: number;
   cantidad_validada: number;
   motivo: string;
+}
+
+interface BodegaRow {
+  referencia: string;
+  tipo: string;
+  bodega: string;
+  erp: number;
+  c1: number;
+  c2: number;
+  c3: number;
+  c4: number;
+  dif1: number;
+  dif2: number;
+  dif3: number;
+  dif4: number;
+  resultado: string;
+  a_montar: string;
+  cant_a_montar: number | null;
 }
 
 interface CountByLocation {
