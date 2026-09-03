@@ -53,6 +53,7 @@ const UbicacionesPT: React.FC = () => {
   const [piso, setPiso] = useState<string>('all');
   const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<PtLocationRow | null>(null);
+  const [editReferencia, setEditReferencia] = useState('');
   const [editUe, setEditUe] = useState('');
   const [editSupervisor, setEditSupervisor] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -113,6 +114,7 @@ const UbicacionesPT: React.FC = () => {
 
   const openEdit = (l: PtLocationRow) => {
     setEditing(l);
+    setEditReferencia(l.referencia);
     setEditUe(l.ue !== null && l.ue !== undefined ? String(l.ue) : '');
     setEditSupervisor(l.assigned_supervisor_id);
   };
