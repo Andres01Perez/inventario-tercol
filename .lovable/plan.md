@@ -31,18 +31,18 @@ Reglas:
 
 ## Cerrar en cero lo que quedó sin contar en almacén
 
-Situación real en el inventario abierto (ubicaciones de almacén, es decir de `admin_mp`):
+Los dos grupos de la vista de conteo son, en la base, el campo "punto de referencia" de las ubicaciones de almacén (`admin_mp`):
 
-| Ubicación | Ubicaciones | Sin C1 | Sin C2 |
+| Grupo | Ubicaciones | Sin C1 | Sin C2 |
 |---|---|---|---|
-| (sin nombre / sin asignar) | 1.194 | 1.097 | 1.099 |
-| ALMACEN | 847 | 169 | 346 |
+| Sección: G1 | 387 | 169 | 346 |
+| Sin Zona Asignada (punto de referencia vacío) | 1.167 | 1.097 | 1.099 |
 
-Acción: sembrar **C1 = 0 y C2 = 0** en todas las ubicaciones de almacén que hoy no tienen ese conteo, de forma que la validación las cierre sola con `C1=C2` y ninguna quede colgada. No se toca ninguna ubicación que ya tenga conteo, ni ninguna de planta ni de PT.
+Acción: sembrar **C1 = 0 y C2 = 0** únicamente en las ubicaciones de esos dos grupos que hoy no tienen ese conteo. Las que ya tienen conteo no se tocan, y no se toca nada de planta ni de PT.
 
-Después de sembrar los ceros se ejecuta la re-validación de las referencias de almacén afectadas para que queden con motivo y cantidad validada correctos, y así el export salga con RESULTADO, A MONTAR y CANT A MONTAR llenos.
+Con C1 = C2 = 0 la validación cierra sola esas ubicaciones, así que dejan de aparecer como pendientes en la vista de conteo.
 
-Nota: no existe una ubicación llamada "G1" en la base; las que aparecen sin responsable/nombre son esas 1.194 "sin asignar", que quedan cubiertas por esta acción. Si "G1" es otro nombre exacto, lo agrego al filtro.
+Después de sembrar los ceros se re-validan las referencias de almacén afectadas para que queden con motivo y cantidad validada correctos, y así el export salga con RESULTADO, A MONTAR y CANT A MONTAR llenos.
 
 
 ## De dónde salen los datos
