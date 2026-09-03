@@ -91,6 +91,7 @@ interface PtGroupedRef {
   rows: PtLocRow[];
   totals: { c1: number | null; c2: number | null; c3: number | null; c4: number | null };
   totalValidado: number;
+  hasValidation: boolean;
   descuadre: number;
 }
 
@@ -337,6 +338,7 @@ const AuditoriaPtTable: React.FC = () => {
               c4: sum(rows, 'c4'),
             },
             totalValidado,
+            hasValidation: rows.some((r) => r.validatedQuantity !== null),
             descuadre: totalValidado - erp,
           };
         })
@@ -355,7 +357,7 @@ const AuditoriaPtTable: React.FC = () => {
     return all.filter((g) => {
       if (multiFloorOnly && new Set(g.rows.map((r) => r.piso)).size <= 1) return false;
       if (descuadreFilter === 'all') return true;
-      const hasValidation = g.rows.some((r) => r.validatedQuantity !== null);
+      const hasValidation = g.hasValidation;
       if (descuadreFilter === 'sin_validar') return !hasValidation;
       if (!hasValidation) return false;
       if (descuadreFilter === 'con_descuadre') return g.descuadre !== 0;
@@ -601,7 +603,7 @@ const AuditoriaPtTable: React.FC = () => {
   const renderMainRow = (group: PtGroupedRef) => {
     const hasLocations = group.rows.length > 0;
     const isExpanded = expandedRefs.has(group.referencia);
-    const hasValidation = group.totalValidado > 0;
+    const hasValidation = group.hasValidation;
 
     return (
       <div

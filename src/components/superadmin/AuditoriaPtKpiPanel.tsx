@@ -217,7 +217,7 @@ const AuditoriaPtKpiPanel: React.FC<Props> = ({ piso }) => {
           doneCounts += hechos;
 
           const validado = rows.reduce((acc, l) => acc + (validatedByLoc.get(l.id) ?? 0), 0);
-          const hasValidation = validado > 0;
+          const hasValidation = rows.some((l) => validatedByLoc.has(l.id));
 
           return {
             referencia: m.referencia,
