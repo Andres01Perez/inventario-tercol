@@ -141,6 +141,7 @@ const AuditoriaPtTable: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState(initialRef);
   const [statusFilter, setStatusFilter] = useState(initialStatus);
   const [pisoFilter, setPisoFilter] = useState('all');
+  const [descuadreFilter, setDescuadreFilter] = useState('all');
   const [multiFloorOnly, setMultiFloorOnly] = useState(false);
   const [expandedRefs, setExpandedRefs] = useState<Set<string>>(new Set());
 
@@ -351,8 +352,19 @@ const AuditoriaPtTable: React.FC = () => {
 
   const groupedData = useMemo<PtGroupedRef[]>(() => {
     const all = data?.pages.flatMap((p) => p.groups) ?? [];
-    return multiFloorOnly ? all.filter((g) => new Set(g.rows.map((r) => r.piso)).size > 1) : all;
-  }, [data, multiFloorOnly]);
+    return all.filter((g) => {
+      if (multiFloorOnly && new Set(g.rows.map((r) => r.piso)).size <= 1) return false;
+      if (descuadreFilter === 'all') return true;
+      const hasValidation = g.rows.some((r) => r.validatedQuantity !== null);
+      if (descuadreFilter === 'sin_validar') return !hasValidation;
+      if (!hasValidation) return false;
+      if (descuadreFilter === 'con_descuadre') return g.descuadre !== 0;
+      if (descuadreFilter === 'sin_descuadre') return g.descuadre === 0;
+      if (descuadreFilter === 'faltantes') return g.descuadre < 0;
+      if (descuadreFilter === 'sobrantes') return g.descuadre > 0;
+      return true;
+    });
+  }, [data, multiFloorOnly, descuadreFilter]);
 
   const loadedRefs = data?.pages.reduce((acc, p) => acc + p.groups.length, 0) || 0;
 
