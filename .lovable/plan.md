@@ -25,9 +25,25 @@ Una pestaña nueva en `/superadmin/exportar-conteos` llamada **Almacén**, clara
 | CANT A MONTAR | Cantidad validada que se debe montar en el ERP |
 
 Reglas:
-- Si un conteo no existe, la celda del conteo y su DIF quedan vacías (no cero), para no confundir un conteo real de 0 con "no contado".
+- Los conteos que no existen se exportan como **0** (ya no como celda vacía): el conteo físico terminó y los ajustes finos se harán a mano en el Excel.
 - Todas las cantidades y diferencias se redondean a 1 decimal.
 - Las diferencias van como número con signo natural (positivo = sobrante, negativo = faltante), para poder filtrar y sumar en Excel.
+
+## Cerrar en cero lo que quedó sin contar en almacén
+
+Situación real en el inventario abierto (ubicaciones de almacén, es decir de `admin_mp`):
+
+| Ubicación | Ubicaciones | Sin C1 | Sin C2 |
+|---|---|---|---|
+| (sin nombre / sin asignar) | 1.194 | 1.097 | 1.099 |
+| ALMACEN | 847 | 169 | 346 |
+
+Acción: sembrar **C1 = 0 y C2 = 0** en todas las ubicaciones de almacén que hoy no tienen ese conteo, de forma que la validación las cierre sola con `C1=C2` y ninguna quede colgada. No se toca ninguna ubicación que ya tenga conteo, ni ninguna de planta ni de PT.
+
+Después de sembrar los ceros se ejecuta la re-validación de las referencias de almacén afectadas para que queden con motivo y cantidad validada correctos, y así el export salga con RESULTADO, A MONTAR y CANT A MONTAR llenos.
+
+Nota: no existe una ubicación llamada "G1" en la base; las que aparecen sin responsable/nombre son esas 1.194 "sin asignar", que quedan cubiertas por esta acción. Si "G1" es otro nombre exacto, lo agrego al filtro.
+
 
 ## De dónde salen los datos
 
