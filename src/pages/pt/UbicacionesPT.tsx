@@ -53,6 +53,7 @@ const UbicacionesPT: React.FC = () => {
   const [piso, setPiso] = useState<string>('all');
   const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<PtLocationRow | null>(null);
+  const [editReferencia, setEditReferencia] = useState('');
   const [editUe, setEditUe] = useState('');
   const [editSupervisor, setEditSupervisor] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -113,6 +114,7 @@ const UbicacionesPT: React.FC = () => {
 
   const openEdit = (l: PtLocationRow) => {
     setEditing(l);
+    setEditReferencia(l.referencia);
     setEditUe(l.ue !== null && l.ue !== undefined ? String(l.ue) : '');
     setEditSupervisor(l.assigned_supervisor_id);
   };
@@ -129,10 +131,42 @@ const UbicacionesPT: React.FC = () => {
       }
       ueValue = parsed;
     }
+
+    const newRef = editReferencia.trim();
+    if (newRef === '') {
+      toast({ title: 'Referencia vacía', description: 'La referencia no puede quedar vacía.', variant: 'destructive' });
+      return;
+    }
+
     setSaving(true);
+
+    // Si cambió la referencia, validar que exista en la maestra PT del inventario
+    if (newRef.toLowerCase() !== editing.referencia.toLowerCase()) {
+      const { data: masterRows, error: masterError } = await supabase
+        .from('pt_master')
+        .select('referencia')
+        .eq('inventory_id', inventoryId!)
+        .ilike('referencia', newRef)
+        .limit(1);
+      if (masterError) {
+        setSaving(false);
+        toast({ title: 'No se pudo validar la referencia', description: masterError.message, variant: 'destructive' });
+        return;
+      }
+      if (!masterRows || masterRows.length === 0) {
+        setSaving(false);
+        toast({
+          title: 'Referencia no existe en la maestra PT',
+          description: `"${newRef}" no está cargada en la maestra de este inventario.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     const { error } = await supabase
       .from('pt_locations')
-      .update({ ue: ueValue, assigned_supervisor_id: editSupervisor })
+      .update({ referencia: newRef, ue: ueValue, assigned_supervisor_id: editSupervisor })
       .eq('id', editing.id);
     setSaving(false);
     if (error) {
@@ -291,6 +325,19 @@ const UbicacionesPT: React.FC = () => {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="pt-referencia">Referencia</Label>
+                <Input
+                  id="pt-referencia"
+                  placeholder="Referencia"
+                  value={editReferencia}
+                  onChange={(e) => setEditReferencia(e.target.value)}
+                  className="font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Debe existir en la maestra PT de este inventario. Los conteos registrados se conservan.
+                </p>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="pt-ue">Unidad de empaque (U.E)</Label>
                 <div className="flex gap-2">
