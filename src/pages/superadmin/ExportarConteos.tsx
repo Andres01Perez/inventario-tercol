@@ -130,6 +130,13 @@ const ExportarConteos: React.FC = () => {
   const [currentPageLoc, setCurrentPageLoc] = useState(1);
   const [isExportingLoc, setIsExportingLoc] = useState(false);
 
+  // Tab Almacén state
+  const [searchTermAlm, setSearchTermAlm] = useState('');
+  const [currentPageAlm, setCurrentPageAlm] = useState(1);
+  const [isExportingAlm, setIsExportingAlm] = useState(false);
+
+
+
   // ===== TAB VALIDADOS: Query =====
   const { data: auditedReferences, isLoading, refetch } = useQuery({
     queryKey: ['export-auditados', searchTerm, materialTypeFilter, inventoryId],
