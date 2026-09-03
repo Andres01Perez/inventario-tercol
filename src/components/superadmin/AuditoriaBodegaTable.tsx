@@ -711,12 +711,12 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
     return (
       <div
         key={group.referencia}
-        className={`flex items-center h-11 border-b border-border hover:bg-muted/30 ${hasMultipleLocations ? 'cursor-pointer' : ''}`}
+        className={`flex items-center min-h-11 py-1 border-b border-border hover:bg-muted/30 ${hasMultipleLocations ? 'cursor-pointer' : ''}`}
         onClick={() => hasMultipleLocations && toggleExpand(group.referencia)}
       >
-        <div className="w-[240px] min-w-[240px] px-3 font-medium flex items-center gap-2 truncate">
+        <div className="w-[240px] min-w-[240px] px-3 font-medium flex items-center gap-2">
           {hasMultipleLocations && (isExpanded ? <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />)}
-          <span className="truncate">{group.referencia}</span>
+          <span className="break-words whitespace-normal leading-tight">{group.referencia}</span>
           {hasMultipleLocations && <Badge variant="secondary" className="text-xs flex-shrink-0">{group.rows.length}</Badge>}
         </div>
         <div className="w-[50px] min-w-[50px] px-2" onClick={(e) => e.stopPropagation()}>
@@ -807,7 +807,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
     return (
       <div
         key={row.locationId}
-        className={`flex items-center h-11 border-b border-border ${isValidated ? 'bg-green-500/10' : isDiscovered ? 'bg-amber-500/10' : 'bg-muted/20'} hover:bg-muted/40`}
+        className={`flex items-center min-h-11 py-1 border-b border-border ${isValidated ? 'bg-green-500/10' : isDiscovered ? 'bg-amber-500/10' : 'bg-muted/20'} hover:bg-muted/40`}
       >
         <div className="w-[240px] min-w-[240px] px-3 pl-10">
           <div className="flex items-center gap-2 flex-wrap">
