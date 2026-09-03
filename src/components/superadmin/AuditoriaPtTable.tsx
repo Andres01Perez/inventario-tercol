@@ -597,7 +597,7 @@ const AuditoriaPtTable: React.FC = () => {
         className={`flex items-center h-11 border-b border-border hover:bg-muted/30 ${hasLocations ? 'cursor-pointer' : ''}`}
         onClick={() => hasLocations && toggleExpand(group.referencia)}
       >
-        <div className="w-[170px] min-w-[170px] px-3 font-medium flex items-center gap-2 truncate">
+        <div className="w-[240px] min-w-[240px] px-3 font-medium flex items-center gap-2 truncate">
           {hasLocations && (isExpanded ? <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />)}
           <span className="truncate">{group.referencia}</span>
           {group.rows.length > 0 && <Badge variant="secondary" className="text-xs flex-shrink-0">{group.rows.length}</Badge>}
@@ -690,7 +690,7 @@ const AuditoriaPtTable: React.FC = () => {
         key={row.locationId}
         className={`flex items-center h-11 border-b border-border ${isValidated ? 'bg-green-500/10' : isDiscovered ? 'bg-amber-500/10' : 'bg-muted/20'} hover:bg-muted/40`}
       >
-        <div className="w-[170px] min-w-[170px] px-3 pl-8">
+        <div className="w-[240px] min-w-[240px] px-3 pl-8">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-muted-foreground text-sm">{subIndex === group.rows.length - 1 ? '└' : '├'} Piso {row.piso}</span>
             {isDiscovered && <Badge className="bg-amber-500/20 text-amber-600 border-amber-500/30 text-[10px]">C{row.discoveredAtRound}</Badge>}
@@ -785,7 +785,7 @@ const AuditoriaPtTable: React.FC = () => {
         <ScrollArea className="w-full">
           <div className="min-w-fit">
             <div className="flex items-center bg-muted/50 border-b border-border font-semibold text-sm">
-              <div className="w-[170px] min-w-[170px] px-3 py-3">Referencia</div>
+              <div className="w-[240px] min-w-[240px] px-3 py-3">Referencia</div>
               <div className="w-[220px] min-w-[220px] px-2 py-3">Descripción / Ubicación</div>
               <div className="w-[100px] min-w-[100px] px-2 py-3 text-right">ERP</div>
               <div className="w-[70px] min-w-[70px] px-2 py-3 text-right">C1</div>

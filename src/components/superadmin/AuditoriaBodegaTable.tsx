@@ -714,7 +714,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
         className={`flex items-center h-11 border-b border-border hover:bg-muted/30 ${hasMultipleLocations ? 'cursor-pointer' : ''}`}
         onClick={() => hasMultipleLocations && toggleExpand(group.referencia)}
       >
-        <div className="w-[180px] min-w-[180px] px-3 font-medium flex items-center gap-2 truncate">
+        <div className="w-[240px] min-w-[240px] px-3 font-medium flex items-center gap-2 truncate">
           {hasMultipleLocations && (isExpanded ? <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />)}
           <span className="truncate">{group.referencia}</span>
           {hasMultipleLocations && <Badge variant="secondary" className="text-xs flex-shrink-0">{group.rows.length}</Badge>}
@@ -809,7 +809,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
         key={row.locationId}
         className={`flex items-center h-11 border-b border-border ${isValidated ? 'bg-green-500/10' : isDiscovered ? 'bg-amber-500/10' : 'bg-muted/20'} hover:bg-muted/40`}
       >
-        <div className="w-[180px] min-w-[180px] px-3 pl-10">
+        <div className="w-[240px] min-w-[240px] px-3 pl-10">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-muted-foreground text-sm">{subIndex === group.rows.length - 1 ? '└' : '├'} Ubic {subIndex + 1}</span>
             {isDiscovered && <Badge className="bg-amber-500/20 text-amber-600 border-amber-500/30 text-[10px]">C{row.discoveredAtRound}</Badge>}
@@ -905,7 +905,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
         <ScrollArea className="w-full">
           <div className="min-w-fit">
             <div className="flex items-center bg-muted/50 border-b border-border font-semibold text-sm">
-              <div className="w-[180px] min-w-[180px] px-3 py-3">Referencia</div>
+              <div className="w-[240px] min-w-[240px] px-3 py-3">Referencia</div>
               <div className="w-[50px] min-w-[50px] px-2 py-3">Info</div>
               <div className="w-[90px] min-w-[90px] px-2 py-3 text-right">ERP {bodega === 'almacen' ? 'Alm' : 'Planta'}</div>
               <div className="w-[60px] min-w-[60px] px-2 py-3 text-right">C1</div>
