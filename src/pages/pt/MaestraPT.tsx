@@ -45,8 +45,12 @@ const MaestraPT: React.FC = () => {
             <Badge variant="outline">{stats?.references ?? 0} referencias PT</Badge>
             <Badge variant="outline">{stats?.locations ?? 0} ubicaciones PT</Badge>
           </div>
-          <InventorySelector />
+          <div className="flex items-center gap-2">
+            <PtBackupExport />
+            <InventorySelector />
+          </div>
         </div>
+
 
         <ReadOnlyBanner />
 
