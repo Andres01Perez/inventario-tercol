@@ -759,6 +759,17 @@ const AuditoriaPtTable: React.FC = () => {
               {pisoOptions?.map((p) => <SelectItem key={p} value={p}>Piso {p}</SelectItem>)}
             </SelectContent>
           </Select>
+          <Select value={descuadreFilter} onValueChange={setDescuadreFilter}>
+            <SelectTrigger className="w-[160px]"><SelectValue placeholder="Descuadre" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los descuadres</SelectItem>
+              <SelectItem value="con_descuadre">Con descuadre</SelectItem>
+              <SelectItem value="sin_descuadre">Sin descuadre</SelectItem>
+              <SelectItem value="faltantes">Solo faltantes (−)</SelectItem>
+              <SelectItem value="sobrantes">Solo sobrantes (+)</SelectItem>
+              <SelectItem value="sin_validar">Sin validar</SelectItem>
+            </SelectContent>
+          </Select>
           <div className="flex items-center gap-2 px-3 py-2 border rounded-lg bg-background">
             <Switch id="pt-multifloor" checked={multiFloorOnly} onCheckedChange={setMultiFloorOnly} />
             <Label htmlFor="pt-multifloor" className="text-sm cursor-pointer whitespace-nowrap">Varios pisos</Label>
