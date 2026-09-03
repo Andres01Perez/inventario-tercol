@@ -633,7 +633,7 @@ const ExportarConteos: React.FC = () => {
       <main>
         <ReadOnlyBanner />
         <Tabs defaultValue="validados" className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-2xl grid-cols-3">
             <TabsTrigger value="validados" className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4" />
               Validados
