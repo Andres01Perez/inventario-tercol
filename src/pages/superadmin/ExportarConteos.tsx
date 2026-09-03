@@ -642,7 +642,125 @@ const ExportarConteos: React.FC = () => {
               <MapPin className="w-4 h-4" />
               Por Ubicación
             </TabsTrigger>
+            <TabsTrigger value="almacen" className="flex items-center gap-2">
+              <Warehouse className="w-4 h-4" />
+              Almacén
+            </TabsTrigger>
           </TabsList>
+
+          {/* ===== TAB ALMACÉN ===== */}
+          <TabsContent value="almacen" className="space-y-6">
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Warehouse className="w-5 h-5 text-amber-600" />
+                  Conteos de Almacén
+                </CardTitle>
+                <CardDescription>
+                  Una fila por referencia de almacén (MP y PP), con conteos 1 a 4, diferencias contra el ERP y la cantidad validada a montar.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col sm:flex-row gap-4 items-end">
+                  <div className="flex-1 space-y-1">
+                    <label className="text-sm font-medium text-muted-foreground">Buscar referencia</label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Buscar por referencia..."
+                        value={searchTermAlm}
+                        onChange={(e) => setSearchTermAlm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => refetchAlm()} disabled={isLoadingAlm}>
+                      <RefreshCw className={`w-4 h-4 mr-2 ${isLoadingAlm ? 'animate-spin' : ''}`} />
+                      Actualizar
+                    </Button>
+                    <Button onClick={handleExportAlmacen} disabled={isExportingAlm || !filteredBodegaRows.length}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Exportar Almacén ({filteredBodegaRows.length})
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">Vista Previa</CardTitle>
+                  <span className="text-sm text-muted-foreground">
+                    {filteredBodegaRows.length} referencias
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isLoadingAlm ? (
+                  <div className="flex items-center justify-center py-12">
+                    <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : paginatedBodega.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    No se encontraron referencias de almacén
+                  </div>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>REFERENCIA</TableHead>
+                            <TableHead>TIPO</TableHead>
+                            <TableHead>BODEGA</TableHead>
+                            <TableHead className="text-right">ERP</TableHead>
+                            <TableHead className="text-right">C1</TableHead>
+                            <TableHead className="text-right">C2</TableHead>
+                            <TableHead className="text-right">C3</TableHead>
+                            <TableHead className="text-right">C4</TableHead>
+                            <TableHead className="text-right">DIF1</TableHead>
+                            <TableHead className="text-right">DIF2</TableHead>
+                            <TableHead className="text-right">DIF3</TableHead>
+                            <TableHead className="text-right">DIF4</TableHead>
+                            <TableHead>RESULTADO</TableHead>
+                            <TableHead>A MONTAR</TableHead>
+                            <TableHead className="text-right">CANT A MONTAR</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {paginatedBodega.map((r) => (
+                            <TableRow key={r.referencia}>
+                              <TableCell className="font-medium">{r.referencia}</TableCell>
+                              <TableCell>{r.tipo}</TableCell>
+                              <TableCell>{r.bodega}</TableCell>
+                              <TableCell className="text-right font-mono">{r.erp}</TableCell>
+                              <TableCell className="text-right font-mono">{r.c1}</TableCell>
+                              <TableCell className="text-right font-mono">{r.c2}</TableCell>
+                              <TableCell className="text-right font-mono">{r.c3}</TableCell>
+                              <TableCell className="text-right font-mono">{r.c4}</TableCell>
+                              <TableCell className="text-right font-mono">{r.dif1}</TableCell>
+                              <TableCell className="text-right font-mono">{r.dif2}</TableCell>
+                              <TableCell className="text-right font-mono">{r.dif3}</TableCell>
+                              <TableCell className="text-right font-mono">{r.dif4}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{r.resultado}</TableCell>
+                              <TableCell>{r.a_montar || '-'}</TableCell>
+                              <TableCell className="text-right font-mono font-semibold">
+                                {r.cant_a_montar ?? 0}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    {renderPagination(currentPageAlm, totalPagesAlm, setCurrentPageAlm)}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
 
           {/* ===== TAB VALIDADOS ===== */}
           <TabsContent value="validados" className="space-y-6">
