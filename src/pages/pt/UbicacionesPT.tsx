@@ -326,6 +326,19 @@ const UbicacionesPT: React.FC = () => {
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
+                <Label htmlFor="pt-referencia">Referencia</Label>
+                <Input
+                  id="pt-referencia"
+                  placeholder="Referencia"
+                  value={editReferencia}
+                  onChange={(e) => setEditReferencia(e.target.value)}
+                  className="font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Debe existir en la maestra PT de este inventario. Los conteos registrados se conservan.
+                </p>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="pt-ue">Unidad de empaque (U.E)</Label>
                 <div className="flex gap-2">
                   <Input
