@@ -5,6 +5,8 @@ import AppLayout from '@/components/layout/AppLayout';
 import ReadOnlyBanner from '@/components/shared/ReadOnlyBanner';
 import InventorySelector from '@/components/shared/InventorySelector';
 import PtMasterImport from '@/components/pt/PtMasterImport';
+import PtBackupExport from '@/components/pt/PtBackupExport';
+
 import { useInventory } from '@/contexts/InventoryContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -45,8 +47,12 @@ const MaestraPT: React.FC = () => {
             <Badge variant="outline">{stats?.references ?? 0} referencias PT</Badge>
             <Badge variant="outline">{stats?.locations ?? 0} ubicaciones PT</Badge>
           </div>
-          <InventorySelector />
+          <div className="flex items-center gap-2">
+            <PtBackupExport />
+            <InventorySelector />
+          </div>
         </div>
+
 
         <ReadOnlyBanner />
 

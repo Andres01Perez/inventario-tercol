@@ -2,6 +2,7 @@ import React from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import ReadOnlyBanner from '@/components/shared/ReadOnlyBanner';
 import AuditoriaPtTable from '@/components/superadmin/AuditoriaPtTable';
+import PtBackupExport from '@/components/pt/PtBackupExport';
 
 const AuditoriaPT: React.FC = () => (
   <AppLayout
@@ -13,9 +14,13 @@ const AuditoriaPT: React.FC = () => (
   >
     <div className="space-y-4">
       <ReadOnlyBanner />
+      <div className="flex justify-end">
+        <PtBackupExport />
+      </div>
       <AuditoriaPtTable />
     </div>
   </AppLayout>
 );
 
 export default AuditoriaPT;
+
