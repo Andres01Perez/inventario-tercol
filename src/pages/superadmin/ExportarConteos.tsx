@@ -495,6 +495,10 @@ const ExportarConteos: React.FC = () => {
     setCurrentPageLoc(1);
   }, [searchTermLoc, materialTypeFilterLoc]);
 
+  React.useEffect(() => {
+    setCurrentPageAlm(1);
+  }, [searchTermLoc, materialTypeFilterLoc]);
+
   // Export function - Validados
   const handleExport = async () => {
     if (!auditedReferences || auditedReferences.length === 0) {
