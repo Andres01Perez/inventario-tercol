@@ -33,11 +33,13 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { Download, Search, RefreshCw, CheckCircle2, MapPin } from 'lucide-react';
+import { Download, Search, RefreshCw, CheckCircle2, MapPin, Warehouse } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
 const ITEMS_PER_PAGE = 20;
+
+const round1 = (n: number) => Math.round((Number(n) || 0) * 10) / 10;
 
 interface AuditedReference {
   material_type: string;
@@ -45,6 +47,24 @@ interface AuditedReference {
   conteo: number;
   cantidad_validada: number;
   motivo: string;
+}
+
+interface BodegaRow {
+  referencia: string;
+  tipo: string;
+  bodega: string;
+  erp: number;
+  c1: number;
+  c2: number;
+  c3: number;
+  c4: number;
+  dif1: number;
+  dif2: number;
+  dif3: number;
+  dif4: number;
+  resultado: string;
+  a_montar: string;
+  cant_a_montar: number | null;
 }
 
 interface CountByLocation {
@@ -109,6 +129,13 @@ const ExportarConteos: React.FC = () => {
   const [materialTypeFilterLoc, setMaterialTypeFilterLoc] = useState<string>('all');
   const [currentPageLoc, setCurrentPageLoc] = useState(1);
   const [isExportingLoc, setIsExportingLoc] = useState(false);
+
+  // Tab Almacén state
+  const [searchTermAlm, setSearchTermAlm] = useState('');
+  const [currentPageAlm, setCurrentPageAlm] = useState(1);
+  const [isExportingAlm, setIsExportingAlm] = useState(false);
+
+
 
   // ===== TAB VALIDADOS: Query =====
   const { data: auditedReferences, isLoading, refetch } = useQuery({
@@ -274,6 +301,177 @@ const ExportarConteos: React.FC = () => {
     staleTime: 30 * 1000,
   });
 
+  // ===== TAB ALMACÉN: una referencia por fila =====
+  const { data: bodegaRows, isLoading: isLoadingAlm, refetch: refetchAlm } = useQuery({
+    queryKey: ['export-bodega-almacen', inventoryId],
+    enabled: !!inventoryId,
+    queryFn: async (): Promise<BodegaRow[]> => {
+      // 1. Ubicaciones de almacén (paginado, sin tope de 1000)
+      const locs: {
+        id: string;
+        master_reference: string;
+        material_type: string | null;
+        bodega_erp: number | null;
+        bodega_status: string | null;
+      }[] = [];
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from('locations_bodega_view')
+          .select('id, master_reference, material_type, bodega_erp, bodega_status')
+          .eq('inventory_id', inventoryId!)
+          .eq('bodega', 'almacen')
+          .order('master_reference')
+          .range(from, from + 999);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        locs.push(...(data as typeof locs));
+        if (data.length < 1000) break;
+        from += 1000;
+      }
+      if (locs.length === 0) return [];
+
+      const locIds = new Set(locs.map(l => l.id));
+
+      const counts = await fetchAllInBatches<{ location_id: string; audit_round: number; quantity_counted: number }>(
+        'inventory_counts',
+        'location_id, audit_round, quantity_counted',
+        inventoryId!
+      );
+      const validated = await fetchAllInBatches<{
+        location_id: string;
+        master_reference: string;
+        validated_quantity: number;
+        audit_round: number;
+        reason: string;
+      }>(
+        'validated_counts',
+        'location_id, master_reference, validated_quantity, audit_round, reason',
+        inventoryId!
+      );
+
+      const countsByLoc = new Map<string, Map<number, number>>();
+      for (const c of counts) {
+        if (!locIds.has(c.location_id)) continue;
+        if (!countsByLoc.has(c.location_id)) countsByLoc.set(c.location_id, new Map());
+        countsByLoc.get(c.location_id)!.set(c.audit_round, Number(c.quantity_counted) || 0);
+      }
+
+      const validatedByLoc = new Map(validated.filter(v => locIds.has(v.location_id)).map(v => [v.location_id, v]));
+
+      // 2. Agrupar por referencia
+      const byRef = new Map<string, BodegaRow & { hasValidated: boolean }>();
+      for (const l of locs) {
+        const key = l.master_reference;
+        let row = byRef.get(key);
+        if (!row) {
+          row = {
+            referencia: key,
+            tipo: l.material_type || '',
+            bodega: 'Almacén',
+            erp: round1(Number(l.bodega_erp) || 0),
+            c1: 0, c2: 0, c3: 0, c4: 0,
+            dif1: 0, dif2: 0, dif3: 0, dif4: 0,
+            resultado: '',
+            a_montar: '',
+            cant_a_montar: null,
+            hasValidated: false,
+          };
+          byRef.set(key, row);
+        }
+        const lc = countsByLoc.get(l.id);
+        row.c1 += lc?.get(1) ?? 0;
+        row.c2 += lc?.get(2) ?? 0;
+        row.c3 += lc?.get(3) ?? 0;
+        row.c4 += lc?.get(4) ?? 0;
+
+        const v = validatedByLoc.get(l.id);
+        if (v) {
+          row.hasValidated = true;
+          row.cant_a_montar = (row.cant_a_montar ?? 0) + (Number(v.validated_quantity) || 0);
+          if (!row.a_montar) row.a_montar = `C${v.audit_round}`;
+          if (!row.resultado) row.resultado = v.reason || '';
+        } else if (!row.resultado && !row.hasValidated) {
+          row.resultado = l.bodega_status || '';
+        }
+      }
+
+      const rows: BodegaRow[] = Array.from(byRef.values()).map(r => {
+        const c1 = round1(r.c1), c2 = round1(r.c2), c3 = round1(r.c3), c4 = round1(r.c4);
+        return {
+          referencia: r.referencia,
+          tipo: r.tipo,
+          bodega: r.bodega,
+          erp: r.erp,
+          c1, c2, c3, c4,
+          dif1: round1(c1 - r.erp),
+          dif2: round1(c2 - r.erp),
+          dif3: round1(c3 - r.erp),
+          dif4: round1(c4 - r.erp),
+          resultado: r.resultado,
+          a_montar: r.a_montar,
+          cant_a_montar: r.cant_a_montar === null ? null : round1(r.cant_a_montar),
+        };
+      });
+
+      rows.sort((a, b) => a.referencia.localeCompare(b.referencia));
+      return rows;
+    },
+    staleTime: 30 * 1000,
+  });
+
+  const filteredBodegaRows = useMemo(() => {
+    if (!bodegaRows) return [];
+    const term = searchTermAlm.trim().toLowerCase();
+    if (!term) return bodegaRows;
+    return bodegaRows.filter(r => r.referencia.toLowerCase().includes(term));
+  }, [bodegaRows, searchTermAlm]);
+
+  const totalPagesAlm = Math.ceil(filteredBodegaRows.length / ITEMS_PER_PAGE);
+  const paginatedBodega = useMemo(() => {
+    const start = (currentPageAlm - 1) * ITEMS_PER_PAGE;
+    return filteredBodegaRows.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredBodegaRows, currentPageAlm]);
+
+  const handleExportAlmacen = async () => {
+    if (!filteredBodegaRows.length) {
+      toast.error('No hay datos para exportar');
+      return;
+    }
+    setIsExportingAlm(true);
+    try {
+      const exportData = filteredBodegaRows.map(r => ({
+        REFERENCIA: r.referencia,
+        TIPO: r.tipo,
+        BODEGA: r.bodega,
+        ERP: r.erp,
+        CONTEO1: r.c1,
+        CONTEO2: r.c2,
+        CONTEO3: r.c3,
+        CONTEO4: r.c4,
+        DIF1: r.dif1,
+        DIF2: r.dif2,
+        DIF3: r.dif3,
+        DIF4: r.dif4,
+        RESULTADO: r.resultado,
+        'A MONTAR': r.a_montar,
+        'CANT A MONTAR': r.cant_a_montar ?? 0,
+      }));
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Almacén');
+      const today = new Date().toISOString().split('T')[0];
+      XLSX.writeFile(workbook, `conteos_almacen_${today}.xlsx`);
+      toast.success(`Exportadas ${exportData.length} referencias de almacén`);
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Error al exportar');
+    } finally {
+      setIsExportingAlm(false);
+    }
+  };
+
+
   // Pagination - Validados
   const totalPages = Math.ceil((auditedReferences?.length || 0) / ITEMS_PER_PAGE);
   const paginatedReferences = useMemo(() => {
@@ -296,6 +494,10 @@ const ExportarConteos: React.FC = () => {
   React.useEffect(() => {
     setCurrentPageLoc(1);
   }, [searchTermLoc, materialTypeFilterLoc]);
+
+  React.useEffect(() => {
+    setCurrentPageAlm(1);
+  }, [searchTermAlm]);
 
   // Export function - Validados
   const handleExport = async () => {
@@ -431,7 +633,7 @@ const ExportarConteos: React.FC = () => {
       <main>
         <ReadOnlyBanner />
         <Tabs defaultValue="validados" className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-2xl grid-cols-3">
             <TabsTrigger value="validados" className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4" />
               Validados
@@ -440,7 +642,125 @@ const ExportarConteos: React.FC = () => {
               <MapPin className="w-4 h-4" />
               Por Ubicación
             </TabsTrigger>
+            <TabsTrigger value="almacen" className="flex items-center gap-2">
+              <Warehouse className="w-4 h-4" />
+              Almacén
+            </TabsTrigger>
           </TabsList>
+
+          {/* ===== TAB ALMACÉN ===== */}
+          <TabsContent value="almacen" className="space-y-6">
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Warehouse className="w-5 h-5 text-amber-600" />
+                  Conteos de Almacén
+                </CardTitle>
+                <CardDescription>
+                  Una fila por referencia de almacén (MP y PP), con conteos 1 a 4, diferencias contra el ERP y la cantidad validada a montar.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col sm:flex-row gap-4 items-end">
+                  <div className="flex-1 space-y-1">
+                    <label className="text-sm font-medium text-muted-foreground">Buscar referencia</label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Buscar por referencia..."
+                        value={searchTermAlm}
+                        onChange={(e) => setSearchTermAlm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => refetchAlm()} disabled={isLoadingAlm}>
+                      <RefreshCw className={`w-4 h-4 mr-2 ${isLoadingAlm ? 'animate-spin' : ''}`} />
+                      Actualizar
+                    </Button>
+                    <Button onClick={handleExportAlmacen} disabled={isExportingAlm || !filteredBodegaRows.length}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Exportar Almacén ({filteredBodegaRows.length})
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">Vista Previa</CardTitle>
+                  <span className="text-sm text-muted-foreground">
+                    {filteredBodegaRows.length} referencias
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isLoadingAlm ? (
+                  <div className="flex items-center justify-center py-12">
+                    <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : paginatedBodega.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    No se encontraron referencias de almacén
+                  </div>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>REFERENCIA</TableHead>
+                            <TableHead>TIPO</TableHead>
+                            <TableHead>BODEGA</TableHead>
+                            <TableHead className="text-right">ERP</TableHead>
+                            <TableHead className="text-right">C1</TableHead>
+                            <TableHead className="text-right">C2</TableHead>
+                            <TableHead className="text-right">C3</TableHead>
+                            <TableHead className="text-right">C4</TableHead>
+                            <TableHead className="text-right">DIF1</TableHead>
+                            <TableHead className="text-right">DIF2</TableHead>
+                            <TableHead className="text-right">DIF3</TableHead>
+                            <TableHead className="text-right">DIF4</TableHead>
+                            <TableHead>RESULTADO</TableHead>
+                            <TableHead>A MONTAR</TableHead>
+                            <TableHead className="text-right">CANT A MONTAR</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {paginatedBodega.map((r) => (
+                            <TableRow key={r.referencia}>
+                              <TableCell className="font-medium">{r.referencia}</TableCell>
+                              <TableCell>{r.tipo}</TableCell>
+                              <TableCell>{r.bodega}</TableCell>
+                              <TableCell className="text-right font-mono">{r.erp}</TableCell>
+                              <TableCell className="text-right font-mono">{r.c1}</TableCell>
+                              <TableCell className="text-right font-mono">{r.c2}</TableCell>
+                              <TableCell className="text-right font-mono">{r.c3}</TableCell>
+                              <TableCell className="text-right font-mono">{r.c4}</TableCell>
+                              <TableCell className="text-right font-mono">{r.dif1}</TableCell>
+                              <TableCell className="text-right font-mono">{r.dif2}</TableCell>
+                              <TableCell className="text-right font-mono">{r.dif3}</TableCell>
+                              <TableCell className="text-right font-mono">{r.dif4}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{r.resultado}</TableCell>
+                              <TableCell>{r.a_montar || '-'}</TableCell>
+                              <TableCell className="text-right font-mono font-semibold">
+                                {r.cant_a_montar ?? 0}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    {renderPagination(currentPageAlm, totalPagesAlm, setCurrentPageAlm)}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
 
           {/* ===== TAB VALIDADOS ===== */}
           <TabsContent value="validados" className="space-y-6">
