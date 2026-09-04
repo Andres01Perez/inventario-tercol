@@ -114,6 +114,137 @@ async function fetchAllInBatches<T>(
   return allData;
 }
 
+// Motor compartido: una fila por referencia para una bodega (almacén o planta).
+// En planta una referencia puede tener varias ubicaciones: los conteos y lo validado
+// se SUMAN, pero el ERP de la bodega pertenece a la referencia y se toma una sola vez.
+async function fetchBodegaRows(
+  inventoryId: string,
+  bodega: 'almacen' | 'planta'
+): Promise<BodegaRow[]> {
+  const bodegaLabel = bodega === 'almacen' ? 'Almacén' : 'Planta';
+
+  const locs: {
+    id: string;
+    master_reference: string;
+    material_type: string | null;
+    bodega_erp: number | null;
+    bodega_status: string | null;
+  }[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from('locations_bodega_view')
+      .select('id, master_reference, material_type, bodega_erp, bodega_status')
+      .eq('inventory_id', inventoryId)
+      .eq('bodega', bodega)
+      .order('master_reference')
+      .range(from, from + 999);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    locs.push(...(data as typeof locs));
+    if (data.length < 1000) break;
+    from += 1000;
+  }
+  if (locs.length === 0) return [];
+
+  const locIds = new Set(locs.map(l => l.id));
+
+  const counts = await fetchAllInBatches<{ location_id: string; audit_round: number; quantity_counted: number }>(
+    'inventory_counts',
+    'location_id, audit_round, quantity_counted',
+    inventoryId
+  );
+  const validated = await fetchAllInBatches<{
+    location_id: string;
+    master_reference: string;
+    validated_quantity: number;
+    audit_round: number;
+    reason: string;
+  }>(
+    'validated_counts',
+    'location_id, master_reference, validated_quantity, audit_round, reason',
+    inventoryId
+  );
+
+  const countsByLoc = new Map<string, Map<number, number>>();
+  for (const c of counts) {
+    if (!locIds.has(c.location_id)) continue;
+    if (!countsByLoc.has(c.location_id)) countsByLoc.set(c.location_id, new Map());
+    countsByLoc.get(c.location_id)!.set(c.audit_round, Number(c.quantity_counted) || 0);
+  }
+
+  const validatedByLoc = new Map(validated.filter(v => locIds.has(v.location_id)).map(v => [v.location_id, v]));
+
+  type Acc = BodegaRow & { hasValidated: boolean; maxRound: number };
+  const byRef = new Map<string, Acc>();
+
+  for (const l of locs) {
+    const key = l.master_reference;
+    let row = byRef.get(key);
+    if (!row) {
+      row = {
+        referencia: key,
+        tipo: l.material_type || '',
+        bodega: bodegaLabel,
+        erp: round1(Number(l.bodega_erp) || 0), // ERP de la referencia: NO se suma
+        c1: 0, c2: 0, c3: 0, c4: 0,
+        dif1: 0, dif2: 0, dif3: 0, dif4: 0,
+        resultado: '',
+        a_montar: '',
+        cant_a_montar: null,
+        ubicaciones: 0,
+        hasValidated: false,
+        maxRound: 0,
+      };
+      byRef.set(key, row);
+    }
+    row.ubicaciones += 1;
+
+    const lc = countsByLoc.get(l.id);
+    row.c1 += lc?.get(1) ?? 0;
+    row.c2 += lc?.get(2) ?? 0;
+    row.c3 += lc?.get(3) ?? 0;
+    row.c4 += lc?.get(4) ?? 0;
+
+    const v = validatedByLoc.get(l.id);
+    if (v) {
+      row.hasValidated = true;
+      row.cant_a_montar = (row.cant_a_montar ?? 0) + (Number(v.validated_quantity) || 0);
+      const r = Number(v.audit_round) || 0;
+      if (r > row.maxRound) {
+        row.maxRound = r;
+        row.a_montar = `C${r}`;
+      }
+      if (!row.resultado || !row.hasValidated) row.resultado = v.reason || '';
+      if (row.resultado === '' ) row.resultado = v.reason || '';
+    } else if (!row.hasValidated) {
+      row.resultado = l.bodega_status || '';
+    }
+  }
+
+  const rows: BodegaRow[] = Array.from(byRef.values()).map(r => {
+    const c1 = round1(r.c1), c2 = round1(r.c2), c3 = round1(r.c3), c4 = round1(r.c4);
+    return {
+      referencia: r.referencia,
+      tipo: r.tipo,
+      bodega: r.bodega,
+      erp: r.erp,
+      c1, c2, c3, c4,
+      dif1: round1(c1 - r.erp),
+      dif2: round1(c2 - r.erp),
+      dif3: round1(c3 - r.erp),
+      dif4: round1(c4 - r.erp),
+      resultado: r.resultado,
+      a_montar: r.a_montar,
+      cant_a_montar: r.cant_a_montar === null ? null : round1(r.cant_a_montar),
+      ubicaciones: r.ubicaciones,
+    };
+  });
+
+  rows.sort((a, b) => a.referencia.localeCompare(b.referencia));
+  return rows;
+}
+
 const ExportarConteos: React.FC = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
