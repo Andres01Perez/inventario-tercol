@@ -776,6 +776,7 @@ const ExportarConteos: React.FC = () => {
                             <TableHead>REFERENCIA</TableHead>
                             <TableHead>TIPO</TableHead>
                             <TableHead>BODEGA</TableHead>
+                            <TableHead className="text-right">UBIC.</TableHead>
                             <TableHead className="text-right">ERP</TableHead>
                             <TableHead className="text-right">C1</TableHead>
                             <TableHead className="text-right">C2</TableHead>
