@@ -460,17 +460,35 @@ const ExportarConteos: React.FC = () => {
     return filteredBodegaRows.slice(start, start + ITEMS_PER_PAGE);
   }, [filteredBodegaRows, currentPageAlm]);
 
-  const handleExportAlmacen = async () => {
-    if (!filteredBodegaRows.length) {
+  const filteredPlantaRows = useMemo(() => {
+    if (!plantaRows) return [];
+    const term = searchTermPl.trim().toLowerCase();
+    if (!term) return plantaRows;
+    return plantaRows.filter(r => r.referencia.toLowerCase().includes(term));
+  }, [plantaRows, searchTermPl]);
+
+  const totalPagesPl = Math.ceil(filteredPlantaRows.length / ITEMS_PER_PAGE);
+  const paginatedPlanta = useMemo(() => {
+    const start = (currentPagePl - 1) * ITEMS_PER_PAGE;
+    return filteredPlantaRows.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredPlantaRows, currentPagePl]);
+
+  const exportBodegaRows = (
+    rows: BodegaRow[],
+    bodega: 'almacen' | 'planta',
+    setBusy: (v: boolean) => void
+  ) => {
+    if (!rows.length) {
       toast.error('No hay datos para exportar');
       return;
     }
-    setIsExportingAlm(true);
+    setBusy(true);
     try {
-      const exportData = filteredBodegaRows.map(r => ({
+      const exportData = rows.map(r => ({
         REFERENCIA: r.referencia,
         TIPO: r.tipo,
         BODEGA: r.bodega,
+        UBICACIONES: r.ubicaciones,
         ERP: r.erp,
         CONTEO1: r.c1,
         CONTEO2: r.c2,
@@ -486,17 +504,20 @@ const ExportarConteos: React.FC = () => {
       }));
       const worksheet = XLSX.utils.json_to_sheet(exportData);
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Almacén');
+      XLSX.utils.book_append_sheet(workbook, worksheet, bodega === 'almacen' ? 'Almacén' : 'Planta');
       const today = new Date().toISOString().split('T')[0];
-      XLSX.writeFile(workbook, `conteos_almacen_${today}.xlsx`);
-      toast.success(`Exportadas ${exportData.length} referencias de almacén`);
+      XLSX.writeFile(workbook, `conteos_${bodega}_${today}.xlsx`);
+      toast.success(`Exportadas ${exportData.length} referencias de ${bodega === 'almacen' ? 'almacén' : 'planta'}`);
     } catch (error) {
       console.error('Export error:', error);
       toast.error('Error al exportar');
     } finally {
-      setIsExportingAlm(false);
+      setBusy(false);
     }
   };
+
+  const handleExportAlmacen = () => exportBodegaRows(filteredBodegaRows, 'almacen', setIsExportingAlm);
+  const handleExportPlanta = () => exportBodegaRows(filteredPlantaRows, 'planta', setIsExportingPl);
 
 
   // Pagination - Validados
