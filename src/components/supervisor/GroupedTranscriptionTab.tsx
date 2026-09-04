@@ -637,7 +637,7 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
   // Show diagnostic panel even when no locations (for debugging)
   const canShowDiagnostic = role === 'superadmin' || role === 'admin_mp' || role === 'admin_pp';
 
-  if (groupedByZone.length === 0 && !canShowDiagnostic) {
+  if (groupedByZone.length === 0 && !canShowDiagnostic && !debouncedSearchTerm.trim()) {
     return (
       <div className="text-center py-12 text-muted-foreground">
         No hay ubicaciones pendientes para transcribir en este conteo
@@ -806,11 +806,16 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
       </div>
 
       {groupedByZone.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
+        <div className="flex flex-col items-center justify-center gap-3 py-12 text-muted-foreground">
           {localSearchTerm 
             ? `No se encontraron resultados para "${localSearchTerm}"`
             : 'No hay ubicaciones pendientes para transcribir en este conteo'
           }
+          {localSearchTerm && (
+            <Button variant="outline" size="sm" onClick={() => setLocalSearchTerm('')}>
+              Limpiar búsqueda
+            </Button>
+          )}
         </div>
       ) : (
         <Accordion type="multiple" className="space-y-3">
