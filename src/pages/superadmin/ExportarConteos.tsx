@@ -65,6 +65,7 @@ interface BodegaRow {
   resultado: string;
   a_montar: string;
   cant_a_montar: number | null;
+  ubicaciones: number;
 }
 
 interface CountByLocation {
