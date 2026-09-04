@@ -814,6 +814,122 @@ const ExportarConteos: React.FC = () => {
             </Card>
           </TabsContent>
 
+          {/* ===== TAB PLANTA ===== */}
+          <TabsContent value="planta" className="space-y-6">
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Factory className="w-5 h-5 text-blue-600" />
+                  Conteos de Planta
+                </CardTitle>
+                <CardDescription>
+                  Una fila por referencia de planta (MP y PP). Los conteos y lo validado se suman entre todas las
+                  ubicaciones de la referencia; el ERP de planta se toma una sola vez.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col sm:flex-row gap-4 items-end">
+                  <div className="flex-1 space-y-1">
+                    <label className="text-sm font-medium text-muted-foreground">Buscar referencia</label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Buscar por referencia..."
+                        value={searchTermPl}
+                        onChange={(e) => setSearchTermPl(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => refetchPl()} disabled={isLoadingPl}>
+                      <RefreshCw className={`w-4 h-4 mr-2 ${isLoadingPl ? 'animate-spin' : ''}`} />
+                      Actualizar
+                    </Button>
+                    <Button onClick={handleExportPlanta} disabled={isExportingPl || !filteredPlantaRows.length}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Exportar Planta ({filteredPlantaRows.length})
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">Vista Previa</CardTitle>
+                  <span className="text-sm text-muted-foreground">
+                    {filteredPlantaRows.length} referencias
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isLoadingPl ? (
+                  <div className="flex items-center justify-center py-12">
+                    <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : paginatedPlanta.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    No se encontraron referencias de planta
+                  </div>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>REFERENCIA</TableHead>
+                            <TableHead>TIPO</TableHead>
+                            <TableHead>BODEGA</TableHead>
+                            <TableHead className="text-right">UBIC.</TableHead>
+                            <TableHead className="text-right">ERP</TableHead>
+                            <TableHead className="text-right">C1</TableHead>
+                            <TableHead className="text-right">C2</TableHead>
+                            <TableHead className="text-right">C3</TableHead>
+                            <TableHead className="text-right">C4</TableHead>
+                            <TableHead className="text-right">DIF1</TableHead>
+                            <TableHead className="text-right">DIF2</TableHead>
+                            <TableHead className="text-right">DIF3</TableHead>
+                            <TableHead className="text-right">DIF4</TableHead>
+                            <TableHead>RESULTADO</TableHead>
+                            <TableHead>A MONTAR</TableHead>
+                            <TableHead className="text-right">CANT A MONTAR</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {paginatedPlanta.map((r) => (
+                            <TableRow key={r.referencia}>
+                              <TableCell className="font-medium">{r.referencia}</TableCell>
+                              <TableCell>{r.tipo}</TableCell>
+                              <TableCell>{r.bodega}</TableCell>
+                              <TableCell className="text-right font-mono">{r.ubicaciones}</TableCell>
+                              <TableCell className="text-right font-mono">{r.erp}</TableCell>
+                              <TableCell className="text-right font-mono">{r.c1}</TableCell>
+                              <TableCell className="text-right font-mono">{r.c2}</TableCell>
+                              <TableCell className="text-right font-mono">{r.c3}</TableCell>
+                              <TableCell className="text-right font-mono">{r.c4}</TableCell>
+                              <TableCell className="text-right font-mono">{r.dif1}</TableCell>
+                              <TableCell className="text-right font-mono">{r.dif2}</TableCell>
+                              <TableCell className="text-right font-mono">{r.dif3}</TableCell>
+                              <TableCell className="text-right font-mono">{r.dif4}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{r.resultado}</TableCell>
+                              <TableCell>{r.a_montar || '-'}</TableCell>
+                              <TableCell className="text-right font-mono font-semibold">
+                                {r.cant_a_montar ?? 0}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    {renderPagination(currentPagePl, totalPagesPl, setCurrentPagePl)}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
 
           {/* ===== TAB VALIDADOS ===== */}
           <TabsContent value="validados" className="space-y-6">
