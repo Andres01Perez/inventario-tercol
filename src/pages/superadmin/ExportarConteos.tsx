@@ -797,6 +797,7 @@ const ExportarConteos: React.FC = () => {
                               <TableCell className="font-medium">{r.referencia}</TableCell>
                               <TableCell>{r.tipo}</TableCell>
                               <TableCell>{r.bodega}</TableCell>
+                              <TableCell className="text-right font-mono">{r.ubicaciones}</TableCell>
                               <TableCell className="text-right font-mono">{r.erp}</TableCell>
                               <TableCell className="text-right font-mono">{r.c1}</TableCell>
                               <TableCell className="text-right font-mono">{r.c2}</TableCell>
