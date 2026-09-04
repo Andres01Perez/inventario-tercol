@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useInventory } from '@/contexts/InventoryContext';
@@ -33,7 +33,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { friendlyCountError } from '@/lib/countErrorMessage';
 import { Loader2, Check, ChevronsUpDown } from 'lucide-react';
@@ -50,30 +49,26 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
 }) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  
+
   // Form state
-  // Removed tipo state - all references are now shown
+  const [bodega, setBodega] = useState<'planta' | 'almacen'>('planta');
   const [referencia, setReferencia] = useState('');
-  const [subcategoria, setSubcategoria] = useState('');
-  const [observaciones, setObservaciones] = useState('');
   const [ubicacion, setUbicacion] = useState('');
-  const [ubicacionDetallada, setUbicacionDetallada] = useState('');
   const [puntoReferencia, setPuntoReferencia] = useState('');
-  const [metodoConteo, setMetodoConteo] = useState('');
   const [cantidad, setCantidad] = useState('');
-  
+
   // Combobox state
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const { inventoryId, isReadOnly } = useInventory();
 
-  // Fetch ALL references (no filter by type) - fetch in batches to avoid 1000 row limit
+  // Fetch ALL references (validated against inventory_master) - fetch in batches to avoid 1000 row limit
   const { data: references = [], isLoading: loadingRefs } = useQuery({
     queryKey: ['all-inventory-references', inventoryId],
     queryFn: async () => {
       let allData: { referencia: string; material_type: string }[] = [];
       let from = 0;
       const batchSize = 1000;
-      
+
       while (true) {
         const { data, error } = await supabase
           .from('inventory_master')
@@ -81,28 +76,25 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
           .eq('inventory_id', inventoryId!)
           .order('referencia')
           .range(from, from + batchSize - 1);
-        
+
         if (error) throw error;
         if (!data || data.length === 0) break;
-        
+
         allData.push(...data);
         if (data.length < batchSize) break;
         from += batchSize;
       }
-      
+
       return allData;
     },
     enabled: open && !!inventoryId,
   });
 
   const resetForm = () => {
+    setBodega('planta');
     setReferencia('');
-    setSubcategoria('');
-    setObservaciones('');
     setUbicacion('');
-    setUbicacionDetallada('');
     setPuntoReferencia('');
-    setMetodoConteo('');
     setCantidad('');
   };
 
@@ -126,20 +118,26 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
       if (masterError) throw masterError;
 
       const currentAuditRound = master?.audit_round || 1;
-      
-      // 2. Insert location with discovered_at_round if adding in later rounds
+
+      // 2. Resolve assigned_admin_id for the selected bodega
+      const { data: adminId, error: adminError } = await supabase
+        .rpc('get_bodega_admin', { _bodega: bodega });
+
+      if (adminError) throw adminError;
+      if (!adminId) {
+        throw new Error(`No se encontró un administrador para la bodega ${bodega === 'planta' ? 'Planta' : 'Almacén'}`);
+      }
+
+      // 3. Insert location with discovered_at_round if adding in later rounds
       const { data: newLocation, error: locError } = await supabase
         .from('locations')
         .insert({
           inventory_id: inventoryId!,
           master_reference: referencia,
           location_name: ubicacion,
-          location_detail: ubicacionDetallada || null,
-          subcategoria: subcategoria || null,
-          observaciones: observaciones || null,
           punto_referencia: puntoReferencia || null,
-          metodo_conteo: metodoConteo || null,
           assigned_supervisor_id: user!.id,
+          assigned_admin_id: adminId,
           // Set discovered_at_round if adding location after round 1
           discovered_at_round: currentAuditRound > 1 ? currentAuditRound : null,
           activo: true,
@@ -150,7 +148,7 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
 
       if (locError) throw locError;
 
-      // 3. Insert initial count if quantity provided (use current audit_round)
+      // 4. Insert initial count if quantity provided (use current audit_round)
       const qty = parseFloat(cantidad);
       if (!isNaN(qty) && qty >= 0) {
         const { error: countError } = await supabase
@@ -158,7 +156,7 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
           .upsert({
             location_id: newLocation.id,
             supervisor_id: user!.id,
-            audit_round: currentAuditRound <= 2 ? currentAuditRound : currentAuditRound,
+            audit_round: currentAuditRound,
             quantity_counted: qty,
           }, { onConflict: 'location_id,audit_round' });
 
@@ -194,7 +192,21 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Referencia - Combobox with search */}
+          {/* Bodega - defaults to Planta */}
+          <div className="space-y-2">
+            <Label>Bodega *</Label>
+            <Select value={bodega} onValueChange={(v) => setBodega(v as 'planta' | 'almacen')}>
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccione bodega" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="planta">Planta</SelectItem>
+                <SelectItem value="almacen">Almacén</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Referencia - Combobox with search (validated against maestra) */}
           <div className="space-y-2">
             <Label>Referencia *</Label>
             <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
@@ -214,7 +226,7 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
                   <CommandInput placeholder="Buscar referencia..." />
                   <CommandList>
                     <CommandEmpty>
-                      {loadingRefs ? 'Cargando...' : 'No se encontró la referencia.'}
+                      {loadingRefs ? 'Cargando...' : 'No se encontró la referencia en la maestra.'}
                     </CommandEmpty>
                     <CommandGroup className="max-h-60 overflow-y-auto">
                       {references.map((ref) => (
@@ -242,29 +254,6 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
             </Popover>
           </div>
 
-          {/* Subcategoría */}
-          <div className="space-y-2">
-            <Label htmlFor="subcategoria">Subcategoría</Label>
-            <Input
-              id="subcategoria"
-              value={subcategoria}
-              onChange={(e) => setSubcategoria(e.target.value)}
-              placeholder="Subcategoría opcional"
-            />
-          </div>
-
-          {/* Observaciones */}
-          <div className="space-y-2">
-            <Label htmlFor="observaciones">Observaciones</Label>
-            <Textarea
-              id="observaciones"
-              value={observaciones}
-              onChange={(e) => setObservaciones(e.target.value)}
-              placeholder="Observaciones opcionales"
-              rows={2}
-            />
-          </div>
-
           {/* Ubicación */}
           <div className="space-y-2">
             <Label htmlFor="ubicacion">Ubicación *</Label>
@@ -280,17 +269,6 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
             </p>
           </div>
 
-          {/* Ubicación Detallada */}
-          <div className="space-y-2">
-            <Label htmlFor="ubicacionDetallada">Ubicación Detallada</Label>
-            <Input
-              id="ubicacionDetallada"
-              value={ubicacionDetallada}
-              onChange={(e) => setUbicacionDetallada(e.target.value)}
-              placeholder="Detalle de ubicación"
-            />
-          </div>
-
           {/* Punto de Referencia */}
           <div className="space-y-2">
             <Label htmlFor="puntoReferencia">Punto de Referencia *</Label>
@@ -304,17 +282,6 @@ const AddLocationDialog: React.FC<AddLocationDialogProps> = ({
             <p className="text-xs text-muted-foreground">
               Ubicación exacta o punto exacto donde se encuentra el material. Ejemplos: AA, V, S
             </p>
-          </div>
-
-          {/* Método de Conteo */}
-          <div className="space-y-2">
-            <Label htmlFor="metodoConteo">Método de Conteo</Label>
-            <Input
-              id="metodoConteo"
-              value={metodoConteo}
-              onChange={(e) => setMetodoConteo(e.target.value)}
-              placeholder="Método de conteo"
-            />
           </div>
 
           {/* Cantidad */}
