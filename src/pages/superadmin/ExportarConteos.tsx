@@ -33,7 +33,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { Download, Search, RefreshCw, CheckCircle2, MapPin, Warehouse } from 'lucide-react';
+import { Download, Search, RefreshCw, CheckCircle2, MapPin, Warehouse, Factory } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -65,6 +65,7 @@ interface BodegaRow {
   resultado: string;
   a_montar: string;
   cant_a_montar: number | null;
+  ubicaciones: number;
 }
 
 interface CountByLocation {
@@ -113,6 +114,136 @@ async function fetchAllInBatches<T>(
   return allData;
 }
 
+// Motor compartido: una fila por referencia para una bodega (almacén o planta).
+// En planta una referencia puede tener varias ubicaciones: los conteos y lo validado
+// se SUMAN, pero el ERP de la bodega pertenece a la referencia y se toma una sola vez.
+async function fetchBodegaRows(
+  inventoryId: string,
+  bodega: 'almacen' | 'planta'
+): Promise<BodegaRow[]> {
+  const bodegaLabel = bodega === 'almacen' ? 'Almacén' : 'Planta';
+
+  const locs: {
+    id: string;
+    master_reference: string;
+    material_type: string | null;
+    bodega_erp: number | null;
+    bodega_status: string | null;
+  }[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from('locations_bodega_view')
+      .select('id, master_reference, material_type, bodega_erp, bodega_status')
+      .eq('inventory_id', inventoryId)
+      .eq('bodega', bodega)
+      .order('master_reference')
+      .range(from, from + 999);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    locs.push(...(data as typeof locs));
+    if (data.length < 1000) break;
+    from += 1000;
+  }
+  if (locs.length === 0) return [];
+
+  const locIds = new Set(locs.map(l => l.id));
+
+  const counts = await fetchAllInBatches<{ location_id: string; audit_round: number; quantity_counted: number }>(
+    'inventory_counts',
+    'location_id, audit_round, quantity_counted',
+    inventoryId
+  );
+  const validated = await fetchAllInBatches<{
+    location_id: string;
+    master_reference: string;
+    validated_quantity: number;
+    audit_round: number;
+    reason: string;
+  }>(
+    'validated_counts',
+    'location_id, master_reference, validated_quantity, audit_round, reason',
+    inventoryId
+  );
+
+  const countsByLoc = new Map<string, Map<number, number>>();
+  for (const c of counts) {
+    if (!locIds.has(c.location_id)) continue;
+    if (!countsByLoc.has(c.location_id)) countsByLoc.set(c.location_id, new Map());
+    countsByLoc.get(c.location_id)!.set(c.audit_round, Number(c.quantity_counted) || 0);
+  }
+
+  const validatedByLoc = new Map(validated.filter(v => locIds.has(v.location_id)).map(v => [v.location_id, v]));
+
+  type Acc = BodegaRow & { hasValidated: boolean; maxRound: number };
+  const byRef = new Map<string, Acc>();
+
+  for (const l of locs) {
+    const key = l.master_reference;
+    let row = byRef.get(key);
+    if (!row) {
+      row = {
+        referencia: key,
+        tipo: l.material_type || '',
+        bodega: bodegaLabel,
+        erp: round1(Number(l.bodega_erp) || 0), // ERP de la referencia: NO se suma
+        c1: 0, c2: 0, c3: 0, c4: 0,
+        dif1: 0, dif2: 0, dif3: 0, dif4: 0,
+        resultado: '',
+        a_montar: '',
+        cant_a_montar: null,
+        ubicaciones: 0,
+        hasValidated: false,
+        maxRound: 0,
+      };
+      byRef.set(key, row);
+    }
+    row.ubicaciones += 1;
+
+    const lc = countsByLoc.get(l.id);
+    row.c1 += lc?.get(1) ?? 0;
+    row.c2 += lc?.get(2) ?? 0;
+    row.c3 += lc?.get(3) ?? 0;
+    row.c4 += lc?.get(4) ?? 0;
+
+    const v = validatedByLoc.get(l.id);
+    if (v) {
+      row.hasValidated = true;
+      row.cant_a_montar = (row.cant_a_montar ?? 0) + (Number(v.validated_quantity) || 0);
+      const r = Number(v.audit_round) || 0;
+      if (r > row.maxRound) {
+        row.maxRound = r;
+        row.a_montar = `C${r}`;
+      }
+      if (!row.resultado || r >= row.maxRound) row.resultado = v.reason || '';
+    } else if (!row.hasValidated) {
+      row.resultado = l.bodega_status || '';
+    }
+  }
+
+  const rows: BodegaRow[] = Array.from(byRef.values()).map(r => {
+    const c1 = round1(r.c1), c2 = round1(r.c2), c3 = round1(r.c3), c4 = round1(r.c4);
+    return {
+      referencia: r.referencia,
+      tipo: r.tipo,
+      bodega: r.bodega,
+      erp: r.erp,
+      c1, c2, c3, c4,
+      dif1: round1(c1 - r.erp),
+      dif2: round1(c2 - r.erp),
+      dif3: round1(c3 - r.erp),
+      dif4: round1(c4 - r.erp),
+      resultado: r.resultado,
+      a_montar: r.a_montar,
+      cant_a_montar: r.cant_a_montar === null ? null : round1(r.cant_a_montar),
+      ubicaciones: r.ubicaciones,
+    };
+  });
+
+  rows.sort((a, b) => a.referencia.localeCompare(b.referencia));
+  return rows;
+}
+
 const ExportarConteos: React.FC = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
@@ -134,6 +265,11 @@ const ExportarConteos: React.FC = () => {
   const [searchTermAlm, setSearchTermAlm] = useState('');
   const [currentPageAlm, setCurrentPageAlm] = useState(1);
   const [isExportingAlm, setIsExportingAlm] = useState(false);
+
+  // Tab Planta state
+  const [searchTermPl, setSearchTermPl] = useState('');
+  const [currentPagePl, setCurrentPagePl] = useState(1);
+  const [isExportingPl, setIsExportingPl] = useState(false);
 
 
 
@@ -301,122 +437,18 @@ const ExportarConteos: React.FC = () => {
     staleTime: 30 * 1000,
   });
 
-  // ===== TAB ALMACÉN: una referencia por fila =====
+  // ===== TABS ALMACÉN / PLANTA: una referencia por fila =====
   const { data: bodegaRows, isLoading: isLoadingAlm, refetch: refetchAlm } = useQuery({
     queryKey: ['export-bodega-almacen', inventoryId],
     enabled: !!inventoryId,
-    queryFn: async (): Promise<BodegaRow[]> => {
-      // 1. Ubicaciones de almacén (paginado, sin tope de 1000)
-      const locs: {
-        id: string;
-        master_reference: string;
-        material_type: string | null;
-        bodega_erp: number | null;
-        bodega_status: string | null;
-      }[] = [];
-      let from = 0;
-      while (true) {
-        const { data, error } = await supabase
-          .from('locations_bodega_view')
-          .select('id, master_reference, material_type, bodega_erp, bodega_status')
-          .eq('inventory_id', inventoryId!)
-          .eq('bodega', 'almacen')
-          .order('master_reference')
-          .range(from, from + 999);
-        if (error) throw error;
-        if (!data || data.length === 0) break;
-        locs.push(...(data as typeof locs));
-        if (data.length < 1000) break;
-        from += 1000;
-      }
-      if (locs.length === 0) return [];
+    queryFn: () => fetchBodegaRows(inventoryId!, 'almacen'),
+    staleTime: 30 * 1000,
+  });
 
-      const locIds = new Set(locs.map(l => l.id));
-
-      const counts = await fetchAllInBatches<{ location_id: string; audit_round: number; quantity_counted: number }>(
-        'inventory_counts',
-        'location_id, audit_round, quantity_counted',
-        inventoryId!
-      );
-      const validated = await fetchAllInBatches<{
-        location_id: string;
-        master_reference: string;
-        validated_quantity: number;
-        audit_round: number;
-        reason: string;
-      }>(
-        'validated_counts',
-        'location_id, master_reference, validated_quantity, audit_round, reason',
-        inventoryId!
-      );
-
-      const countsByLoc = new Map<string, Map<number, number>>();
-      for (const c of counts) {
-        if (!locIds.has(c.location_id)) continue;
-        if (!countsByLoc.has(c.location_id)) countsByLoc.set(c.location_id, new Map());
-        countsByLoc.get(c.location_id)!.set(c.audit_round, Number(c.quantity_counted) || 0);
-      }
-
-      const validatedByLoc = new Map(validated.filter(v => locIds.has(v.location_id)).map(v => [v.location_id, v]));
-
-      // 2. Agrupar por referencia
-      const byRef = new Map<string, BodegaRow & { hasValidated: boolean }>();
-      for (const l of locs) {
-        const key = l.master_reference;
-        let row = byRef.get(key);
-        if (!row) {
-          row = {
-            referencia: key,
-            tipo: l.material_type || '',
-            bodega: 'Almacén',
-            erp: round1(Number(l.bodega_erp) || 0),
-            c1: 0, c2: 0, c3: 0, c4: 0,
-            dif1: 0, dif2: 0, dif3: 0, dif4: 0,
-            resultado: '',
-            a_montar: '',
-            cant_a_montar: null,
-            hasValidated: false,
-          };
-          byRef.set(key, row);
-        }
-        const lc = countsByLoc.get(l.id);
-        row.c1 += lc?.get(1) ?? 0;
-        row.c2 += lc?.get(2) ?? 0;
-        row.c3 += lc?.get(3) ?? 0;
-        row.c4 += lc?.get(4) ?? 0;
-
-        const v = validatedByLoc.get(l.id);
-        if (v) {
-          row.hasValidated = true;
-          row.cant_a_montar = (row.cant_a_montar ?? 0) + (Number(v.validated_quantity) || 0);
-          if (!row.a_montar) row.a_montar = `C${v.audit_round}`;
-          if (!row.resultado) row.resultado = v.reason || '';
-        } else if (!row.resultado && !row.hasValidated) {
-          row.resultado = l.bodega_status || '';
-        }
-      }
-
-      const rows: BodegaRow[] = Array.from(byRef.values()).map(r => {
-        const c1 = round1(r.c1), c2 = round1(r.c2), c3 = round1(r.c3), c4 = round1(r.c4);
-        return {
-          referencia: r.referencia,
-          tipo: r.tipo,
-          bodega: r.bodega,
-          erp: r.erp,
-          c1, c2, c3, c4,
-          dif1: round1(c1 - r.erp),
-          dif2: round1(c2 - r.erp),
-          dif3: round1(c3 - r.erp),
-          dif4: round1(c4 - r.erp),
-          resultado: r.resultado,
-          a_montar: r.a_montar,
-          cant_a_montar: r.cant_a_montar === null ? null : round1(r.cant_a_montar),
-        };
-      });
-
-      rows.sort((a, b) => a.referencia.localeCompare(b.referencia));
-      return rows;
-    },
+  const { data: plantaRows, isLoading: isLoadingPl, refetch: refetchPl } = useQuery({
+    queryKey: ['export-bodega-planta', inventoryId],
+    enabled: !!inventoryId,
+    queryFn: () => fetchBodegaRows(inventoryId!, 'planta'),
     staleTime: 30 * 1000,
   });
 
@@ -433,17 +465,35 @@ const ExportarConteos: React.FC = () => {
     return filteredBodegaRows.slice(start, start + ITEMS_PER_PAGE);
   }, [filteredBodegaRows, currentPageAlm]);
 
-  const handleExportAlmacen = async () => {
-    if (!filteredBodegaRows.length) {
+  const filteredPlantaRows = useMemo(() => {
+    if (!plantaRows) return [];
+    const term = searchTermPl.trim().toLowerCase();
+    if (!term) return plantaRows;
+    return plantaRows.filter(r => r.referencia.toLowerCase().includes(term));
+  }, [plantaRows, searchTermPl]);
+
+  const totalPagesPl = Math.ceil(filteredPlantaRows.length / ITEMS_PER_PAGE);
+  const paginatedPlanta = useMemo(() => {
+    const start = (currentPagePl - 1) * ITEMS_PER_PAGE;
+    return filteredPlantaRows.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredPlantaRows, currentPagePl]);
+
+  const exportBodegaRows = (
+    rows: BodegaRow[],
+    bodega: 'almacen' | 'planta',
+    setBusy: (v: boolean) => void
+  ) => {
+    if (!rows.length) {
       toast.error('No hay datos para exportar');
       return;
     }
-    setIsExportingAlm(true);
+    setBusy(true);
     try {
-      const exportData = filteredBodegaRows.map(r => ({
+      const exportData = rows.map(r => ({
         REFERENCIA: r.referencia,
         TIPO: r.tipo,
         BODEGA: r.bodega,
+        UBICACIONES: r.ubicaciones,
         ERP: r.erp,
         CONTEO1: r.c1,
         CONTEO2: r.c2,
@@ -459,17 +509,20 @@ const ExportarConteos: React.FC = () => {
       }));
       const worksheet = XLSX.utils.json_to_sheet(exportData);
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Almacén');
+      XLSX.utils.book_append_sheet(workbook, worksheet, bodega === 'almacen' ? 'Almacén' : 'Planta');
       const today = new Date().toISOString().split('T')[0];
-      XLSX.writeFile(workbook, `conteos_almacen_${today}.xlsx`);
-      toast.success(`Exportadas ${exportData.length} referencias de almacén`);
+      XLSX.writeFile(workbook, `conteos_${bodega}_${today}.xlsx`);
+      toast.success(`Exportadas ${exportData.length} referencias de ${bodega === 'almacen' ? 'almacén' : 'planta'}`);
     } catch (error) {
       console.error('Export error:', error);
       toast.error('Error al exportar');
     } finally {
-      setIsExportingAlm(false);
+      setBusy(false);
     }
   };
+
+  const handleExportAlmacen = () => exportBodegaRows(filteredBodegaRows, 'almacen', setIsExportingAlm);
+  const handleExportPlanta = () => exportBodegaRows(filteredPlantaRows, 'planta', setIsExportingPl);
 
 
   // Pagination - Validados
@@ -498,6 +551,10 @@ const ExportarConteos: React.FC = () => {
   React.useEffect(() => {
     setCurrentPageAlm(1);
   }, [searchTermAlm]);
+
+  React.useEffect(() => {
+    setCurrentPagePl(1);
+  }, [searchTermPl]);
 
   // Export function - Validados
   const handleExport = async () => {
@@ -633,7 +690,7 @@ const ExportarConteos: React.FC = () => {
       <main>
         <ReadOnlyBanner />
         <Tabs defaultValue="validados" className="space-y-6">
-          <TabsList className="grid w-full max-w-2xl grid-cols-3">
+          <TabsList className="grid w-full max-w-3xl grid-cols-4">
             <TabsTrigger value="validados" className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4" />
               Validados
@@ -645,6 +702,10 @@ const ExportarConteos: React.FC = () => {
             <TabsTrigger value="almacen" className="flex items-center gap-2">
               <Warehouse className="w-4 h-4" />
               Almacén
+            </TabsTrigger>
+            <TabsTrigger value="planta" className="flex items-center gap-2">
+              <Factory className="w-4 h-4" />
+              Planta
             </TabsTrigger>
           </TabsList>
 
@@ -715,6 +776,7 @@ const ExportarConteos: React.FC = () => {
                             <TableHead>REFERENCIA</TableHead>
                             <TableHead>TIPO</TableHead>
                             <TableHead>BODEGA</TableHead>
+                            <TableHead className="text-right">UBIC.</TableHead>
                             <TableHead className="text-right">ERP</TableHead>
                             <TableHead className="text-right">C1</TableHead>
                             <TableHead className="text-right">C2</TableHead>
@@ -735,6 +797,7 @@ const ExportarConteos: React.FC = () => {
                               <TableCell className="font-medium">{r.referencia}</TableCell>
                               <TableCell>{r.tipo}</TableCell>
                               <TableCell>{r.bodega}</TableCell>
+                              <TableCell className="text-right font-mono">{r.ubicaciones}</TableCell>
                               <TableCell className="text-right font-mono">{r.erp}</TableCell>
                               <TableCell className="text-right font-mono">{r.c1}</TableCell>
                               <TableCell className="text-right font-mono">{r.c2}</TableCell>
@@ -755,6 +818,122 @@ const ExportarConteos: React.FC = () => {
                       </Table>
                     </div>
                     {renderPagination(currentPageAlm, totalPagesAlm, setCurrentPageAlm)}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ===== TAB PLANTA ===== */}
+          <TabsContent value="planta" className="space-y-6">
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Factory className="w-5 h-5 text-blue-600" />
+                  Conteos de Planta
+                </CardTitle>
+                <CardDescription>
+                  Una fila por referencia de planta (MP y PP). Los conteos y lo validado se suman entre todas las
+                  ubicaciones de la referencia; el ERP de planta se toma una sola vez.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col sm:flex-row gap-4 items-end">
+                  <div className="flex-1 space-y-1">
+                    <label className="text-sm font-medium text-muted-foreground">Buscar referencia</label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Buscar por referencia..."
+                        value={searchTermPl}
+                        onChange={(e) => setSearchTermPl(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => refetchPl()} disabled={isLoadingPl}>
+                      <RefreshCw className={`w-4 h-4 mr-2 ${isLoadingPl ? 'animate-spin' : ''}`} />
+                      Actualizar
+                    </Button>
+                    <Button onClick={handleExportPlanta} disabled={isExportingPl || !filteredPlantaRows.length}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Exportar Planta ({filteredPlantaRows.length})
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">Vista Previa</CardTitle>
+                  <span className="text-sm text-muted-foreground">
+                    {filteredPlantaRows.length} referencias
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isLoadingPl ? (
+                  <div className="flex items-center justify-center py-12">
+                    <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : paginatedPlanta.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    No se encontraron referencias de planta
+                  </div>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>REFERENCIA</TableHead>
+                            <TableHead>TIPO</TableHead>
+                            <TableHead>BODEGA</TableHead>
+                            <TableHead className="text-right">UBIC.</TableHead>
+                            <TableHead className="text-right">ERP</TableHead>
+                            <TableHead className="text-right">C1</TableHead>
+                            <TableHead className="text-right">C2</TableHead>
+                            <TableHead className="text-right">C3</TableHead>
+                            <TableHead className="text-right">C4</TableHead>
+                            <TableHead className="text-right">DIF1</TableHead>
+                            <TableHead className="text-right">DIF2</TableHead>
+                            <TableHead className="text-right">DIF3</TableHead>
+                            <TableHead className="text-right">DIF4</TableHead>
+                            <TableHead>RESULTADO</TableHead>
+                            <TableHead>A MONTAR</TableHead>
+                            <TableHead className="text-right">CANT A MONTAR</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {paginatedPlanta.map((r) => (
+                            <TableRow key={r.referencia}>
+                              <TableCell className="font-medium">{r.referencia}</TableCell>
+                              <TableCell>{r.tipo}</TableCell>
+                              <TableCell>{r.bodega}</TableCell>
+                              <TableCell className="text-right font-mono">{r.ubicaciones}</TableCell>
+                              <TableCell className="text-right font-mono">{r.erp}</TableCell>
+                              <TableCell className="text-right font-mono">{r.c1}</TableCell>
+                              <TableCell className="text-right font-mono">{r.c2}</TableCell>
+                              <TableCell className="text-right font-mono">{r.c3}</TableCell>
+                              <TableCell className="text-right font-mono">{r.c4}</TableCell>
+                              <TableCell className="text-right font-mono">{r.dif1}</TableCell>
+                              <TableCell className="text-right font-mono">{r.dif2}</TableCell>
+                              <TableCell className="text-right font-mono">{r.dif3}</TableCell>
+                              <TableCell className="text-right font-mono">{r.dif4}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{r.resultado}</TableCell>
+                              <TableCell>{r.a_montar || '-'}</TableCell>
+                              <TableCell className="text-right font-mono font-semibold">
+                                {r.cant_a_montar ?? 0}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    {renderPagination(currentPagePl, totalPagesPl, setCurrentPagePl)}
                   </>
                 )}
               </CardContent>
