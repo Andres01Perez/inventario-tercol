@@ -33,7 +33,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { Download, Search, RefreshCw, CheckCircle2, MapPin, Warehouse } from 'lucide-react';
+import { Download, Search, RefreshCw, CheckCircle2, MapPin, Warehouse, Factory } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
