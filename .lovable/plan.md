@@ -13,13 +13,17 @@ Esto pasó porque cuando se borraron y volvieron a importar las ubicaciones de B
 
 Ejemplos: BN12, CN08-75PG, PUERTA-4-75P (auditado en ronda 1) y DF30R.v2, T-CE2525, LCT4020 (ronda 3, conflicto).
 
+## Garantía: los conteos NO se borran
+
+Lo verifiqué directamente en el código de las funciones de reapertura/revalidación: lo único que borran son las **validaciones** (`validated_counts`, es decir, el resultado del cierre). Los conteos digitados (`inventory_counts`: C1, C2, C3, C4 de cada ubicación) **no se tocan**. Al reabrir, los conteos que ya existen se reutilizan en la nueva validación — no hay que volver a digitarlos ni se pierden. Si una ubicación de otra bodega ya tenía C1=C2=269, ese 269 sigue ahí y se vuelve a comparar junto con el nuevo conteo de Bodega 3.
+
 ## Propuesta
 
 Reabrir en ronda 1 el bloque **Planta** de las referencias que tienen ubicaciones reimportadas sin contar, para que vuelvan a aparecer en Conteo 1:
 
 1. Identificar las referencias del inventario activo que tienen al menos una ubicación de Planta sin conteo en la ronda vigente de su bloque y cuyo bloque Planta está `auditado`, en `conflicto` o en ronda mayor a 1.
 2. Para esas referencias: borrar sus validaciones de Planta (`validated_counts` del bloque Planta), poner `audit_round_pl = 1` y `status_pl = 'pendiente'`, y limpiar el estado de ronda de sus ubicaciones de Planta.
-3. Conservar intactos los conteos ya digitados (`inventory_counts`) de las ubicaciones que sí se contaron: al revalidar, esos conteos se vuelven a usar.
+3. Los conteos ya digitados (`inventory_counts`) quedan intactos y se reutilizan al validar de nuevo.
 4. Registrar la operación en `audit_logs` con el motivo "reapertura por reimportación de Bodega 3".
 5. Al terminar el conteo, revalidar las referencias afectadas para que cierren con el total completo (Bodega 3 incluida).
 
