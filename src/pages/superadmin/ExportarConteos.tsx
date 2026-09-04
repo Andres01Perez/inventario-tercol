@@ -266,6 +266,11 @@ const ExportarConteos: React.FC = () => {
   const [currentPageAlm, setCurrentPageAlm] = useState(1);
   const [isExportingAlm, setIsExportingAlm] = useState(false);
 
+  // Tab Planta state
+  const [searchTermPl, setSearchTermPl] = useState('');
+  const [currentPagePl, setCurrentPagePl] = useState(1);
+  const [isExportingPl, setIsExportingPl] = useState(false);
+
 
 
   // ===== TAB VALIDADOS: Query =====
