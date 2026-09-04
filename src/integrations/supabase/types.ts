@@ -848,6 +848,7 @@ export type Database = {
         Returns: number
       }
       get_active_inventory: { Args: never; Returns: string }
+      get_bodega_admin: { Args: { _bodega: string }; Returns: string }
       get_filter_options:
         | { Args: { _material_type?: string }; Returns: Json }
         | {
