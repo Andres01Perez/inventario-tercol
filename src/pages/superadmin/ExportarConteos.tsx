@@ -552,6 +552,10 @@ const ExportarConteos: React.FC = () => {
     setCurrentPageAlm(1);
   }, [searchTermAlm]);
 
+  React.useEffect(() => {
+    setCurrentPagePl(1);
+  }, [searchTermPl]);
+
   // Export function - Validados
   const handleExport = async () => {
     if (!auditedReferences || auditedReferences.length === 0) {
