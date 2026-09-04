@@ -215,8 +215,7 @@ async function fetchBodegaRows(
         row.maxRound = r;
         row.a_montar = `C${r}`;
       }
-      if (!row.resultado || !row.hasValidated) row.resultado = v.reason || '';
-      if (row.resultado === '' ) row.resultado = v.reason || '';
+      if (!row.resultado || r >= row.maxRound) row.resultado = v.reason || '';
     } else if (!row.hasValidated) {
       row.resultado = l.bodega_status || '';
     }
