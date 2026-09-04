@@ -607,6 +607,13 @@ const GroupedTranscriptionTab: React.FC<GroupedTranscriptionTabProps> = ({
       groups[key].locations.push(loc);
     });
 
+    // Ordenar referencias alfabéticamente dentro de cada zona
+    Object.values(groups).forEach(group => {
+      group.locations.sort((a, b) =>
+        a.master_reference.localeCompare(b.master_reference, 'es', { numeric: true })
+      );
+    });
+
     // Sort: sin_zona last, then alphabetically
     const entries = Object.entries(groups);
     entries.sort((a, b) => {
