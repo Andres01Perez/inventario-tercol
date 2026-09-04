@@ -266,6 +266,12 @@ const PtTranscriptionTab: React.FC<Props> = ({ roundNumber, isAdminMode = false 
       list.push(loc);
       map.set(loc.piso, list);
     }
+
+    // Ordenar referencias alfabéticamente dentro de cada piso
+    for (const list of map.values()) {
+      list.sort((a, b) => a.referencia.localeCompare(b.referencia, 'es', { numeric: true }));
+    }
+
     return [...map.entries()].sort((a, b) =>
       a[0].localeCompare(b[0], 'es', { numeric: true })
     );
