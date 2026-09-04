@@ -308,11 +308,22 @@ const PtTranscriptionTab: React.FC<Props> = ({ roundNumber, isAdminMode = false 
       </div>
 
       {grouped.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
-          <CheckCircle2 className="h-10 w-10 mb-3 text-primary" />
-          <p className="font-medium text-foreground">No hay ubicaciones pendientes</p>
-          <p className="text-sm">Todo lo asignado para este conteo ya fue transcrito.</p>
-        </div>
+        debouncedSearch.trim() ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-16 text-center text-muted-foreground">
+            <Search className="h-10 w-10 mb-1" />
+            <p className="font-medium text-foreground">Sin resultados</p>
+            <p className="text-sm">No se encontraron resultados para "{search}".</p>
+            <Button variant="outline" size="sm" onClick={() => setSearch('')}>
+              Limpiar búsqueda
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
+            <CheckCircle2 className="h-10 w-10 mb-3 text-primary" />
+            <p className="font-medium text-foreground">No hay ubicaciones pendientes</p>
+            <p className="text-sm">Todo lo asignado para este conteo ya fue transcrito.</p>
+          </div>
+        )
       ) : (
         <Accordion
           type="multiple"
