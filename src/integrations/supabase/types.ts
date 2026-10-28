@@ -874,6 +874,7 @@ export type Database = {
       is_superadmin: { Args: { _user_id: string }; Returns: boolean }
       is_viewer: { Args: { _user_id: string }; Returns: boolean }
       location_bodega: { Args: { _assigned_admin_id: string }; Returns: string }
+      normalize_location_name: { Args: { _n: string }; Returns: string }
       pt_reopen_reference: {
         Args: {
           _inventory_id: string
