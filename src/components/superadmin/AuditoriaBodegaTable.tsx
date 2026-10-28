@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useInventory } from '@/contexts/InventoryContext';
+import { groupLocationsByBodega } from '@/lib/groupLocations';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import {
@@ -96,6 +97,7 @@ interface GroupedRef {
   costoUnitario: number | null;
   countHistory: unknown;
   rows: LocRow[];
+  displayRows: (LocRow & { memberIds: string[] })[];
   totals: { c1: number | null; c2: number | null; c3: number | null; c4: number | null; c5: number | null };
   totalValidado: number;
   descuadre: number;
@@ -375,6 +377,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
         costoUnitario: costo,
         countHistory: masters[referencia]?.history ?? [],
         rows,
+        displayRows: groupLocationsByBodega(rows),
         totals: {
           c1: sum(rows, 'c1'),
           c2: sum(rows, 'c2'),
@@ -388,7 +391,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
       };
     });
 
-    if (sharedLocationsOnly) result = result.filter((g) => g.rows.length > 1);
+    if (sharedLocationsOnly) result = result.filter((g) => g.displayRows.length > 1);
     return result;
   }, [data, sharedLocationsOnly]);
 
@@ -704,9 +707,9 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
   };
 
   const renderMainRow = (group: GroupedRef) => {
-    const hasMultipleLocations = group.rows.length > 1;
+    const hasMultipleLocations = group.displayRows.length > 1;
     const isExpanded = expandedRefs.has(group.referencia);
-    const row = group.rows[0];
+    const row = group.displayRows[0];
 
     return (
       <div
@@ -717,7 +720,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
         <div className="w-[240px] min-w-[240px] px-3 font-medium flex items-center gap-2">
           {hasMultipleLocations && (isExpanded ? <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />)}
           <span className="break-words whitespace-normal leading-tight">{group.referencia}</span>
-          {hasMultipleLocations && <Badge variant="secondary" className="text-xs flex-shrink-0">{group.rows.length}</Badge>}
+          {hasMultipleLocations && <Badge variant="secondary" className="text-xs flex-shrink-0">{group.displayRows.length}</Badge>}
         </div>
         <div className="w-[50px] min-w-[50px] px-2" onClick={(e) => e.stopPropagation()}>
           {!hasMultipleLocations && <LocationInfoPopover row={row} />}
@@ -811,7 +814,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
       >
         <div className="w-[240px] min-w-[240px] px-3 pl-10">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-muted-foreground text-sm">{subIndex === group.rows.length - 1 ? '└' : '├'} Ubic {subIndex + 1}</span>
+            <span className="text-muted-foreground text-sm">{subIndex === group.displayRows.length - 1 ? '└' : '├'} {row.locationName || `Ubic ${subIndex + 1}`}</span>
             {isDiscovered && <Badge className="bg-amber-500/20 text-amber-600 border-amber-500/30 text-[10px]">C{row.discoveredAtRound}</Badge>}
             {isValidated && <Badge className="bg-green-500/20 text-green-600 border-green-500/30 text-[10px] gap-1"><CheckCircle2 className="w-3 h-3" />C{row.validatedAtRound}</Badge>}
           </div>
@@ -936,8 +939,8 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
                   {groupedData.map((group) => (
                     <React.Fragment key={group.referencia}>
                       {renderMainRow(group)}
-                      {expandedRefs.has(group.referencia) && group.rows.length > 1 &&
-                        group.rows.map((row, idx) => renderSubRow(group, row, idx))}
+                      {expandedRefs.has(group.referencia) && group.displayRows.length > 1 &&
+                        group.displayRows.map((row, idx) => renderSubRow(group, row, idx))}
                     </React.Fragment>
                   ))}
                 </div>
