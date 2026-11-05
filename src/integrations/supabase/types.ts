@@ -847,6 +847,18 @@ export type Database = {
         }
         Returns: number
       }
+      erp_bodega_ctl: {
+        Args: {
+          _bodega: string
+          _cant_alm_mp: number
+          _cant_alm_pp: number
+          _cant_pld: number
+          _cant_plr: number
+          _control: string
+          _material_type: Database["public"]["Enums"]["material_type"]
+        }
+        Returns: number
+      }
       get_active_inventory: { Args: never; Returns: string }
       get_bodega_admin: { Args: { _bodega: string }; Returns: string }
       get_filter_options:
