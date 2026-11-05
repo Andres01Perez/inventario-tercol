@@ -127,6 +127,7 @@ export function useExportToExcel() {
     materialType?: string;
     status?: string;
     location?: string;
+    punto?: string;
   }) => {
     setIsExporting(true);
     try {
@@ -187,6 +188,9 @@ export function useExportToExcel() {
 
           if (filters?.location && filters.location !== 'all') {
             query = query.eq('location_name', filters.location);
+          }
+          if (filters?.punto && filters.punto !== 'all') {
+            query = query.eq('punto_referencia', filters.punto);
           }
 
           const { data, error } = await query.order('id').range(from, from + 999);
@@ -304,6 +308,7 @@ export function useExportToExcel() {
     searchTerm?: string;
     status?: string;
     location?: string;
+    punto?: string;
   }) => {
     setIsExporting(true);
     try {
@@ -331,6 +336,7 @@ export function useExportToExcel() {
         if (params.searchTerm) query = query.ilike('master_reference', `%${params.searchTerm}%`);
         if (params.status && params.status !== 'all') query = query.eq('bodega_status', params.status);
         if (params.location && params.location !== 'all') query = query.eq('location_name', params.location);
+        if (params.punto && params.punto !== 'all') query = query.eq('punto_referencia', params.punto);
 
         return query;
       });
