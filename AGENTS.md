@@ -1,0 +1,1 @@
+- PP references are audited in a single warehouse decided by inventory_master.control (NULL = Planta, set = Almacén) via erp_bodega_ctl and the locations_pp_bodega trigger; why: the ERP total and all locations of a PP reference must live in one audit.
