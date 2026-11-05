@@ -127,6 +127,7 @@ export function useExportToExcel() {
     materialType?: string;
     status?: string;
     location?: string;
+    punto?: string;
   }) => {
     setIsExporting(true);
     try {
@@ -187,6 +188,9 @@ export function useExportToExcel() {
 
           if (filters?.location && filters.location !== 'all') {
             query = query.eq('location_name', filters.location);
+          }
+          if (filters?.punto && filters.punto !== 'all') {
+            query = query.eq('punto_referencia', filters.punto);
           }
 
           const { data, error } = await query.order('id').range(from, from + 999);

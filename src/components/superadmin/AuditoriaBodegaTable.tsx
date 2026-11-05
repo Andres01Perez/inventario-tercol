@@ -157,6 +157,8 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [locationFilter, setLocationFilter] = useState('all');
+  const [puntoFilter, setPuntoFilter] = useState('all');
+  React.useEffect(() => { setPuntoFilter('all'); }, [locationFilter]);
   const [sharedLocationsOnly, setSharedLocationsOnly] = useState(false);
   const [expandedRefs, setExpandedRefs] = useState<Set<string>>(new Set());
 
@@ -179,7 +181,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const queryKeyBase = ['audit-bodega', bodega, materialType, inventoryId, debouncedSearch, statusFilter, locationFilter];
+  const queryKeyBase = ['audit-bodega', bodega, materialType, inventoryId, debouncedSearch, statusFilter, locationFilter, puntoFilter];
 
   // Ubicaciones disponibles para el filtro (solo de esta bodega/familia)
   const { data: locationOptions } = useQuery({
@@ -207,6 +209,33 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
     },
   });
 
+  // Puntos de referencia disponibles (según la ubicación elegida)
+  const { data: puntoOptions } = useQuery({
+    queryKey: ['audit-bodega-puntos', bodega, materialType, inventoryId, locationFilter],
+    enabled: !!inventoryId,
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      const names = new Set<string>();
+      let from = 0;
+      while (true) {
+        let q = supabase
+          .from('locations_bodega_view')
+          .select('punto_referencia')
+          .eq('inventory_id', inventoryId!)
+          .eq('bodega', bodega)
+          .eq('material_type', materialType);
+        if (locationFilter !== 'all') q = q.eq('location_name', locationFilter);
+        const { data, error } = await q.range(from, from + 999);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        data.forEach((d) => d.punto_referencia && d.punto_referencia.trim() && names.add(d.punto_referencia));
+        if (data.length < 1000) break;
+        from += 1000;
+      }
+      return [...names].sort((a, b) => a.localeCompare(b, 'es', { numeric: true }));
+    },
+  });
+
   // Total de ubicaciones (para saber cuánto falta por cargar)
   const { data: totalLocations } = useQuery({
     queryKey: [...queryKeyBase, 'count'],
@@ -221,6 +250,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
       if (debouncedSearch) q = q.ilike('master_reference', `%${debouncedSearch}%`);
       if (statusFilter !== 'all') q = q.eq('bodega_status', statusFilter);
       if (locationFilter !== 'all') q = q.eq('location_name', locationFilter);
+      if (puntoFilter !== 'all') q = q.eq('punto_referencia', puntoFilter);
       const { count, error } = await q;
       if (error) throw error;
       return count || 0;
@@ -256,6 +286,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
       if (debouncedSearch) q = q.ilike('master_reference', `%${debouncedSearch}%`);
       if (statusFilter !== 'all') q = q.eq('bodega_status', statusFilter);
       if (locationFilter !== 'all') q = q.eq('location_name', locationFilter);
+      if (puntoFilter !== 'all') q = q.eq('punto_referencia', puntoFilter);
 
       const { data: locs, error } = await q;
       if (error) throw error;
@@ -864,6 +895,13 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
               {locationOptions?.map((loc) => <SelectItem key={loc} value={loc}>{loc}</SelectItem>)}
             </SelectContent>
           </Select>
+          <Select value={puntoFilter} onValueChange={setPuntoFilter}>
+            <SelectTrigger className="w-[180px]"><SelectValue placeholder="Punto de referencia" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los puntos</SelectItem>
+              {puntoOptions?.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+            </SelectContent>
+          </Select>
           <div className="flex items-center gap-2 px-3 py-2 border rounded-lg bg-background">
             <Switch id={`shared-${bodega}-${materialType}`} checked={sharedLocationsOnly} onCheckedChange={setSharedLocationsOnly} />
             <Label htmlFor={`shared-${bodega}-${materialType}`} className="text-sm cursor-pointer whitespace-nowrap">Solo compartidas</Label>
@@ -889,6 +927,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
               searchTerm: debouncedSearch,
               status: statusFilter,
               location: locationFilter,
+              punto: puntoFilter,
             })}
             disabled={isExporting}
           >
