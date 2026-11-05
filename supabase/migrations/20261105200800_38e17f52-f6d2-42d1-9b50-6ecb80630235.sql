@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.locations_pp_bodega() FROM PUBLIC, anon, authenticated;
