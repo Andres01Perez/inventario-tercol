@@ -248,7 +248,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
         .eq('bodega', bodega)
         .eq('material_type', materialType);
       if (debouncedSearch) q = q.ilike('master_reference', `%${debouncedSearch}%`);
-      if (statusFilter !== 'all') q = q.eq('bodega_status', statusFilter);
+      if (statusFilter !== 'all') q = q.eq('bodega_status', statusFilter); else q = q.neq('bodega_status', 'n/a');
       if (locationFilter !== 'all') q = q.eq('location_name', locationFilter);
       if (puntoFilter !== 'all') q = q.eq('punto_referencia', puntoFilter);
       const { count, error } = await q;
@@ -284,7 +284,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
         .range(offset, offset + PAGE_SIZE - 1);
 
       if (debouncedSearch) q = q.ilike('master_reference', `%${debouncedSearch}%`);
-      if (statusFilter !== 'all') q = q.eq('bodega_status', statusFilter);
+      if (statusFilter !== 'all') q = q.eq('bodega_status', statusFilter); else q = q.neq('bodega_status', 'n/a');
       if (locationFilter !== 'all') q = q.eq('location_name', locationFilter);
       if (puntoFilter !== 'all') q = q.eq('punto_referencia', puntoFilter);
 
@@ -883,9 +883,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
               <SelectItem value="pendiente">Pendiente</SelectItem>
               <SelectItem value="auditado">Auditado</SelectItem>
               <SelectItem value="conflicto">Conflicto</SelectItem>
-              <SelectItem value="critico">Crítico</SelectItem>
               <SelectItem value="cerrado_forzado">Cerrado Forzado</SelectItem>
-              <SelectItem value="n/a">N/A</SelectItem>
             </SelectContent>
           </Select>
           <Select value={locationFilter} onValueChange={setLocationFilter}>

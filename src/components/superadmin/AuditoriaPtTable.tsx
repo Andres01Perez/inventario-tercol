@@ -749,9 +749,7 @@ const AuditoriaPtTable: React.FC = () => {
               <SelectItem value="pendiente">Pendiente</SelectItem>
               <SelectItem value="auditado">Auditado</SelectItem>
               <SelectItem value="conflicto">Conflicto</SelectItem>
-              <SelectItem value="critico">Crítico</SelectItem>
               <SelectItem value="cerrado_forzado">Cerrado Forzado</SelectItem>
-              <SelectItem value="n/a">N/A</SelectItem>
             </SelectContent>
           </Select>
           <Select value={pisoFilter} onValueChange={setPisoFilter}>

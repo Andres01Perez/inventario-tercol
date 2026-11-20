@@ -254,12 +254,12 @@ const AuditoriaPtKpiPanel: React.FC<Props> = ({ piso }) => {
         if (r.descuadre > 0) sobrante += r.descuadre;
       });
 
-      const statusOrder = ['auditado', 'cerrado_forzado', 'conflicto', 'critico', 'pendiente_en_progreso', 'pendiente_sin_iniciar', 'n/a'];
+      const statusOrder = ['auditado', 'cerrado_forzado', 'conflicto', 'pendiente_en_progreso', 'pendiente_sin_iniciar'];
       const byStatus = statusOrder
         .filter((s) => statusCounts.has(s))
         .map((s) => ({ key: s, count: statusCounts.get(s)! }));
       [...statusCounts.keys()]
-        .filter((s) => !statusOrder.includes(s))
+        .filter((s) => !statusOrder.includes(s) && s !== 'n/a' && s !== 'critico')
         .forEach((s) => byStatus.push({ key: s, count: statusCounts.get(s)! }));
 
       const roundOrder = ['C1', 'C2', 'C3', 'C4', 'C5', 'cerrada'];

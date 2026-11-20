@@ -1,0 +1,2 @@
+REVOKE EXECUTE ON FUNCTION public.auto_close_c4(uuid,text,text,uuid) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.pt_auto_close_c4(uuid,text,uuid) FROM PUBLIC, anon, authenticated;
