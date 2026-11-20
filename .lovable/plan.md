@@ -1,38 +1,30 @@
-# Significado de los estados en Auditoría (Planta / Almacén)
+# Quitar los estados "Crítico" y "N/A"
 
-Este documento solo explica; no propone cambios en la aplicación.
+## Qué encontré (datos actuales)
 
-Cada referencia se audita **por separado en cada bodega** (Planta con Planta, Almacén con Almacén). Para PP, la bodega la define la columna Controlado (no controlado = Planta, controlado = Almacén).
+**Crítico** hoy se asigna por dos motivos distintos:
+1. **Hay ERP en la bodega pero no hay ninguna ubicación para contar.** Es la mayoría: 57 referencias de Materia Prima salen "Crítico" en Planta (ERP Planta > 0) aunque ya están auditadas en Almacén y no tienen ubicaciones en Planta. Por eso parece que "C1 = C2 y aun así sale Crítico": esos conteos son de Almacén, no de Planta.
+2. **Se llegó a C4 sin coincidencia.** Solo unas 8 referencias (6 en Almacén, 2 en Planta).
 
-## Pendiente
-Todavía no se puede validar la referencia. Pasa cuando:
-- Falta contar alguna de sus ubicaciones en la ronda actual (deben contarse **todas** las ubicaciones antes de comparar).
-- Solo tiene C1 y falta C2.
-- Aún no tiene ningún conteo.
+Totales: Planta 60, Almacén 6 (+ 3 en ambas). PT: ninguna.
 
-## Auditado
-La referencia ya quedó validada y tiene "Cantidad a montar". Se valida sola al guardar un conteo cuando:
-- C1 coincide con el ERP, o
-- dos conteos coinciden entre sí (C1 = C2, C2 = C3, etc.), aunque no coincidan con el ERP. En ese caso queda auditado con descuadre (+ verde o − rojo).
-- También queda así cuando un superadmin la valida manualmente (motivo "manual_edit").
+**N/A** = la referencia no tiene ERP ni ubicaciones en esa bodega (Planta 1.169, Almacén 1.104). No hay nada que auditar ahí.
 
-## Conflicto
-Se contó C1 y C2 (o C3), pero **no coinciden entre sí ni con el ERP**. La referencia pasa a la siguiente ronda (C3, luego C4) y hay que volver a contar. Algunas también quedaron aquí tras correcciones manuales y solo requieren usar **Re-validar**.
+## Qué propongo
 
-## Crítico
-Se llegó a C4 y tampoco hubo coincidencia (ni con otro conteo ni con el ERP). Requiere decisión del superadmin: editar conteos, Re-validar o hacer un cierre forzado.
+**N/A desaparece de la vista**
+- Esas referencias dejan de mostrarse en la auditoría de esa bodega (no pertenecen a ella). Se quita "N/A" del filtro y de los indicadores.
+- En la base se siguen marcando internamente para no contarlas, pero nunca se ven.
 
-## Cerrado forzado
-Un superadmin cerró la referencia manualmente con motivo obligatorio (por ejemplo "cierre forzado superadmin"). Se toma como cantidad a montar el conteo elegido (el más cercano al ERP o el más reciente).
+**Crítico se elimina y se reemplaza por cierre automático**
+- Caso 1 (ERP sin ubicaciones): la referencia queda **Auditado** con cantidad a montar **0** y motivo "Sin ubicaciones en bodega". El descuadre se ve en rojo (−ERP) para que se pueda revisar.
+- Caso 2 (C4 sin coincidencia): al guardar el C4 la referencia queda **Auditado** con el conteo más cercano al ERP (mismo criterio usado en el cierre de pendientes) y motivo "Cierre automático C4".
+- Se aplica a lo que ya existe y a lo que pase en adelante (Planta, Almacén y PT).
+- Antes de tocar datos: respaldo en Excel de las referencias afectadas.
 
-## N/A
-La referencia **no aplica a esta bodega**: no tiene ERP ni ubicaciones en ella. Ejemplo: una PP controlada aparece N/A en Planta porque se audita en Almacén. No requiere acción.
+Estados finales: **Pendiente, Auditado, Conflicto, Cerrado forzado.**
 
-## Resumen del flujo
-```text
-Sin conteos / incompleto -> Pendiente
-C1 = ERP o C1 = C2        -> Auditado
-No coinciden              -> Conflicto (C3, C4)
-C4 sin coincidencia       -> Crítico -> Cerrado forzado
-No pertenece a la bodega  -> N/A
-```
+## Detalle técnico
+- Migración: en `validate_bucket`, cuando no hay ubicaciones y ERP>0 → `auditado` + insertar validación 0 con motivo; cuando `v_new_round = 5` → elegir conteo C1–C4 más cercano al ERP, `upsert_validated_count`, estado `auditado`. Igual en `pt_validate_and_close_round`. `n/a` se conserva como valor interno.
+- Datos: recalcular las ~69 referencias hoy en `critico` con la nueva lógica.
+- UI: quitar opciones `critico` y `n/a` de los filtros en `AuditoriaBodegaTable`, `AuditoriaPtTable` y los paneles KPI; excluir filas `n/a` de las consultas y de la exportación.
