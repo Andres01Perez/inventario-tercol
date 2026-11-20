@@ -836,6 +836,15 @@ export type Database = {
             }
             Returns: boolean
           }
+      auto_close_c4: {
+        Args: {
+          _bodega: string
+          _inv: string
+          _reference: string
+          _user: string
+        }
+        Returns: Json
+      }
       erp_bodega: {
         Args: {
           _bodega: string
@@ -887,6 +896,10 @@ export type Database = {
       is_viewer: { Args: { _user_id: string }; Returns: boolean }
       location_bodega: { Args: { _assigned_admin_id: string }; Returns: string }
       normalize_location_name: { Args: { _n: string }; Returns: string }
+      pt_auto_close_c4: {
+        Args: { _inv: string; _referencia: string; _user: string }
+        Returns: Json
+      }
       pt_reopen_reference: {
         Args: {
           _inventory_id: string
