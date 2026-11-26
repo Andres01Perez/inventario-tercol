@@ -12,12 +12,13 @@ import {
 } from '@/components/ui/select';
 import AuditoriaKpiPanel, { Bodega } from '@/components/superadmin/AuditoriaKpiPanel';
 import AuditoriaPtKpiPanel from '@/components/superadmin/AuditoriaPtKpiPanel';
+import ValorizacionPanel from '@/components/superadmin/ValorizacionPanel';
 import { supabase } from '@/integrations/supabase/client';
 import { useInventory } from '@/contexts/InventoryContext';
-import { Warehouse, Factory, PackageCheck } from 'lucide-react';
+import { Warehouse, Factory, PackageCheck, DollarSign } from 'lucide-react';
 
 type Familia = 'all' | 'MP' | 'PP';
-type Vista = Bodega | 'pt';
+type Vista = Bodega | 'pt' | 'valorizacion';
 
 const DashboardAuditoria: React.FC = () => {
   const { inventoryId } = useInventory();
@@ -73,6 +74,10 @@ const DashboardAuditoria: React.FC = () => {
               <PackageCheck className="w-4 h-4 mr-2" />
               PT
             </Button>
+            <Button variant={vista === 'valorizacion' ? 'default' : 'ghost'} size="sm" onClick={() => setVista('valorizacion')}>
+              <DollarSign className="w-4 h-4 mr-2" />
+              Valorización
+            </Button>
           </div>
 
           {vista === 'pt' ? (
@@ -83,7 +88,7 @@ const DashboardAuditoria: React.FC = () => {
                 {pisos.map((p) => <SelectItem key={p} value={p}>Piso {p}</SelectItem>)}
               </SelectContent>
             </Select>
-          ) : (
+          ) : vista !== 'valorizacion' ? (
             <Tabs value={familia} onValueChange={(v) => setFamilia(v as Familia)}>
               <TabsList>
                 <TabsTrigger value="all">Todas</TabsTrigger>
@@ -91,11 +96,13 @@ const DashboardAuditoria: React.FC = () => {
                 <TabsTrigger value="PP">PP</TabsTrigger>
               </TabsList>
             </Tabs>
-          )}
+          ) : null}
         </div>
 
         {vista === 'pt' ? (
           <AuditoriaPtKpiPanel piso={piso} />
+        ) : vista === 'valorizacion' ? (
+          <ValorizacionPanel />
         ) : (
           <AuditoriaKpiPanel bodega={vista} familia={familia} />
         )}

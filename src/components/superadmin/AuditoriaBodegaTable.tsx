@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useInventory } from '@/contexts/InventoryContext';
@@ -152,9 +153,11 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
   const queryClient = useQueryClient();
   const { inventoryId, isReadOnly } = useInventory();
   const { isExporting, exportAuditoriaBodega } = useExportToExcel();
+  const [searchParams] = useSearchParams();
+  const initialQ = searchParams.get('q') ?? '';
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [searchQuery, setSearchQuery] = useState(initialQ);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialQ);
   const [statusFilter, setStatusFilter] = useState('all');
   const [locationFilter, setLocationFilter] = useState('all');
   const [puntoFilter, setPuntoFilter] = useState('all');

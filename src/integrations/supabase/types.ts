@@ -975,6 +975,24 @@ export type Database = {
         }
         Returns: Json
       }
+      valorizacion_bodega: {
+        Args: { _inventory_id: string }
+        Returns: {
+          bodega: string
+          cant_a_montar: number
+          control: string
+          costo_u: number
+          dif_valor: number
+          erp_bodega: number
+          estado: string
+          familia: Database["public"]["Enums"]["material_type"]
+          num_ubicaciones: number
+          referencia: string
+          sin_costo: boolean
+          valor_a_montar: number
+          valor_inicial: number
+        }[]
+      }
     }
     Enums: {
       app_role:
