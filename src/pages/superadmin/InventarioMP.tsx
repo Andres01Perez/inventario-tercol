@@ -11,9 +11,11 @@ import {
   Search, 
   RefreshCw,
   AlertCircle,
-  Download
+  Download,
+  DollarSign
 } from 'lucide-react';
 import { useExportToExcel } from '@/hooks/useExportToExcel';
+import ActualizarCostosDialog from '@/components/superadmin/ActualizarCostosDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -38,7 +40,7 @@ import {
 const ITEMS_PER_PAGE = 20;
 
 const InventarioMP: React.FC = () => {
-  const { profile } = useAuth();
+  const { role } = useAuth();
   const { inventoryId, isReadOnly } = useInventory();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -47,6 +49,7 @@ const InventarioMP: React.FC = () => {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [costsOpen, setCostsOpen] = useState(false);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['inventory-mp', searchTerm, currentPage, inventoryId],
@@ -155,6 +158,17 @@ const InventarioMP: React.FC = () => {
             <Download className="w-4 h-4 mr-2" />
             {isExporting ? 'Exportando...' : 'Exportar'}
           </Button>
+          {role === 'superadmin' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCostsOpen(true)}
+              disabled={isReadOnly || !inventoryId}
+            >
+              <DollarSign className="w-4 h-4 mr-2" />
+              Actualizar costos
+            </Button>
+          )}
           <span className="text-sm text-muted-foreground">
             {data?.total || 0} referencias
           </span>
@@ -248,6 +262,16 @@ const InventarioMP: React.FC = () => {
           )}
         </div>
       </main>
+
+      {role === 'superadmin' && inventoryId && (
+        <ActualizarCostosDialog
+          open={costsOpen}
+          onOpenChange={setCostsOpen}
+          materialType="MP"
+          inventoryId={inventoryId}
+          onSuccess={() => refetch()}
+        />
+      )}
     </AppLayout>
   );
 };
