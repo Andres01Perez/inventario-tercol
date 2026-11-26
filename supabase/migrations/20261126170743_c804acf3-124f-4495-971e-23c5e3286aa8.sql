@@ -1,0 +1,47 @@
+DO $test$
+DECLARE inv uuid; uid uuid; ref text := '__AJUSTE_RULES_' || gen_random_uuid();
+  loc uuid; p jsonb; before_sn jsonb; a jsonb; batch1 uuid; batch2 uuid; failed boolean;
+BEGIN
+  SELECT id INTO inv FROM public.inventories WHERE status='abierto' LIMIT 1;
+  SELECT user_id INTO uid FROM public.user_roles WHERE role='superadmin' LIMIT 1;
+  BEGIN
+    PERFORM set_config('request.jwt.claim.sub',uid::text,true);
+    INSERT INTO public.inventory_master(inventory_id,referencia,material_type,control,cant_alm_pp,costo_u_pp) VALUES(inv,ref,'PP',NULL,100,10);
+    p:=jsonb_build_array(jsonb_build_object('referencia',ref,'bodega','almacen','familia','PP','cantidad_final',100,'motivo','test','soporte','test'));
+    a:=public.previsualizar_ajustes_cierre(inv,p);
+    IF NOT EXISTS(SELECT 1 FROM jsonb_array_elements_text(a->0->'errores') x WHERE x LIKE 'PP asignada por Control a planta%') THEN RAISE EXCEPTION 'PP NULL rule failed'; END IF;
+    UPDATE public.inventory_master SET control='1' WHERE inventory_id=inv AND referencia=ref;
+    a:=public.previsualizar_ajustes_cierre(inv,jsonb_set(p,'{0,bodega}','"planta"'));
+    IF NOT EXISTS(SELECT 1 FROM jsonb_array_elements_text(a->0->'errores') x WHERE x LIKE 'PP asignada por Control a almacen%') THEN RAISE EXCEPTION 'PP controlled rule failed'; END IF;
+    a:=public.previsualizar_ajustes_cierre(inv,p||p);
+    IF NOT (a->0->'errores' @> '["Duplicada: referencia + bodega"]') OR NOT (a->1->'errores' @> '["Duplicada: referencia + bodega"]') THEN RAISE EXCEPTION 'Duplicate rule failed'; END IF;
+    a:=public.previsualizar_ajustes_cierre(inv,jsonb_set(p,'{0,cantidad_final}','-1'));
+    IF NOT (a->0->'errores' @> '["Cantidad vacía, inválida o negativa"]') THEN RAISE EXCEPTION 'Negative rule failed'; END IF;
+    a:=public.previsualizar_ajustes_cierre(inv,jsonb_set(p,'{0,familia}','"MP"'));
+    IF NOT (a->0->'errores' @> '["Familia distinta a la maestra"]') THEN RAISE EXCEPTION 'Family rule failed'; END IF;
+    a:=public.previsualizar_ajustes_cierre(inv,jsonb_set(jsonb_set(p,'{0,motivo}','""'),'{0,soporte}','""'));
+    IF NOT (a->0->'errores' @> '["Motivo obligatorio","Soporte obligatorio"]') THEN RAISE EXCEPTION 'Reason support rule failed'; END IF;
+    UPDATE public.inventories SET status='cerrado' WHERE id=inv;
+    failed:=false;
+    BEGIN PERFORM public.previsualizar_ajustes_cierre(inv,p); EXCEPTION WHEN OTHERS THEN failed:=SQLERRM LIKE 'Inventario cerrado%'; END;
+    IF NOT failed THEN RAISE EXCEPTION 'Historical rule failed'; END IF;
+    UPDATE public.inventories SET status='abierto' WHERE id=inv;
+    INSERT INTO public.locations(inventory_id,master_reference,location_name,activo,assigned_admin_id) VALUES(inv,ref,'TEST',true,public.get_bodega_admin('almacen')) RETURNING id INTO loc;
+    INSERT INTO public.inventory_counts(inventory_id,location_id,audit_round,quantity_counted,supervisor_id) VALUES(inv,loc,1,30,uid);
+    PERFORM public.upsert_validated_count(inv,ref,loc,7,1,'ALM:original',uid);
+    UPDATE public.locations SET validated_quantity=7,validated_at_round=1,terminado=true WHERE id=loc;
+    before_sn:=public.ajuste_cierre_snapshot(inv,ref,'almacen');
+    a:=public.aplicar_ajustes_cierre(inv,'first.xlsx',public.previsualizar_ajustes_cierre(inv,p)); batch1:=(a->>'lote_id')::uuid;
+    a:=public.aplicar_ajustes_cierre(inv,'second.xlsx',public.previsualizar_ajustes_cierre(inv,jsonb_set(p,'{0,cantidad_final}','120'))); batch2:=(a->>'lote_id')::uuid;
+    failed:=false;
+    BEGIN PERFORM public.revertir_ajustes_cierre(batch1,'test'); EXCEPTION WHEN OTHERS THEN failed:=SQLERRM LIKE '%cambios posteriores%'; END;
+    IF NOT failed THEN RAISE EXCEPTION 'Older lot reversed over newer lot'; END IF;
+    PERFORM public.revertir_ajustes_cierre(batch2,'test');
+    IF NOT EXISTS(SELECT 1 FROM public.ajustes_cierre_vigentes(inv) WHERE lote_id=batch1) THEN RAISE EXCEPTION 'Prior lot not restored'; END IF;
+    PERFORM public.revertir_ajustes_cierre(batch1,'test');
+    IF public.ajuste_cierre_snapshot(inv,ref,'almacen') IS DISTINCT FROM before_sn THEN RAISE EXCEPTION 'Existing validated value not restored'; END IF;
+    RAISE EXCEPTION USING ERRCODE='ZX001', MESSAGE='Rollback rules fixtures';
+  EXCEPTION WHEN SQLSTATE 'ZX001' THEN NULL;
+  END;
+  IF EXISTS(SELECT 1 FROM public.inventory_master WHERE inventory_id=inv AND referencia=ref) THEN RAISE EXCEPTION 'Test survived'; END IF;
+END $test$;
