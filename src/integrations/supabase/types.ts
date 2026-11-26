@@ -44,6 +44,66 @@ export type Database = {
         }
         Relationships: []
       }
+      cost_update_history: {
+        Row: {
+          batch_id: string
+          costo_t_anterior: number | null
+          costo_t_nuevo: number
+          costo_u_anterior: number | null
+          costo_u_nuevo: number
+          created_at: string
+          file_name: string | null
+          id: string
+          inventory_id: string
+          material_type: Database["public"]["Enums"]["material_type"]
+          referencia: string
+          updated_by: string
+        }
+        Insert: {
+          batch_id: string
+          costo_t_anterior?: number | null
+          costo_t_nuevo: number
+          costo_u_anterior?: number | null
+          costo_u_nuevo: number
+          created_at?: string
+          file_name?: string | null
+          id?: string
+          inventory_id: string
+          material_type: Database["public"]["Enums"]["material_type"]
+          referencia: string
+          updated_by: string
+        }
+        Update: {
+          batch_id?: string
+          costo_t_anterior?: number | null
+          costo_t_nuevo?: number
+          costo_u_anterior?: number | null
+          costo_u_nuevo?: number
+          created_at?: string
+          file_name?: string | null
+          id?: string
+          inventory_id?: string
+          material_type?: Database["public"]["Enums"]["material_type"]
+          referencia?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cost_update_history_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cost_update_history_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventories: {
         Row: {
           created_at: string
@@ -950,6 +1010,15 @@ export type Database = {
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      update_master_costs: {
+        Args: {
+          _file_name?: string
+          _inventory_id: string
+          _items: Json
+          _material_type: Database["public"]["Enums"]["material_type"]
+        }
+        Returns: Json
+      }
       upsert_validated_count: {
         Args: {
           _inventory_id: string
