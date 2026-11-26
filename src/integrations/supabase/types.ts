@@ -14,6 +14,143 @@ export type Database = {
   }
   public: {
     Tables: {
+      ajustes_cierre: {
+        Row: {
+          bodega: string
+          cantidad_anterior: number
+          cantidad_final: number
+          costo_u: number
+          creado_por: string
+          created_at: string
+          estado_anterior: string
+          id: string
+          impacto_valor: number
+          inventory_id: string
+          lote_id: string
+          material_type: Database["public"]["Enums"]["material_type"]
+          motivo: string
+          observacion: string | null
+          referencia: string
+          snapshot_anterior: Json
+          snapshot_posterior: Json
+          soporte: string
+          ubicaciones: Json
+          updated_at: string
+        }
+        Insert: {
+          bodega: string
+          cantidad_anterior: number
+          cantidad_final: number
+          costo_u: number
+          creado_por: string
+          created_at?: string
+          estado_anterior: string
+          id?: string
+          impacto_valor: number
+          inventory_id: string
+          lote_id: string
+          material_type: Database["public"]["Enums"]["material_type"]
+          motivo: string
+          observacion?: string | null
+          referencia: string
+          snapshot_anterior: Json
+          snapshot_posterior: Json
+          soporte: string
+          ubicaciones: Json
+          updated_at?: string
+        }
+        Update: {
+          bodega?: string
+          cantidad_anterior?: number
+          cantidad_final?: number
+          costo_u?: number
+          creado_por?: string
+          created_at?: string
+          estado_anterior?: string
+          id?: string
+          impacto_valor?: number
+          inventory_id?: string
+          lote_id?: string
+          material_type?: Database["public"]["Enums"]["material_type"]
+          motivo?: string
+          observacion?: string | null
+          referencia?: string
+          snapshot_anterior?: Json
+          snapshot_posterior?: Json
+          soporte?: string
+          ubicaciones?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ajustes_cierre_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ajustes_cierre_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "ajustes_cierre_lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ajustes_cierre_lotes: {
+        Row: {
+          aplicadas: number
+          creado_por: string
+          created_at: string
+          estado: string
+          id: string
+          inventory_id: string
+          motivo_reversion: string | null
+          nombre_archivo: string
+          revertido_at: string | null
+          revertido_por: string | null
+          total_filas: number
+          updated_at: string
+        }
+        Insert: {
+          aplicadas?: number
+          creado_por: string
+          created_at?: string
+          estado?: string
+          id?: string
+          inventory_id: string
+          motivo_reversion?: string | null
+          nombre_archivo: string
+          revertido_at?: string | null
+          revertido_por?: string | null
+          total_filas: number
+          updated_at?: string
+        }
+        Update: {
+          aplicadas?: number
+          creado_por?: string
+          created_at?: string
+          estado?: string
+          id?: string
+          inventory_id?: string
+          motivo_reversion?: string | null
+          nombre_archivo?: string
+          revertido_at?: string | null
+          revertido_por?: string | null
+          total_filas?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ajustes_cierre_lotes_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action_type: string
@@ -21,6 +158,7 @@ export type Database = {
           id: string
           master_reference: string
           new_data: Json | null
+          old_data: Json | null
           round_number: number | null
           user_id: string | null
         }
@@ -30,6 +168,7 @@ export type Database = {
           id?: string
           master_reference: string
           new_data?: Json | null
+          old_data?: Json | null
           round_number?: number | null
           user_id?: string | null
         }
@@ -39,6 +178,7 @@ export type Database = {
           id?: string
           master_reference?: string
           new_data?: Json | null
+          old_data?: Json | null
           round_number?: number | null
           user_id?: string | null
         }
@@ -896,6 +1036,45 @@ export type Database = {
             }
             Returns: boolean
           }
+      ajuste_cierre_snapshot: {
+        Args: { _bod: string; _inv: string; _ref: string }
+        Returns: Json
+      }
+      ajustes_cierre_vigentes: {
+        Args: { _inventory_id: string }
+        Returns: {
+          bodega: string
+          cantidad_anterior: number
+          cantidad_final: number
+          costo_u: number
+          creado_por: string
+          created_at: string
+          estado_anterior: string
+          id: string
+          impacto_valor: number
+          inventory_id: string
+          lote_id: string
+          material_type: Database["public"]["Enums"]["material_type"]
+          motivo: string
+          observacion: string | null
+          referencia: string
+          snapshot_anterior: Json
+          snapshot_posterior: Json
+          soporte: string
+          ubicaciones: Json
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "ajustes_cierre"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      aplicar_ajustes_cierre: {
+        Args: { _filas: Json; _inventory_id: string; _nombre_archivo: string }
+        Returns: Json
+      }
       auto_close_c4: {
         Args: {
           _bodega: string
@@ -956,6 +1135,10 @@ export type Database = {
       is_viewer: { Args: { _user_id: string }; Returns: boolean }
       location_bodega: { Args: { _assigned_admin_id: string }; Returns: string }
       normalize_location_name: { Args: { _n: string }; Returns: string }
+      previsualizar_ajustes_cierre: {
+        Args: { _filas: Json; _inventory_id: string }
+        Returns: Json
+      }
       pt_auto_close_c4: {
         Args: { _inv: string; _referencia: string; _user: string }
         Returns: Json
@@ -1008,6 +1191,10 @@ export type Database = {
         }
         Returns: Json
       }
+      revertir_ajustes_cierre: {
+        Args: { _lote_id: string; _motivo: string }
+        Returns: Json
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       update_master_costs: {
@@ -1056,6 +1243,28 @@ export type Database = {
           erp_bodega: number
           estado: string
           familia: Database["public"]["Enums"]["material_type"]
+          motivo_ajuste: string
+          num_ubicaciones: number
+          origen: string
+          referencia: string
+          sin_costo: boolean
+          soporte_ajuste: string
+          valor_a_montar: number
+          valor_inicial: number
+        }[]
+      }
+      valorizacion_bodega_base: {
+        Args: { _inventory_id: string }
+        Returns: {
+          bodega: string
+          cant_a_montar: number
+          cant_validada_inactivas: number
+          control: string
+          costo_u: number
+          dif_valor: number
+          erp_bodega: number
+          estado: string
+          familia: Database["public"]["Enums"]["material_type"]
           num_ubicaciones: number
           referencia: string
           sin_costo: boolean
@@ -1073,6 +1282,7 @@ export type Database = {
           referencias: number
           total_inv_a_montar: number
           total_inv_inicial: number
+          valor_ajustes_cierre: number
         }[]
       }
     }

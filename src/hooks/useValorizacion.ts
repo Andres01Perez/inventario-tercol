@@ -15,11 +15,12 @@ export function useValorizacion(inventoryId: string | null) {
     enabled: !!inventoryId,
     refetchInterval: 30_000,
     queryFn: async () => {
+      if (!inventoryId) return [];
       const all: ValorizacionRow[] = [];
       let from = 0;
       while (true) {
         const { data, error } = await supabase
-          .rpc('valorizacion_bodega', { _inventory_id: inventoryId! })
+          .rpc('valorizacion_bodega', { _inventory_id: inventoryId })
           .range(from, from + PAGE_SIZE - 1);
         if (error) throw error;
         const batch = data ?? [];
@@ -39,6 +40,9 @@ export function useValorizacion(inventoryId: string | null) {
             valor_a_montar: Number(r.valor_a_montar ?? 0),
             dif_valor: Number(r.dif_valor ?? 0),
             cant_validada_inactivas: Number(r.cant_validada_inactivas ?? 0),
+            origen: r.origen === 'ajuste_cierre' ? 'ajuste_cierre' : 'validado',
+            motivo_ajuste: r.motivo_ajuste,
+            soporte_ajuste: r.soporte_ajuste,
           });
         }
         if (batch.length < PAGE_SIZE) break;
@@ -55,8 +59,9 @@ export function useValorizacionResumen(inventoryId: string | null) {
     enabled: !!inventoryId,
     refetchInterval: 30_000,
     queryFn: async () => {
+      if (!inventoryId) return [];
       const { data, error } = await supabase.rpc('valorizacion_resumen', {
-        _inventory_id: inventoryId!,
+        _inventory_id: inventoryId,
       });
       if (error) throw error;
       return (data ?? []).map((r) => ({
@@ -67,6 +72,7 @@ export function useValorizacionResumen(inventoryId: string | null) {
         total_inv_a_montar: Number(r.total_inv_a_montar ?? 0),
         costo_dif_negativa: Number(r.costo_dif_negativa ?? 0),
         costo_dif_positiva: Number(r.costo_dif_positiva ?? 0),
+        valor_ajustes_cierre: Number(r.valor_ajustes_cierre ?? 0),
       }));
     },
   });

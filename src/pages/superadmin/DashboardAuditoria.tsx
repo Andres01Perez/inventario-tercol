@@ -13,12 +13,13 @@ import {
 import AuditoriaKpiPanel, { Bodega } from '@/components/superadmin/AuditoriaKpiPanel';
 import AuditoriaPtKpiPanel from '@/components/superadmin/AuditoriaPtKpiPanel';
 import ValorizacionPanel from '@/components/superadmin/ValorizacionPanel';
+import AjustesCierrePanel from '@/components/superadmin/AjustesCierrePanel';
 import { supabase } from '@/integrations/supabase/client';
 import { useInventory } from '@/contexts/InventoryContext';
 import { Warehouse, Factory, PackageCheck, DollarSign } from 'lucide-react';
 
 type Familia = 'all' | 'MP' | 'PP';
-type Vista = Bodega | 'pt' | 'valorizacion';
+type Vista = Bodega | 'pt' | 'valorizacion' | 'ajustes';
 
 const DashboardAuditoria: React.FC = () => {
   const { inventoryId } = useInventory();
@@ -78,6 +79,7 @@ const DashboardAuditoria: React.FC = () => {
               <DollarSign className="w-4 h-4 mr-2" />
               Valorización
             </Button>
+            <Button variant={vista === 'ajustes' ? 'default' : 'ghost'} size="sm" onClick={() => setVista('ajustes')}>Lotes de ajustes</Button>
           </div>
 
           {vista === 'pt' ? (
@@ -88,7 +90,7 @@ const DashboardAuditoria: React.FC = () => {
                 {pisos.map((p) => <SelectItem key={p} value={p}>Piso {p}</SelectItem>)}
               </SelectContent>
             </Select>
-          ) : vista !== 'valorizacion' ? (
+          ) : vista !== 'valorizacion' && vista !== 'ajustes' ? (
             <Tabs value={familia} onValueChange={(v) => setFamilia(v as Familia)}>
               <TabsList>
                 <TabsTrigger value="all">Todas</TabsTrigger>
@@ -99,7 +101,7 @@ const DashboardAuditoria: React.FC = () => {
           ) : null}
         </div>
 
-        {vista === 'pt' ? (
+        {vista === 'ajustes' ? <AjustesCierrePanel /> : vista === 'pt' ? (
           <AuditoriaPtKpiPanel piso={piso} />
         ) : vista === 'valorizacion' ? (
           <ValorizacionPanel />

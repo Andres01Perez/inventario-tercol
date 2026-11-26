@@ -145,6 +145,7 @@ const ValorizacionPanel: React.FC = () => {
         <div className="glass-card p-4">
           <p className="text-xs text-muted-foreground">TOTAL INV A MONTAR</p>
           <p className="text-xl font-bold mt-1">{formatMoney(resumen.totalAMontar)}</p>
+          <p className="text-xs text-muted-foreground mt-1">De ajustes de cierre: {formatMoney(resumen.valorAjustes)}</p>
           <p className={`text-xs mt-1 ${descuadreColorClass(resumen.totalAMontar - resumen.totalInicial)}`}>
             Neto: {formatSignedMoney(resumen.totalAMontar - resumen.totalInicial)}
           </p>
@@ -181,6 +182,7 @@ const ValorizacionPanel: React.FC = () => {
               <TableHead className="text-right">Refs</TableHead>
               <TableHead className="text-right">Inv. Inicial</TableHead>
               <TableHead className="text-right">Inv. a Montar</TableHead>
+              <TableHead className="text-right">De ajustes</TableHead>
               <TableHead className="text-right">Dif. Negativa</TableHead>
               <TableHead className="text-right">Dif. Positiva</TableHead>
             </TableRow>
@@ -192,6 +194,7 @@ const ValorizacionPanel: React.FC = () => {
                 <TableCell className="text-right">{m.resumen.refs}</TableCell>
                 <TableCell className="text-right">{formatMoney(m.resumen.totalInicial)}</TableCell>
                 <TableCell className="text-right">{formatMoney(m.resumen.totalAMontar)}</TableCell>
+                <TableCell className="text-right">{formatMoney(m.resumen.valorAjustes)}</TableCell>
                 <TableCell className="text-right text-red-600 dark:text-red-400">{formatSignedMoney(m.resumen.difNegativa)}</TableCell>
                 <TableCell className="text-right text-green-600 dark:text-green-400">{formatSignedMoney(m.resumen.difPositiva)}</TableCell>
               </TableRow>
@@ -255,6 +258,7 @@ const ValorizacionPanel: React.FC = () => {
                 <TableHead>Fam.</TableHead>
                 <TableHead>Bodega</TableHead>
                 <TableHead>Estado</TableHead>
+                <TableHead>Origen / soporte</TableHead>
                 <TableHead className="text-right">ERP</TableHead>
                 <TableHead className="text-right">A montar</TableHead>
                 <TableHead className="text-right">Costo u.</TableHead>
@@ -274,6 +278,7 @@ const ValorizacionPanel: React.FC = () => {
                   <TableCell>{r.familia}</TableCell>
                   <TableCell>{r.bodega === 'almacen' ? 'Almacén' : 'Planta'}</TableCell>
                   <TableCell><Badge variant="outline">{r.estado}</Badge></TableCell>
+                  <TableCell title={`${r.motivo_ajuste ?? ''}\n${r.soporte_ajuste ?? ''}`}><Badge variant="outline">{r.origen === 'ajuste_cierre' ? 'Ajuste de cierre' : 'Validado'}</Badge>{r.motivo_ajuste && <p className="text-xs text-muted-foreground">{r.motivo_ajuste}</p>}</TableCell>
                   <TableCell className="text-right">{formatQty(r.erp_bodega)}</TableCell>
                   <TableCell className="text-right">{formatQty(r.cant_a_montar)}</TableCell>
                   <TableCell className="text-right">{r.sin_costo ? <span className="text-amber-600">Sin costo</span> : formatMoney(r.costo_u)}</TableCell>
@@ -284,7 +289,7 @@ const ValorizacionPanel: React.FC = () => {
               ))}
               {tableRows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center text-muted-foreground py-8">Sin resultados con los filtros actuales.</TableCell>
+                  <TableCell colSpan={11} className="text-center text-muted-foreground py-8">Sin resultados con los filtros actuales.</TableCell>
                 </TableRow>
               )}
             </TableBody>

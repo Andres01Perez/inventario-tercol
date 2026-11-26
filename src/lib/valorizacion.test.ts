@@ -3,6 +3,8 @@ import { describe, expect, it } from 'bun:test';
 import {
   checkValorizacionIntegrity,
   sortDetailForExport,
+  summarizeFromServer,
+  summarizeValorizacion,
   ValorizacionResumenRow,
   ValorizacionRow,
 } from './valorizacion';
@@ -85,5 +87,19 @@ describe('sortDetailForExport', () => {
       'PP-almacen-A',
       'PP-planta-B',
     ]);
+  });
+});
+
+describe('Ajustes en valorización', () => {
+  it('desglosa solo el valor a montar con origen ajuste_cierre', () => {
+    expect(summarizeValorizacion([makeRow({ origen: 'ajuste_cierre', valor_a_montar: 800 }), makeRow({ origen: 'validado', valor_a_montar: 900 })]).valorAjustes).toBe(800);
+  });
+  it('respeta familia y bodega para el desglose del servidor', () => {
+    const rows: ValorizacionResumenRow[] = [
+      { familia: 'MP', bodega: 'almacen', referencias: 1, total_inv_inicial: 1000, total_inv_a_montar: 800, costo_dif_negativa: -200, costo_dif_positiva: 0, valor_ajustes_cierre: 800 },
+      { familia: 'PP', bodega: 'planta', referencias: 1, total_inv_inicial: 1000, total_inv_a_montar: 900, costo_dif_negativa: -100, costo_dif_positiva: 0, valor_ajustes_cierre: 900 },
+    ];
+    expect(summarizeFromServer(rows, 'almacen', 'MP').valorAjustes).toBe(800);
+    expect(summarizeFromServer(rows).valorAjustes).toBe(1700);
   });
 });

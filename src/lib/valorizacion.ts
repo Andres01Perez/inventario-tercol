@@ -18,6 +18,9 @@ export interface ValorizacionRow {
   valor_a_montar: number;
   dif_valor: number;
   cant_validada_inactivas: number;
+  origen?: 'validado' | 'ajuste_cierre';
+  motivo_ajuste?: string | null;
+  soporte_ajuste?: string | null;
 }
 
 export interface ValorizacionResumenRow {
@@ -28,6 +31,7 @@ export interface ValorizacionResumenRow {
   total_inv_a_montar: number;
   costo_dif_negativa: number;
   costo_dif_positiva: number;
+  valor_ajustes_cierre?: number;
 }
 
 export interface ValorizacionResumen {
@@ -38,6 +42,7 @@ export interface ValorizacionResumen {
   difPositiva: number;
   checkDiff: number;
   isConsistent: boolean;
+  valorAjustes: number;
 }
 
 export interface ValorizacionRiesgos {
@@ -76,6 +81,7 @@ export function summarizeValorizacion(rows: ValorizacionRow[]): ValorizacionResu
   const checkDiff = (totalAMontar - totalInicial) - (difNegativa + difPositiva);
   return {
     refs: rows.length,
+    valorAjustes: rows.reduce((s, r) => s + (r.origen === 'ajuste_cierre' ? r.valor_a_montar : 0), 0),
     totalInicial,
     totalAMontar,
     difNegativa,
@@ -109,6 +115,7 @@ export function summarizeFromServer(
   const checkDiff = (totalAMontar - totalInicial) - (difNegativa + difPositiva);
   return {
     refs,
+    valorAjustes: rows.filter(r => (bodega === 'all' || r.bodega === bodega) && (familia === 'all' || r.familia === familia)).reduce((s, r) => s + (r.valor_ajustes_cierre ?? 0), 0),
     totalInicial,
     totalAMontar,
     difNegativa,
@@ -219,6 +226,7 @@ export function exportValorizacionExcel(
       Referencias: m.resumen.refs,
       'TOTAL INV INICIAL': m.resumen.totalInicial,
       'TOTAL INV A MONTAR': m.resumen.totalAMontar,
+      'VALOR AJUSTES DE CIERRE': m.resumen.valorAjustes,
       'COSTO DIF NEGATIVA': m.resumen.difNegativa,
       'COSTO DIF POSITIVA': m.resumen.difPositiva,
       'CONTROL CONSISTENCIA': m.resumen.checkDiff,
@@ -228,6 +236,7 @@ export function exportValorizacionExcel(
       Referencias: totalAlmacen.refs,
       'TOTAL INV INICIAL': totalAlmacen.totalInicial,
       'TOTAL INV A MONTAR': totalAlmacen.totalAMontar,
+      'VALOR AJUSTES DE CIERRE': totalAlmacen.valorAjustes,
       'COSTO DIF NEGATIVA': totalAlmacen.difNegativa,
       'COSTO DIF POSITIVA': totalAlmacen.difPositiva,
       'CONTROL CONSISTENCIA': totalAlmacen.checkDiff,
@@ -237,6 +246,7 @@ export function exportValorizacionExcel(
       Referencias: totalPlanta.refs,
       'TOTAL INV INICIAL': totalPlanta.totalInicial,
       'TOTAL INV A MONTAR': totalPlanta.totalAMontar,
+      'VALOR AJUSTES DE CIERRE': totalPlanta.valorAjustes,
       'COSTO DIF NEGATIVA': totalPlanta.difNegativa,
       'COSTO DIF POSITIVA': totalPlanta.difPositiva,
       'CONTROL CONSISTENCIA': totalPlanta.checkDiff,
@@ -246,6 +256,7 @@ export function exportValorizacionExcel(
       Referencias: totalGeneral.refs,
       'TOTAL INV INICIAL': totalGeneral.totalInicial,
       'TOTAL INV A MONTAR': totalGeneral.totalAMontar,
+      'VALOR AJUSTES DE CIERRE': totalGeneral.valorAjustes,
       'COSTO DIF NEGATIVA': totalGeneral.difNegativa,
       'COSTO DIF POSITIVA': totalGeneral.difPositiva,
       'CONTROL CONSISTENCIA': totalGeneral.checkDiff,
@@ -262,6 +273,9 @@ export function exportValorizacionExcel(
     sin_costo: r.sin_costo ? 'SI' : 'NO',
     cant_a_montar: r.cant_a_montar,
     cant_validada_inactivas: r.cant_validada_inactivas,
+    origen: r.origen ?? 'validado',
+    motivo_ajuste: r.motivo_ajuste ?? '',
+    soporte_ajuste: r.soporte_ajuste ?? '',
     estado: r.estado,
     num_ubicaciones: r.num_ubicaciones,
     valor_inicial: r.valor_inicial,

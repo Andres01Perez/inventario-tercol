@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useInventory } from '@/contexts/InventoryContext';
 import { groupLocationsByBodega } from '@/lib/groupLocations';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAjustesVigentes } from '@/hooks/useAjustesCierre';
 import { toast } from 'sonner';
 import {
   Search,
@@ -177,6 +178,17 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
   const [forceCloseReason, setForceCloseReason] = useState('');
   const [editingCounts, setEditingCounts] = useState<Record<string, { c1?: string; c2?: string; c3?: string; c4?: string; c5?: string }>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const ajustesQuery = useAjustesVigentes(inventoryId, isSuperadmin || role === 'visualizador');
+  const ajustes = ajustesQuery.data ?? [];
+  const [adjustmentWarning, setAdjustmentWarning] = useState<{ lote: string; resolve: (value: boolean) => void } | null>(null);
+  const confirmAdjustment = async (referencia: string): Promise<boolean> => {
+    if (!isSuperadmin) return true;
+    const latest = await ajustesQuery.refetch();
+    if (latest.error) { toast.error('No se pudo verificar si existe un ajuste vigente'); return false; }
+    const adjustment = latest.data?.find(a => a.referencia === referencia && a.bodega === bodega);
+    if (!adjustment) return true;
+    return new Promise(resolve => setAdjustmentWarning({ lote: adjustment.lote_id, resolve }));
+  };
 
 
   React.useEffect(() => {
@@ -586,6 +598,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
     if (!selectedReference || !user || !inventoryId) return;
     if (isReadOnly) { toast.error('Inventario histórico: solo lectura'); return; }
     if (!reopenReason.trim()) { toast.error('Debes ingresar un motivo'); return; }
+    if (!(await confirmAdjustment(selectedReference.referencia))) return;
     setIsSubmitting(true);
     try {
       const { error } = await supabase.rpc('reopen_reference', {
@@ -607,9 +620,10 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
     }
   };
 
-  const handleRevalidate = async (referencia: string) => {
+  const handleRevalidate = async (referencia: string, alreadyConfirmed = false) => {
     if (!user || !inventoryId) return;
     if (isReadOnly) { toast.error('Inventario histórico: solo lectura'); return; }
+    if (!alreadyConfirmed && !(await confirmAdjustment(referencia))) return;
     try {
       const { data: res, error } = await supabase.rpc('revalidate_reference', {
         _inventory_id: inventoryId,
@@ -637,6 +651,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
   const handleSaveEditedCounts = async () => {
     if (!selectedReference || !user) return;
     if (isReadOnly) { toast.error('Inventario histórico: solo lectura'); return; }
+    if (!(await confirmAdjustment(selectedReference.referencia))) return;
     setIsSubmitting(true);
     try {
       const locationIds = selectedReference.rows.map((r) => r.locationId);
@@ -696,7 +711,7 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
       // Revalidar la referencia con los conteos corregidos
       if (inventoryId) {
         if (isSuperadmin) {
-          await handleRevalidate(selectedReference.referencia);
+          await handleRevalidate(selectedReference.referencia, true);
         } else {
           const { error: revalError } = await supabase.rpc('validate_and_close_round', {
             _reference: selectedReference.referencia,
@@ -753,7 +768,9 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
       >
         <div className="w-[240px] min-w-[240px] px-3 font-medium flex items-center gap-2">
           {hasMultipleLocations && (isExpanded ? <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />)}
-          <span className="break-words whitespace-normal leading-tight">{group.referencia}</span>
+          <span className="min-w-0 break-words whitespace-normal leading-tight">{group.referencia}
+            {ajustes.some(a => a.referencia === group.referencia && a.bodega === bodega) && <Badge variant="outline" className="block w-fit mt-1 text-xs">Ajuste de cierre</Badge>}
+          </span>
           {hasMultipleLocations && <Badge variant="secondary" className="text-xs flex-shrink-0">{group.displayRows.length}</Badge>}
         </div>
         <div className="w-[50px] min-w-[50px] px-2" onClick={(e) => e.stopPropagation()}>
@@ -872,6 +889,11 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
 
   return (
     <div className="space-y-4">
+      <Dialog open={!!adjustmentWarning} onOpenChange={open => { if (!open) { adjustmentWarning?.resolve(false); setAdjustmentWarning(null); } }}>
+        <DialogContent><DialogHeader><DialogTitle>Ajuste de cierre vigente</DialogTitle><DialogDescription>Esta referencia tiene un ajuste de cierre (lote {adjustmentWarning?.lote}). La acción lo reemplazará.</DialogDescription></DialogHeader>
+          <DialogFooter><Button variant="outline" onClick={() => { adjustmentWarning?.resolve(false); setAdjustmentWarning(null); }}>Cancelar</Button><Button onClick={() => { adjustmentWarning?.resolve(true); setAdjustmentWarning(null); }}>Confirmar reemplazo</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Filtros */}
       <div className="flex flex-col lg:flex-row gap-4">
         <div className="relative flex-1">
@@ -1029,6 +1051,8 @@ const AuditoriaBodegaTable: React.FC<Props> = ({ bodega, materialType }) => {
                     {entry.bodega && <Badge variant="secondary">{entry.bodega}</Badge>}
                   </div>
                   {entry.reason && <p className="text-muted-foreground mb-2">{entry.reason}</p>}
+                  {entry.motivo && <p className="mb-2">Motivo: {entry.motivo}</p>}
+                  {entry.soporte && <p className="text-muted-foreground break-words mb-2">Soporte: {entry.soporte}</p>}
                   <pre className="text-xs whitespace-pre-wrap text-muted-foreground">{JSON.stringify(entry, null, 2)}</pre>
                 </div>
               ))
