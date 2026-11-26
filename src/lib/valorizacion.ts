@@ -17,6 +17,17 @@ export interface ValorizacionRow {
   valor_inicial: number;
   valor_a_montar: number;
   dif_valor: number;
+  cant_validada_inactivas: number;
+}
+
+export interface ValorizacionResumenRow {
+  familia: ValorizacionFamilia;
+  bodega: ValorizacionBodega;
+  referencias: number;
+  total_inv_inicial: number;
+  total_inv_a_montar: number;
+  costo_dif_negativa: number;
+  costo_dif_positiva: number;
 }
 
 export interface ValorizacionResumen {
@@ -34,6 +45,17 @@ export interface ValorizacionRiesgos {
   abiertasValorInicial: number;
   erpSinUbicRefs: number;
   descuadreSinCostoRefs: number;
+}
+
+export interface ValorizacionIntegrity {
+  loadedCount: number;
+  expectedCount: number;
+  detailDifSum: number;
+  serverNetDiff: number;
+  valueDiff: number;
+  countOk: boolean;
+  valueOk: boolean;
+  isOk: boolean;
 }
 
 const OPEN_STATUSES = new Set(['pendiente', 'conflicto', 'critico']);
@@ -61,6 +83,87 @@ export function summarizeValorizacion(rows: ValorizacionRow[]): ValorizacionResu
     checkDiff,
     isConsistent: Math.abs(checkDiff) < 0.01,
   };
+}
+
+export function summarizeFromServer(
+  rows: ValorizacionResumenRow[],
+  bodega: ValorizacionBodega | 'all' = 'all',
+  familia: ValorizacionFamilia | 'all' = 'all'
+): ValorizacionResumen {
+  let refs = 0;
+  let totalInicial = 0;
+  let totalAMontar = 0;
+  let difNegativa = 0;
+  let difPositiva = 0;
+
+  for (const r of rows) {
+    if (bodega !== 'all' && r.bodega !== bodega) continue;
+    if (familia !== 'all' && r.familia !== familia) continue;
+    refs += r.referencias;
+    totalInicial += r.total_inv_inicial;
+    totalAMontar += r.total_inv_a_montar;
+    difNegativa += r.costo_dif_negativa;
+    difPositiva += r.costo_dif_positiva;
+  }
+
+  const checkDiff = (totalAMontar - totalInicial) - (difNegativa + difPositiva);
+  return {
+    refs,
+    totalInicial,
+    totalAMontar,
+    difNegativa,
+    difPositiva,
+    checkDiff,
+    isConsistent: Math.abs(checkDiff) < 0.01,
+  };
+}
+
+export function buildMatrixFromServer(rows: ValorizacionResumenRow[]) {
+  const buckets: { label: string; bodega: ValorizacionBodega; familia: ValorizacionFamilia }[] = [
+    { label: 'Almacén · MP', bodega: 'almacen', familia: 'MP' },
+    { label: 'Almacén · PP', bodega: 'almacen', familia: 'PP' },
+    { label: 'Planta · MP', bodega: 'planta', familia: 'MP' },
+    { label: 'Planta · PP', bodega: 'planta', familia: 'PP' },
+  ];
+  return buckets.map((b) => ({
+    ...b,
+    resumen: summarizeFromServer(rows, b.bodega, b.familia),
+  }));
+}
+
+export function checkValorizacionIntegrity(
+  detailRows: ValorizacionRow[],
+  resumenRows: ValorizacionResumenRow[]
+): ValorizacionIntegrity {
+  const loadedCount = detailRows.length;
+  const expectedCount = resumenRows.reduce((s, r) => s + r.referencias, 0);
+  const detailDifSum = detailRows.reduce((s, r) => s + r.dif_valor, 0);
+  const serverNetDiff = resumenRows.reduce(
+    (s, r) => s + (r.total_inv_a_montar - r.total_inv_inicial),
+    0
+  );
+  const valueDiff = detailDifSum - serverNetDiff;
+  const countOk = loadedCount === expectedCount;
+  const valueOk = Math.abs(valueDiff) <= 1;
+  return {
+    loadedCount,
+    expectedCount,
+    detailDifSum,
+    serverNetDiff,
+    valueDiff,
+    countOk,
+    valueOk,
+    isOk: countOk && valueOk,
+  };
+}
+
+export function sortDetailForExport(rows: ValorizacionRow[]): ValorizacionRow[] {
+  return [...rows].sort(
+    (a, b) =>
+      a.familia.localeCompare(b.familia) ||
+      a.bodega.localeCompare(b.bodega) ||
+      a.referencia.localeCompare(b.referencia)
+  );
 }
 
 export function computeRisks(rows: ValorizacionRow[]): ValorizacionRiesgos {
@@ -100,11 +203,15 @@ export function buildMatrix(rows: ValorizacionRow[]) {
   }));
 }
 
-export function exportValorizacionExcel(rows: ValorizacionRow[], inventoryName: string) {
-  const matrix = buildMatrix(rows);
-  const totalAlmacen = summarizeValorizacion(rows.filter((r) => r.bodega === 'almacen'));
-  const totalPlanta = summarizeValorizacion(rows.filter((r) => r.bodega === 'planta'));
-  const totalGeneral = summarizeValorizacion(rows);
+export function exportValorizacionExcel(
+  rows: ValorizacionRow[],
+  resumenServerRows: ValorizacionResumenRow[],
+  inventoryName: string
+) {
+  const matrix = buildMatrixFromServer(resumenServerRows);
+  const totalAlmacen = summarizeFromServer(resumenServerRows, 'almacen', 'all');
+  const totalPlanta = summarizeFromServer(resumenServerRows, 'planta', 'all');
+  const totalGeneral = summarizeFromServer(resumenServerRows, 'all', 'all');
 
   const resumenRows = [
     ...matrix.map((m) => ({
@@ -145,7 +252,7 @@ export function exportValorizacionExcel(rows: ValorizacionRow[], inventoryName: 
     },
   ];
 
-  const detalleRows = rows.map((r) => ({
+  const detalleRows = sortDetailForExport(rows).map((r) => ({
     referencia: r.referencia,
     familia: r.familia,
     bodega: r.bodega === 'almacen' ? 'Almacén' : 'Planta',
@@ -154,6 +261,7 @@ export function exportValorizacionExcel(rows: ValorizacionRow[], inventoryName: 
     costo_u: r.costo_u,
     sin_costo: r.sin_costo ? 'SI' : 'NO',
     cant_a_montar: r.cant_a_montar,
+    cant_validada_inactivas: r.cant_validada_inactivas,
     estado: r.estado,
     num_ubicaciones: r.num_ubicaciones,
     valor_inicial: r.valor_inicial,

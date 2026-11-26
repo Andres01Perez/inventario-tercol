@@ -1,0 +1,1 @@
+ALTER FUNCTION public.valorizacion_resumen(uuid) SECURITY INVOKER;

@@ -1,12 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInventory } from '@/contexts/InventoryContext';
-import { useValorizacion } from '@/hooks/useValorizacion';
+import { useValorizacion, useValorizacionResumen } from '@/hooks/useValorizacion';
 import {
-  buildMatrix,
+  buildMatrixFromServer,
+  checkValorizacionIntegrity,
   computeRisks,
   exportValorizacionExcel,
-  summarizeValorizacion,
+  summarizeFromServer,
   ValorizacionBodega,
   ValorizacionFamilia,
 } from '@/lib/valorizacion';
@@ -26,6 +27,11 @@ const ValorizacionPanel: React.FC = () => {
   const navigate = useNavigate();
   const { inventoryId, inventory } = useInventory();
   const { data: rows = [], isLoading, error } = useValorizacion(inventoryId);
+  const {
+    data: resumenRows = [],
+    isLoading: isLoadingResumen,
+    error: errorResumen,
+  } = useValorizacionResumen(inventoryId);
 
   const [bodega, setBodega] = useState<BodegaFilter>('all');
   const [familia, setFamilia] = useState<FamiliaFilter>('all');
@@ -44,8 +50,15 @@ const ValorizacionPanel: React.FC = () => {
     [rows, bodega, familia]
   );
 
-  const resumen = useMemo(() => summarizeValorizacion(scopedRows), [scopedRows]);
-  const matrix = useMemo(() => buildMatrix(rows), [rows]);
+  const resumen = useMemo(
+    () => summarizeFromServer(resumenRows, bodega, familia),
+    [resumenRows, bodega, familia]
+  );
+  const matrix = useMemo(() => buildMatrixFromServer(resumenRows), [resumenRows]);
+  const integrity = useMemo(
+    () => checkValorizacionIntegrity(rows, resumenRows),
+    [rows, resumenRows]
+  );
   const risks = useMemo(() => computeRisks(scopedRows), [scopedRows]);
 
   const tableRows = useMemo(() => {
@@ -65,8 +78,9 @@ const ValorizacionPanel: React.FC = () => {
     );
   }, [scopedRows, search, estado, signo, sortAsc]);
 
-  if (isLoading) return <div className="glass-card p-6 text-sm text-muted-foreground">Calculando valorización...</div>;
-  if (error) return <div className="glass-card p-6 text-sm text-destructive">Error al cargar valorización: {(error as Error).message}</div>;
+  if (isLoading || isLoadingResumen) return <div className="glass-card p-6 text-sm text-muted-foreground">Calculando valorización...</div>;
+  const loadError = error || errorResumen;
+  if (loadError) return <div className="glass-card p-6 text-sm text-destructive">Error al cargar valorización: {(loadError as Error).message}</div>;
 
   return (
     <div className="space-y-4">
@@ -92,12 +106,34 @@ const ValorizacionPanel: React.FC = () => {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => exportValorizacionExcel(rows, inventory?.nombre ?? 'Inventario')}
-          disabled={rows.length === 0}
+          onClick={() => exportValorizacionExcel(rows, resumenRows, inventory?.nombre ?? 'Inventario')}
+          disabled={rows.length === 0 || !integrity.isOk}
         >
           <Download className="w-4 h-4 mr-2" />
           Exportar Excel
         </Button>
+      </div>
+
+      <div
+        className={`glass-card px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs ${
+          !integrity.isOk ? 'border-red-500/60 bg-red-500/10' : ''
+        }`}
+      >
+        <span className="font-medium">
+          Filas cargadas {integrity.loadedCount} de {integrity.expectedCount}
+        </span>
+        {integrity.isOk ? (
+          <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400 font-medium">
+            <CheckCircle2 className="w-4 h-4" /> Detalle y resumen completos
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-red-600 dark:text-red-400 font-medium">
+            <AlertTriangle className="w-4 h-4" />
+            {!integrity.countOk
+              ? `Faltan filas por cargar (${integrity.loadedCount} ≠ ${integrity.expectedCount}). Exportación deshabilitada.`
+              : `Descuadre entre detalle y resumen (${formatSignedMoney(integrity.valueDiff)}). Exportación deshabilitada.`}
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
