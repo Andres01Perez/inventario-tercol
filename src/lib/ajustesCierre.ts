@@ -99,3 +99,25 @@ export function exportAjustesBackup(rows: AjustePreview[], inventory: string) {
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(counts), 'Conteos originales');
   XLSX.writeFile(workbook, `Backup_antes_ajustes_${inventory.replace(/[^\w-]/g, '_')}_${new Date().toISOString().replace(/[:.]/g, '-')}.xlsx`);
 }
+
+export function exportAjustesLote(rows: Record<string, unknown>[], fileName: string) {
+  const workbook = XLSX.utils.book_new();
+  // Separate rows prevent exceeding Excel's 32,767-character cell limit on multi-location references.
+  const detail = rows.map(({ ubicaciones, snapshot_anterior, snapshot_posterior, ...row }) => row);
+  const locations: Record<string, unknown>[] = [];
+  for (const row of rows) {
+    if (!Array.isArray(row.ubicaciones)) continue;
+    for (const item of row.ubicaciones) {
+      locations.push({ referencia: row.referencia, bodega: row.bodega, location_id: item.location_id,
+        cantidad_nueva: item.cantidad_nueva, creada_por_ajuste: !!item.creada_por_ajuste,
+        cantidad_anterior: item.anterior?.validated?.validated_quantity ?? null,
+        ronda_anterior: item.anterior?.validated?.audit_round ?? null,
+        motivo_anterior: item.anterior?.validated?.reason ?? '',
+        validado_por_anterior: item.anterior?.validated?.validated_by ?? '',
+        ubicacion_anterior: JSON.stringify(item.anterior?.location ?? null) });
+    }
+  }
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(detail), 'Detalle');
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(locations), 'Ubicaciones');
+  XLSX.writeFile(workbook, fileName);
+}

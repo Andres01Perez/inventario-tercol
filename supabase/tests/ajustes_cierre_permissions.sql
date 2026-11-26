@@ -1,0 +1,3 @@
+DO $$ BEGIN
+ IF has_table_privilege('anon','public.ajustes_cierre','SELECT') OR has_table_privilege('authenticated','public.ajustes_cierre','INSERT') OR has_table_privilege('authenticated','public.ajustes_cierre','UPDATE') OR has_table_privilege('authenticated','public.ajustes_cierre','DELETE') OR has_table_privilege('anon','public.ajustes_cierre_lotes','SELECT') OR has_table_privilege('authenticated','public.ajustes_cierre_lotes','INSERT') OR has_table_privilege('authenticated','public.ajustes_cierre_lotes','UPDATE') OR has_table_privilege('authenticated','public.ajustes_cierre_lotes','DELETE') THEN RAISE EXCEPTION 'Unexpected direct privileges'; END IF;
+END $$;
