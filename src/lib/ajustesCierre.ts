@@ -84,7 +84,7 @@ export function downloadAjustesTemplate() {
 }
 export function exportAjustesBackup(rows: AjustePreview[], inventory: string) {
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows.map(r => ({ referencia: r.referencia, bodega: r.bodega, familia: r.familia, estado: r.estado_actual, cantidad_anterior: r.cantidad_anterior, cantidad_final: r.cantidad_final, revision: r.revision, motivo: r.motivo, soporte: r.soporte }))), 'Referencias');
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows.map(r => ({ referencia: r.referencia, bodega: r.bodega, familia: r.familia, estado: r.estado_actual, ronda_anterior: r.snapshot.ronda, cantidad_anterior: r.cantidad_anterior, cantidad_final: r.cantidad_final, revision: r.revision, motivo: r.motivo, soporte: r.soporte }))), 'Referencias');
   const locations: Record<string, unknown>[] = [];
   const counts: Record<string, unknown>[] = [];
   for (const row of rows) {

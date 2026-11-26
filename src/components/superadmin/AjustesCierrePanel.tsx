@@ -15,7 +15,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@
 import { Download, Upload, RotateCcw, Loader2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatQty, formatMoney, formatSignedMoney } from '@/lib/format';
-import { parseAjustesExcel, downloadAjustesTemplate, exportAjustesBackup, type AjusteInput, type AjustePreview } from '@/lib/ajustesCierre';
+import { parseAjustesExcel, downloadAjustesTemplate, exportAjustesBackup, type AjustePreview } from '@/lib/ajustesCierre';
 
 const asJson = (value: unknown): Json => JSON.parse(JSON.stringify(value));
 function exportWorkbook(rows: Record<string, unknown>[], name: string) {
@@ -24,6 +24,8 @@ function exportWorkbook(rows: Record<string, unknown>[], name: string) {
 export default function AjustesCierrePanel() {
   const { role } = useAuth(); const { inventoryId, inventory, isReadOnly } = useInventory();
   const cache = useQueryClient(); const input = useRef<HTMLInputElement>(null);
+  const currentInventory = useRef(inventoryId);
+  currentInventory.current = inventoryId;
   const [open, setOpen] = useState(false); const [rows, setRows] = useState<AjustePreview[]>([]);
   const [name, setName] = useState(''); const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false); const [error, setError] = useState('');
@@ -41,7 +43,7 @@ export default function AjustesCierrePanel() {
       }
     }
   });
-  const { data: adjustments = [] } = useQuery({ queryKey: ['ajustes-detalle-lotes', inventoryId], enabled: !!inventoryId,
+  const { data: adjustments = [], error: detailError, isLoading: loadingDetails } = useQuery({ queryKey: ['ajustes-detalle-lotes', inventoryId], enabled: !!inventoryId,
     queryFn: async () => {
       if (!inventoryId) return [];
       const all = [];
@@ -61,8 +63,9 @@ export default function AjustesCierrePanel() {
     try {
       const parsed = parseAjustesExcel(await file.arrayBuffer());
       const { data, error } = await supabase.rpc('previsualizar_ajustes_cierre', { _inventory_id: selectedInventory, _filas: asJson(parsed) });
-      if (error) throw error; setRows(data as unknown as AjustePreview[]);
-    } catch (e) { setError(e instanceof Error ? e.message : String((e as { message?: string }).message ?? e)); }
+      if (error) throw error;
+      if (currentInventory.current === selectedInventory) setRows(data as unknown as AjustePreview[]);
+    } catch (e) { if (currentInventory.current === selectedInventory) setError(e instanceof Error ? e.message : String((e as { message?: string }).message ?? e)); }
     finally { setBusy(false); }
   }
   async function apply() {
@@ -99,10 +102,11 @@ export default function AjustesCierrePanel() {
       {canWrite && <Button onClick={() => { setRows([]); setName(''); setConfirm(''); setError(''); setOpen(true); }}><Upload className="w-4 h-4 mr-2" />Importar ajustes de cierre</Button>}
     </div>
     {batchError && <p role="alert" className="text-destructive">{batchError.message}</p>}
+    {detailError && <p role="alert" className="text-destructive">{detailError.message}</p>}
     <div className="overflow-x-auto"><Table><TableHeader><TableRow>{['Fecha', 'Usuario', 'Archivo', 'Filas', 'Impacto $', 'Estado', 'Acciones'].map(h => <TableHead key={h}>{h}</TableHead>)}</TableRow></TableHeader><TableBody>
       {batches.map(b => <TableRow key={b.id}><TableCell className="whitespace-nowrap">{new Date(b.created_at).toLocaleString('es-CO')}</TableCell><TableCell>{profiles.find(p => p.id === b.creado_por)?.full_name ?? b.creado_por}</TableCell><TableCell className="break-all">{b.nombre_archivo}</TableCell><TableCell>{b.aplicadas} / {b.total_filas}</TableCell><TableCell className="whitespace-nowrap">{formatSignedMoney(adjustments.filter(a => a.lote_id === b.id).reduce((s, a) => s + Number(a.impacto_valor), 0))}</TableCell><TableCell><Badge variant="outline">{b.estado}</Badge></TableCell><TableCell><div className="flex gap-1">
         <Button variant="ghost" size="icon" aria-label="Ver lote" title="Ver lote" onClick={() => setSelected(b.id)}><Eye className="w-4 h-4" /></Button>
-        <Button variant="ghost" size="icon" aria-label="Exportar lote" title="Exportar lote" onClick={() => exportWorkbook(adjustments.filter(a => a.lote_id === b.id).map(a => ({ referencia: a.referencia, familia: a.material_type, bodega: a.bodega, cantidad_anterior: a.cantidad_anterior, cantidad_final: a.cantidad_final, costo_u: a.costo_u, impacto_valor: a.impacto_valor, motivo: a.motivo, soporte: a.soporte, observacion: a.observacion, usuario: b.creado_por, fecha: b.created_at, estado_lote: b.estado, ubicaciones: JSON.stringify(a.ubicaciones) })), `Ajustes_${b.id}.xlsx`)}><Download className="w-4 h-4" /></Button>
+        <Button variant="ghost" size="icon" aria-label="Exportar lote" title="Exportar lote" disabled={loadingDetails || !!detailError || adjustments.filter(a => a.lote_id === b.id).length !== b.aplicadas} onClick={() => exportWorkbook(adjustments.filter(a => a.lote_id === b.id).map(a => ({ referencia: a.referencia, familia: a.material_type, bodega: a.bodega, cantidad_anterior: a.cantidad_anterior, cantidad_final: a.cantidad_final, costo_u: a.costo_u, impacto_valor: a.impacto_valor, motivo: a.motivo, soporte: a.soporte, observacion: a.observacion, usuario: b.creado_por, fecha: b.created_at, estado_lote: b.estado, ubicaciones: JSON.stringify(a.ubicaciones) })), `Ajustes_${b.id}.xlsx`)}><Download className="w-4 h-4" /></Button>
         {canWrite && b.estado === 'aplicado' && <Button variant="ghost" size="icon" aria-label="Revertir lote" title="Revertir lote" onClick={() => { setRevert(b.id); setReason(''); }}><RotateCcw className="w-4 h-4" /></Button>}
       </div></TableCell></TableRow>)}
       {!batches.length && <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">{isLoading ? 'Cargando lotes…' : 'No hay lotes de ajustes'}</TableCell></TableRow>}
