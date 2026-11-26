@@ -980,6 +980,7 @@ export type Database = {
         Returns: {
           bodega: string
           cant_a_montar: number
+          cant_validada_inactivas: number
           control: string
           costo_u: number
           dif_valor: number
@@ -991,6 +992,18 @@ export type Database = {
           sin_costo: boolean
           valor_a_montar: number
           valor_inicial: number
+        }[]
+      }
+      valorizacion_resumen: {
+        Args: { _inventory_id: string }
+        Returns: {
+          bodega: string
+          costo_dif_negativa: number
+          costo_dif_positiva: number
+          familia: Database["public"]["Enums"]["material_type"]
+          referencias: number
+          total_inv_a_montar: number
+          total_inv_inicial: number
         }[]
       }
     }
