@@ -12,7 +12,8 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
-import { Download, Upload, RotateCcw, Loader2, Eye } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Download, Upload, RotateCcw, Loader2, Eye, Info, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatQty, formatMoney, formatSignedMoney } from '@/lib/format';
 import { parseAjustesExcel, downloadAjustesTemplate, exportAjustesBackup, exportAjustesLote, type AjustePreview } from '@/lib/ajustesCierre';
@@ -101,6 +102,31 @@ export default function AjustesCierrePanel() {
     <div className="flex flex-wrap justify-between items-center gap-3"><h2 className="text-lg font-semibold">Lotes de ajustes</h2>
       {canWrite && <Button onClick={() => { setRows([]); setName(''); setConfirm(''); setError(''); setOpen(true); }}><Upload className="w-4 h-4 mr-2" />Importar ajustes de cierre</Button>}
     </div>
+    {role === 'superadmin' && (
+      <Collapsible className="rounded-lg border bg-muted/40 px-4 py-3 text-sm">
+        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left font-medium text-foreground [&[data-state=open]>svg.chevron]:rotate-180">
+          <span className="flex items-center gap-2"><Info className="h-4 w-4 text-muted-foreground" />¿Qué es un lote de ajustes?</span>
+          <ChevronDown className="chevron h-4 w-4 text-muted-foreground transition-transform" />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-3 space-y-2 text-muted-foreground">
+          <p>Cada vez que se carga y aplica un Excel de ajustes de cierre, se crea un lote. El lote agrupa todas las referencias ajustadas en esa carga y guarda:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Quién lo aplicó, cuándo y con qué archivo.</li>
+            <li>Por cada referencia: cantidad antes y después, motivo y soporte.</li>
+            <li>Una foto de cómo estaba todo antes del ajuste, para poder deshacerlo.</li>
+          </ul>
+          <p><strong className="text-foreground">¿Qué hace el ajuste?</strong> Fija la cantidad final validada (A montar) de la referencia en su bodega. Los conteos C1–C4 no se borran ni se modifican.</p>
+          <div>
+            <p className="font-medium text-foreground">Acciones disponibles</p>
+            <ul className="list-disc pl-5 space-y-1 mt-1">
+              <li><strong className="text-foreground">Ver detalle / Exportar:</strong> revisar o descargar en Excel las referencias del lote.</li>
+              <li><strong className="text-foreground">Revertir:</strong> devuelve las referencias a como estaban antes del lote. Pide motivo y solo se permite si nadie modificó esas referencias después; así no se pierden cambios posteriores.</li>
+            </ul>
+          </div>
+          <p>Los ajustes aplicados se reflejan en Valorización (columna origen "Ajuste de cierre") y en Auditoría con una etiqueta de ajuste.</p>
+        </CollapsibleContent>
+      </Collapsible>
+    )}
     {batchError && <p role="alert" className="text-destructive">{batchError.message}</p>}
     {detailError && <p role="alert" className="text-destructive">{detailError.message}</p>}
     <div className="overflow-x-auto"><Table><TableHeader><TableRow>{['Fecha', 'Usuario', 'Archivo', 'Filas', 'Impacto $', 'Estado', 'Acciones'].map(h => <TableHead key={h}>{h}</TableHead>)}</TableRow></TableHeader><TableBody>
